@@ -17,6 +17,7 @@ child) and a memory rlimit. A crash, timeout, or memory kill is recorded in
 """
 import argparse
 import importlib
+import hashlib
 import json
 import subprocess
 import sys
@@ -287,12 +288,40 @@ def _git_sha():
         return "unknown"
 
 
+def _detector_fingerprint():
+    """Hash the detector source actually on disk.
+
+    git_sha alone is a TRAP: scoring usually happens BEFORE the change is
+    committed, so the recorded sha names the PREVIOUS commit while the numbers
+    come from uncommitted code. A reader -- human or agent -- reasonably
+    concludes the file is stale and distrusts it. One did.
+
+    This fingerprint identifies the code that actually produced the numbers, and
+    git_dirty says whether the sha can be trusted on its own.
+    """
+    h = hashlib.sha256()
+    for f in sorted((REPO_ROOT / "engine" / "detect").rglob("*.py")):
+        h.update(f.read_bytes())
+    return h.hexdigest()[:12]
+
+
+def _git_dirty():
+    try:
+        r = subprocess.run(["git", "status", "--porcelain", "engine", "eval"],
+                           cwd=str(REPO_ROOT), capture_output=True, text=True, timeout=5)
+        return bool(r.stdout.strip())
+    except Exception:
+        return None
+
+
 def score_corpus(pairs, out_path=None, *, holdout_pairs=None, adversarial_pairs=None,
                   timeout=DEFAULT_TIMEOUT_S, mem_limit_mb=DEFAULT_MEM_LIMIT_MB,
                   detect_spec=DEFAULT_DETECT_SPEC, git_sha=None) -> dict:
     holdout_pairs = holdout_pairs or []
     adversarial_pairs = adversarial_pairs or []
     git_sha = git_sha or _git_sha()
+    detector_fp = _detector_fingerprint()
+    git_dirty = _git_dirty()
     started_at = datetime.now(timezone.utc).isoformat()
 
     out_dir = Path(out_path) if out_path else None
@@ -379,6 +408,8 @@ def score_corpus(pairs, out_path=None, *, holdout_pairs=None, adversarial_pairs=
     output = {
         "version": 1,
         "git_sha": git_sha,
+        "git_dirty": git_dirty,
+        "detector_fingerprint": detector_fp,
         "started_at": started_at,
         "corpus": {
             "tuning": len(pairs), "holdout": len(holdout_pairs),

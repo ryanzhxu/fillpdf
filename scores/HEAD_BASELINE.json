@@ -5,8 +5,10 @@
     "holdout": 55,
     "tuning": 135
   },
+  "detector_fingerprint": "d20bb644b157",
   "failures": [],
-  "git_sha": "3c5a901aabe6741de5796d6d7230d67d26133f30",
+  "git_dirty": true,
+  "git_sha": "e4f15673f202d0a3b43b8b44103335279489b1d4",
   "guards": {
     "box_over_ink": 0.07048458149779736,
     "glyph_coverage": 1.0,
@@ -3341,6 +3343,6 @@
       "truth": 8407
     }
   },
-  "started_at": "2026-09-02T17:41:58.939801+00:00",
+  "started_at": "2026-09-02T18:02:12.987849+00:00",
   "version": 1
 }

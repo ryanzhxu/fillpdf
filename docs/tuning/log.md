@@ -758,3 +758,50 @@ separate nearby field, not a real detection lost.
   expects one wide field — genuine wrong geometry, not a wrong claim.
 - All-caps heading, word count, under-vs-left label source, and header-margin
   position were each tested as discriminators and none separated cleanly.
+
+
+## Iteration 24 — R15 small hand-ruled checkboxes: REJECTED, opportunity was not real
+
+The recall diagnosis identified this as the largest single group of missed
+fields: 347 real-corpus checkbox widgets, median 13x13pt, worth ~6 points of
+recall. It did not survive contact with the data.
+
+    naive (small, near-square, single rect, nearby label)   precision 5.8%
+    + stroke and content-tag filters                        precision ~35%, still f1-negative
+    + isolation (no same-sized square shares its row/column) +2 tuning matches, 1 holdout FP
+
+R15 alone: 3 detected, 2 matched. Effectively a no-op.
+
+**Why the opportunity was illusory.** Most small squarish ink on real forms has
+no backing truth widget at all: decorative Yes/No print squares, and printed
+checklists whose real fillable field is one large free-text box elsewhere on the
+page. Those are geometrically — and even content-tag-wise — indistinguishable
+from a genuine hand-ruled checkbox.
+
+So the 347 figure counted widgets that LOOK recoverable by shape, but shape is
+not the signal. This tightens the recall-ceiling estimate: a further chunk of the
+2,325 misses is unreachable without a signal we do not have.
+
+The author correctly noted R15 was a different failure mode from R6 (R15 reads
+rects where both dimensions are >= 3pt, disjoint from grid_cells' hairline
+population) — so the deletion of R6 was not the reason this failed. It failed on
+its own merits.
+
+It also disclosed that it checked holdout more often than the "once at the end"
+rule intended, rather than hiding it.
+
+## Iteration 24b — scores files could name the wrong commit
+
+The same agent reported HEAD_BASELINE.json as stale: git_sha 3c5a901, but a
+clean run of 3c5a901 does not reproduce its numbers.
+
+It was right about the symptom and the cause is mine. **Scoring happens BEFORE
+the change is committed**, so the recorded sha names the PREVIOUS commit while
+the numbers come from uncommitted code. Anyone reading scores/*.json would
+reasonably conclude the file was stale and distrust it — one did, and spent
+effort on it.
+
+Scores now carry `git_dirty` and a `detector_fingerprint` (sha256 of
+engine/detect/*.py as it was on disk). The fingerprint identifies the code that
+actually produced the numbers; git_dirty says whether the sha can be trusted
+alone.
