@@ -18,9 +18,15 @@ from pathlib import Path
 
 import pdfplumber
 
-from detect_rules import detect, slug
+
 
 HERE = Path(__file__).parent
+
+# The detector lives in engine/detect now. The demo deliberately calls the SAME
+# code the evaluation harness scores, so what you see is exactly what is
+# measured -- if they drifted apart the demo would stop being evidence.
+sys.path.insert(0, str(HERE.parent))
+from engine.detect import detect as detect_pdf  # noqa: E402
 OUT = HERE / "out"
 
 
@@ -31,30 +37,25 @@ def build(pdf_path: Path):
     shutil.copy(pdf_path, OUT / "source.pdf")
     shutil.copy(HERE / "index.html", OUT / "index.html")
 
-    fields, pages = [], []
     with pdfplumber.open(pdf_path) as pdf:
         if len(pdf.pages) > 30:
             sys.exit("demo caps at 30 pages")
-        for i, pg in enumerate(pdf.pages, 1):
-            pages.append({"page": i, "width": pg.width, "height": pg.height})
-            fields += detect(pg, i)
 
-    seen = {}
-    for f in fields:
-        base = f"p{f['page']}_" + (slug(f["label"]) if f["type"] == "text" else "chk")
-        seen[base] = seen.get(base, 0) + 1
-        f["id"] = base if seen[base] == 1 else f"{base}_{seen[base]}"
-        f["origin"] = "detected"
+    # One call into the same entry point the evaluation harness scores. The
+    # demo used to re-implement the per-page loop and the id assignment, which
+    # meant it could silently drift from what was being measured.
+    doc = detect_pdf(str(pdf_path))
+    fields, pages = doc["fields"], doc["pages"]
 
-    json.dump({"version": 1, "source": {"pages": len(pages)},
-               "pages": pages, "fields": fields},
-              open(OUT / "fields.json", "w"), indent=1)
+    json.dump(doc, open(OUT / "fields.json", "w"), indent=1)
 
-    by_rule = collections.Counter(f["rule"] for f in fields)
+    by_rule = collections.Counter(f.get("rule", "?") for f in fields)
     n_txt = sum(1 for f in fields if f["type"] == "text")
+    n_lab = sum(1 for f in fields if f.get("label", "").strip())
     print(f"detected {len(fields)} fields  ({n_txt} text, {len(fields)-n_txt} checkbox) "
           f"across {len(pages)} pages")
     print("  by rule: " + "  ".join(f"{k}={by_rule[k]}" for k in sorted(by_rule)))
+    print(f"  labelled: {n_lab}/{len(fields)}")
     return len(fields)
 
 
