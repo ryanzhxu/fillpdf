@@ -12,9 +12,12 @@ nested sub-table inside a cell, a caption governing a GROUP of separate
 blank strips rather than one, a rotated caption sitting outside a box's
 own border in an unbordered margin gutter, a continuation table whose
 columns reflow to different widths across the page break, a blank ruled
-column separating a row's label from its own entry box, and a field whose
+column separating a row's label from its own entry box, a field whose
 only cue is the blank space after a printed label -- no rule, box, or dot
-of any kind.
+of any kind, a checkbox drawn as literal ASCII "[ ]" text instead of a
+glyph or a drawn shape, and an underscore write-on line only a few
+characters wide -- short enough to fall under the detector's own
+minimum-run-width floor.
 
 Every truth widget still corresponds to something a human would obviously
 read as "write here": a bordered blank cell, a blank cell under a printed
@@ -1165,6 +1168,99 @@ def sec_gutter_left_label(c, rng, x0, x1, y_top, avail, style):
     return y_top - row_h, [widget]
 
 
+def sec_bracket_checkbox(c, rng, x0, x1, y_top, avail, style):
+    """A checkbox drawn as a literal ASCII bracket pair "[ ]" immediately
+    followed by its option text -- "[ ] Yes   [ ] No" -- the standard
+    plain-text/typewriter checkbox convention used wherever no special
+    box-drawing glyph or vector graphic is available. R1 only fires on the
+    two specific Webdings/Wingdings checkbox glyph codepoints in
+    CHECK_GLYPHS; "[" and "]" are ordinary ASCII characters and are not
+    members of that set. No rect is drawn at all -- this is plain text, the
+    same three characters a "the" or a "and" is made of -- so no cell-
+    walking rule (R2/R3/R4/R10/R12/R14/R16/R17) can reach it either, even
+    though a person reads the bracket pair as a checkbox exactly as readily
+    as a glyph or a drawn square.
+
+    Real form family: plain-text and typewriter-style intake forms, faxed
+    checklists, and forms transcribed to accessible plain text for screen
+    readers, all of which render "[ ] Option" as their checkbox in place of
+    a special glyph or a drawn box.
+    """
+    row_h = 22.0
+    if avail < row_h:
+        return None
+    q = rng.choice(QUESTION_POOL)
+    size_txt = 10
+    baseline = y_top - 14
+    c.setFont(style.body_font, size_txt)
+    c.drawString(x0, baseline, q)
+    cursor_x = x0 + stringWidth(q, style.body_font, size_txt) + 18
+    widgets = []
+    for opt in ("Yes", "No"):
+        if cursor_x > x1 - 60:
+            break
+        box_txt = "[ ]"
+        c.setFont(style.body_font, size_txt)
+        c.drawString(cursor_x, baseline, box_txt)
+        box_w = stringWidth(box_txt, style.body_font, size_txt)
+        gx0, gx1 = cursor_x, cursor_x + box_w
+        if gx1 - gx0 < 15.5:
+            pad = (15.5 - (gx1 - gx0)) / 2
+            gx0, gx1 = gx0 - pad, gx1 + pad
+        rect = [gx0, baseline - 2.05, gx1, baseline + 7.95]
+        widgets.append({"type": "checkbox", "label": f"{q} ({opt})", "rect": rect})
+        cursor_x += box_w + 6
+        c.setFont(style.body_font, size_txt)
+        c.drawString(cursor_x, baseline, opt)
+        cursor_x += stringWidth(opt, style.body_font, size_txt) + 16
+    return baseline - 10, widgets
+
+
+SHORT_FIELD_LABELS = ["Middle Initial", "Suffix", "Apartment Number", "Unit"]
+
+
+def sec_short_underscore_field(c, rng, x0, x1, y_top, avail, style):
+    """A write-on line only 4 underscore characters wide -- enough for a
+    single letter, a check digit, or a short suffix, as real forms draw for
+    "M.I. ____" (middle initial), an apartment/unit letter, or a name
+    suffix. R5's own underscore-run scan requires the drawn run's total
+    width to be at least 25pt (a guard against catching decorative
+    underscore use, e.g. mid-sentence emphasis in a running-text false-
+    positive it was built to reject); a genuine one-character field draws a
+    run of about 20-22pt and is silently skipped by that same floor, even
+    though a person reads the short blank after the label exactly as
+    obviously as a longer line.
+
+    Real form family: "Middle Initial" and suffix fields on government ID,
+    tax, and voter-registration forms, almost always drawn as a single
+    short underscore blank rather than a full-width line.
+    """
+    row_h = 24.0
+    if avail < row_h:
+        return None
+    size = 10
+    label = rng.choice(SHORT_FIELD_LABELS)
+    baseline = y_top - 14
+    c.setFont(style.body_font, size)
+    prefix = f"{label}: "
+    c.drawString(x0, baseline, prefix)
+    pw = stringWidth(prefix, style.body_font, size)
+    line_x0 = x0 + pw
+    if line_x0 + 25 > x1:
+        return None
+    underscores = "____"   # 4 chars: well under R5's own 25pt run-width floor
+    uw = stringWidth(underscores, style.body_font, size)
+    if uw >= 24:
+        return None
+    c.drawString(line_x0, baseline, underscores)
+    line_x1 = line_x0 + uw
+    if line_x1 - line_x0 - 2 < 15.5:
+        return baseline - 10, []
+    widget = {"type": "text", "label": label,
+              "rect": [line_x0 + 1, baseline, line_x1 - 1, baseline + 12]}
+    return baseline - 10, [widget]
+
+
 def sec_whitespace_field(c, rng, x0, x1, y_top, avail, style):
     """A label followed by nothing but printed blank space -- no underscore
     run, no dot leader, no ruled line, no box of any kind -- before either
@@ -1242,6 +1338,7 @@ HARD_FUNCS = [
     sec_label_below, sec_shaded_field, sec_circle_checkbox, sec_comb_field,
     sec_group_caption, sec_margin_caption,
     sec_gutter_left_label, sec_whitespace_field,
+    sec_bracket_checkbox, sec_short_underscore_field,
 ]
 # A modest boost for the sources that measure as the current blind spots:
 # the four constructs (label below its box, an unruled shaded entry area, a
@@ -1293,20 +1390,37 @@ HARD_FUNCS = [
 # recall 5.8% -> 90.8%), the same way dotted_line/ragged_table/
 # merged_header_table/sec_label_below were solved before it. Its boost is
 # removed here for the same reason theirs was removed above -- kept in
-# HARD_FUNCS at base weight for page variety, no longer boosted. Only
-# sec_whitespace_field, still unsolved, keeps the boost.
+# HARD_FUNCS at base weight for page variety, no longer boosted.
+#
+# Two new constructs added this round, both measured (see
+# eval/synth/test_hard.py's isolation harness / docs/tuning/log.md) at
+# well under 10% isolated recall, so both keep the boost alongside
+# sec_whitespace_field:
+#
+# sec_bracket_checkbox -- a checkbox drawn as the literal ASCII text
+# "[ ]" instead of a glyph or a drawn shape. R1 only matches the two
+# specific Webdings/Wingdings codepoints; "[" and "]" are ordinary text
+# characters and draw no rect at all, so no cell-walking rule reaches it
+# either. Isolated recall 5.0%.
+#
+# sec_short_underscore_field -- an underscore write-on line only 4
+# characters wide (~20-22pt), as real forms draw for a "Middle Initial"
+# or suffix blank. R5's own underscore-run scan requires a run at least
+# 25pt wide; a genuine single-character field falls under that floor.
+# Isolated recall 8.4%.
 EXTRA_WEIGHT = ([sec_label_below] * 12 + [sec_shaded_field] * 12
                 + [sec_circle_checkbox] * 12 + [sec_comb_field] * 12
                 + [sec_wrapped_label] * 10 + [sec_nested_table] * 10
                 + [sec_bilingual_grid] * 10
                 + [sec_group_caption] * 22 + [sec_margin_caption] * 22
-                + [sec_whitespace_field] * 22)
+                + [sec_whitespace_field] * 22
+                + [sec_bracket_checkbox] * 22 + [sec_short_underscore_field] * 22)
 LEGIT_FUNCS = [sec_legit_grid, sec_legit_checkbox, sec_legit_line]
 
 # How many of the 40-ish placement attempts a column gets, and how many
 # distinct hard constructs are even eligible in one form, together decide
 # how "presence" (does this form contain the feature at all?) behaves. With
-# every one of the ~18 hard functions offered on every attempt across up to
+# every one of the ~20 hard functions offered on every attempt across up to
 # 3 pages, nearly all of them get drawn at least once per form purely from
 # volume -- measured, this saturated every feature above 70% of forms, no
 # matter how the weights were balanced (weight only shapes how often an
@@ -1318,7 +1432,7 @@ LEGIT_FUNCS = [sec_legit_grid, sec_legit_checkbox, sec_legit_line]
 # form's subset cannot appear in it at all, so a feature's share of the
 # 25-form corpus is controlled directly by ACTIVE_FRACTION rather than by
 # how many draws a column happens to make.
-ACTIVE_MIN, ACTIVE_MAX = 8, 11   # of 18 HARD_FUNCS made eligible per form
+ACTIVE_MIN, ACTIVE_MAX = 9, 12   # of 20 HARD_FUNCS made eligible per form
 
 
 def _active_pool(rng):
