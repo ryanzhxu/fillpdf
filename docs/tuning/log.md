@@ -12,6 +12,8 @@ precision, and the label-free guards. The holdout is never tuned against.
 | 4 | R3 refuses office-use columns | 0.5304 -> 0.5558 (P +.105) | unchanged | **MERGED** |
 | 5 | R10 reads the label from the cell to the left | 0.5558 -> 0.5662 (+.0103) | 0.1810 -> 0.1802 (-.0008) | **MERGED, flagged** |
 | 6 | R3 clusters ragged columns (tol 16pt) | 0.5662 -> 0.6277 (+.0616) | 0.1802 -> 0.1919 (+.0116) | **MERGED** |
+| 7 | R11 reads dot-leader write-on lines | 0.5387 -> 0.5546 (+.0159) | unchanged | **MERGED** |
+| 7b | exempt dot leaders from the ink guard | 0.5546 -> 0.5541 (-.0005) | -.0002 | **REJECTED** |
 
 ## Iteration 1 — MERGED
 
@@ -241,3 +243,34 @@ itself is an ordinary bordered cell, so it is a fair test.
 New baseline on the harder corpus: tuning f1 0.5387, label_accuracy 0.7984
 (down from 0.9857 — the new difficulty exposes naming failures the old corpus
 could not reach). Holdout unchanged at 0.1919, being real forms.
+
+
+## Iteration 7 — MERGED
+
+Nothing read the dot-leader write-on line ("Name . . . . . ." / "Amount ......"),
+a common real convention. Recall on it was 0.000. R11 adds it: 67 detected, 67
+matched, label accuracy 0.955.
+
+Both traps were handled explicitly. A prose ellipsis is excluded by a minimum
+dot COUNT of 6, not width alone — a large enough font clears R5's 25pt with
+three dots. A dotted table divider is excluded by being flush against a cell
+rule, and by carrying no label on its baseline.
+
+**Honest limitation:** all 67 detections fired inside synthetic fixtures. R11
+never fires on a real form in this corpus, and the dot-leader mechanism was
+itself added to that corpus one batch earlier — close to a closed loop. Dot
+leaders are a genuine convention so the rule is worth having, but its evidence
+is weaker than its numbers suggest.
+
+## Iteration 7b — REJECTED, and instructive
+
+R11's boxes sit ON the dots by design, and the ink guard counted those dots as
+ink, pushing box_over_ink up 0.026. Underscores are already exempt for exactly
+that reason, so exempting dot leaders looked obviously correct.
+
+It was not. Precision fell 0.8410 -> 0.8386, f1 fell, and box_over_ink went UP
+rather than down. The reason: R9 uses the same exemption set to decide what to
+reject, so exempting dots stopped R9 killing boxes it was correctly killing —
+including on the real fee-schedule page R11 had proposed and R9 had caught.
+
+A plausible symmetry argument lost to the measurement. Reverted.
