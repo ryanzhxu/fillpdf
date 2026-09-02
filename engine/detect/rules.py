@@ -34,6 +34,95 @@ OFFICE_USE = re.compile(
 INK_EXEMPT = CHECK_GLYPHS | {"_", " ", "\xa0", ""}
 INK_REJECT_AT = 0.25
 
+# Label-building gutter guard, shared by every rule that reads a label off
+# words sitting near a field rather than strictly inside one bounded cell
+# (R2, R3, R5, R5b, R10). Measured on the real corpus (see
+# eval/guards.py's label_plausibility "internal_gap" signal, which is what
+# surfaced this): each of these rules collects every word within a fixed
+# reach or count along a baseline, with no notion of when it has crossed
+# the physical gap BETWEEN two column headers -- "Name*: Last Name*:" is
+# two adjacent column headers glued together this way, not one label.
+# LABEL_GAP_MULTIPLIER/FLOOR/CEIL mirror eval/guards.py's own constants of
+# the same name exactly, so a label this detector builds and the guard that
+# checks it agree on what "too wide" means.
+LABEL_GAP_MULTIPLIER = 3.0   # normal-gap multiplier for the cut threshold
+LABEL_GAP_FLOOR = 10.0       # points; never more sensitive than this
+LABEL_GAP_CEIL = 30.0        # points; never less sensitive than this
+LABEL_LINE_TOL = 2.5         # points; same-line clustering tolerance
+
+
+def _page_gap_threshold(words):
+    """The page's own typical inter-word gap, turned into a cut threshold.
+
+    Real forms vary in font size and word spacing, so a fixed threshold
+    either misses cramped forms or fires on loosely-set ones -- this scales
+    with the page's own median gap between words on the same line, floored
+    and ceilinged so a page with almost no prose still gets a sane value.
+    """
+    lines = []
+    for w in sorted(words, key=lambda w: w["top"]):
+        for ln in lines:
+            if abs(ln["top"] - w["top"]) <= LABEL_LINE_TOL:
+                ln["words"].append(w)
+                break
+        else:
+            lines.append({"top": w["top"], "words": [w]})
+    gaps = []
+    for ln in lines:
+        ws = sorted(ln["words"], key=lambda w: w["x0"])
+        for a, b in zip(ws, ws[1:]):
+            g = b["x0"] - a["x1"]
+            if g > 0.1:
+                gaps.append(g)
+    gaps.sort()
+    n = len(gaps)
+    if n == 0:
+        med = 3.0
+    else:
+        mid = n // 2
+        med = gaps[mid] if n % 2 else (gaps[mid - 1] + gaps[mid]) / 2.0
+    return min(max(med * LABEL_GAP_MULTIPLIER, LABEL_GAP_FLOOR), LABEL_GAP_CEIL)
+
+
+def _cut_at_gutter(words, gap_threshold, keep):
+    """Trim a left-to-right (ascending x0) word list at the first gap wider
+    than `gap_threshold`, keeping only the run adjacent to the field.
+
+    `keep="first"` is for a label whose field starts at the label's own
+    left edge (R2/R3's header band, R5b's below-the-line caption) -- the
+    leftmost run is the one aligned with where the field begins.
+    `keep="last"` is for a label read backward from the field it
+    introduces (R5's write-on line, R5b's left-of-line caption, R10's
+    left-neighbour cell) -- the run nearest the entry, at the right end,
+    wins.
+    """
+    # A run consisting only of mask characters ("$", "#", "(", ")", "-")
+    # names nothing on its own -- measured on the real corpus, "Amount of
+    # rent increase: $" would otherwise cut to the bare "$" the moment a
+    # currency symbol's own wider-than-word spacing crossed gap_threshold,
+    # losing the actual label. So the cut does not stop at the first wide
+    # gap until the run it has kept so far contains at least one letter;
+    # once it does, a later wide gap still stops it exactly as before.
+    def has_letter(ws):
+        return any(HAS_LETTER.search(w["text"]) for w in ws)
+
+    if not words:
+        return words
+    if keep == "last":
+        rev = list(reversed(words))
+        out = [rev[0]]
+        for w in rev[1:]:
+            if out[0]["x0"] - w["x1"] > gap_threshold and has_letter(out):
+                break
+            out.insert(0, w)
+        return out
+    out = [words[0]]
+    for w in words[1:]:
+        if w["x0"] - out[-1]["x1"] > gap_threshold and has_letter(out):
+            break
+        out.append(w)
+    return out
+
 
 def slug(s, n=40):
     return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_")[:n] or "field"
@@ -1084,6 +1173,7 @@ def detect(page, pno, carry_in=None):
     H, W = page.height, page.width
     words = page.extract_words()
     out = []
+    gap_threshold = _page_gap_threshold(words)
 
     # ---- R1  checkbox glyphs ------------------------------------------------
     for c in page.chars:
@@ -1110,13 +1200,26 @@ def detect(page, pno, carry_in=None):
         header = [w for w in inside if w["top"] < first + 6]
         if [w for w in inside if w["top"] >= first + 6]:
             continue
-        label = " ".join(w["text"] for w in sorted(header, key=lambda w: w["x0"]))
+        header_sorted = sorted(header, key=lambda w: w["x0"])
+        # Guards below run on `org_label` -- the FULL pre-cut header text --
+        # not the gutter-cut `label` that actually gets stored. A wide,
+        # colon-ending, over-length or signature-mentioning header is a
+        # signal about the CELL (it is a section title / office-only block
+        # / signature line, not a field), and that signal lives in the full
+        # text the cell prints, even once the emitted label is narrowed to
+        # the word(s) nearest the field. Checking the cut version instead
+        # would let exactly the run-on cells these guards exist for slip
+        # back in, just because trimming happened to remove the tell.
+        org_label = " ".join(w["text"] for w in header_sorted)
+        label = " ".join(w["text"] for w in _cut_at_gutter(header_sorted, gap_threshold, "first"))
         entry_top = max(w["bottom"] for w in header) + 1
-        if bot - entry_top < 11 or not (2 <= len(label) <= 60):
+        if bot - entry_top < 11 or not (2 <= len(org_label) <= 60):
             continue
         if not HAS_LETTER.search(label):                          # see HAS_LETTER above
             continue
-        if label.endswith(":") and (x1 - x0) > W * 0.8:           # R7
+        if SIGNATURE.search(org_label):
+            continue
+        if org_label.endswith(":") and (x1 - x0) > W * 0.8:       # R7
             continue
         ext_x1, absorbed = _extend_row_span(cell, cells, claimed, words, vrules)
         claimed.add(cell)
@@ -1536,10 +1639,19 @@ def detect(page, pno, carry_in=None):
         lines = {}
         for w in linside:
             lines.setdefault(round(w["top"] / 3), []).append(w)
-        label = " ".join(" ".join(w["text"] for w in sorted(ws, key=lambda w: w["x0"]))
-                          for _, ws in sorted(lines.items()))
-        if not (1 <= len(label) <= 60) or (x1 - x0) < 25:
+        sorted_lines = [sorted(ws, key=lambda w: w["x0"]) for _, ws in sorted(lines.items())]
+        # org_label is the FULL pre-cut left-cell text; the length and
+        # SIGNATURE guards below run on it for the same reason as R2's own
+        # org_label/label split -- a length or signature tell can live in
+        # words the per-line gutter-cut discards.
+        org_label = " ".join(" ".join(w["text"] for w in ws) for ws in sorted_lines)
+        if not (1 <= len(org_label) <= 60) or (x1 - x0) < 25:
             continue
+        if SIGNATURE.search(org_label):
+            continue
+        label = " ".join(
+            " ".join(w["text"] for w in _cut_at_gutter(ws, gap_threshold, "last"))
+            for ws in sorted_lines)
         if label[0].islower() or label.strip().lower() in ("yes", "no"):
             continue          # a sentence fragment split across cells, or an option marker
         claimed.add(cell)
@@ -1582,7 +1694,17 @@ def detect(page, pno, carry_in=None):
         base, top = run[0]["bottom"], run[0]["top"]
         before = [w for w in words
                   if abs(w["bottom"] - base) < 6 and w["x1"] <= x0 + 2 and w["x1"] > x0 - 240]
-        label = " ".join(w["text"] for w in sorted(before, key=lambda w: w["x0"])[-6:]) or "line"
+        before_sorted = sorted(before, key=lambda w: w["x0"])
+        # Unlike R2/R10's cell-bounded org_label, `before` is a fixed 240pt
+        # reach across the whole page -- it can cross MORE than one gutter
+        # (measured: safer.pdf's "Landlord Signature" caption sits within
+        # reach of the unrelated "Landlord Phone #" line two columns over).
+        # Checking SIGNATURE against that unbounded text would reject the
+        # Phone # field for a word naming a different one; the global
+        # end-of-detect SIGNATURE filter (on the cut, final label) is the
+        # right scope here, same as before this change.
+        before_cut = _cut_at_gutter(before_sorted, gap_threshold, "last")
+        label = " ".join(w["text"] for w in before_cut[-6:]) or "line"
         out.append({"page": pno, "type": "text", "label": label[:60], "rule": "R5",
                     "confidence": 0.65,
                     "rect": [x0 + 1, H - base + 1, x1 - 1, H - top + 11]})
@@ -1639,11 +1761,30 @@ def detect(page, pno, carry_in=None):
                 and w["x1"] <= r["x0"] + 3 and w["x1"] > r["x0"] - 260]
         under = [w for w in words if 0 < w["top"] - r["top"] < 14
                  and w["x1"] > r["x0"] - 2 and w["x0"] < r["x1"] + 2]
-        src = sorted(left, key=lambda w: w["x0"])[-7:] or sorted(under, key=lambda w: w["x0"])
+        left_sorted = sorted(left, key=lambda w: w["x0"])
+        under_sorted = sorted(under, key=lambda w: w["x0"])
+        # org_label mirrors R2's own org_label/label split for OFFICE_USE:
+        # "For Office Use Only: Approved by:" governs the whole row it
+        # introduces, so the office-only tell must be checked on the FULL
+        # pre-cut text even once the emitted label is narrowed to "Date:".
+        # SIGNATURE is deliberately NOT checked against org_label here: this
+        # is a fixed 260pt reach across the whole page, not a bounded cell
+        # (unlike R2/R10), so it can cross MORE than one gutter -- measured,
+        # safer.pdf's unrelated "Landlord Signature" caption sits within
+        # reach of the "Landlord Phone #" line two columns over, and
+        # org_label would wrongly rule out that field for a word naming a
+        # different one. The global end-of-detect SIGNATURE filter (on the
+        # cut, final label) is the right scope, same as before this change.
+        if left_sorted:
+            org_label = " ".join(w["text"] for w in left_sorted)
+            src = _cut_at_gutter(left_sorted, gap_threshold, "last")[-7:]
+        else:
+            org_label = " ".join(w["text"] for w in under_sorted)
+            src = _cut_at_gutter(under_sorted, gap_threshold, "first")
         label = " ".join(w["text"] for w in src).strip()
         if not label:                      # unlabelled rules are decorative
             continue
-        if OFFICE_USE.search(label):       # office-only block -- not for the applicant
+        if OFFICE_USE.search(org_label):   # office-only block -- not for the applicant
             continue
         out.append({"page": pno, "type": "text", "label": label[:60], "rule": "R5b",
                     "confidence": 0.6,

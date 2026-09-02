@@ -201,17 +201,36 @@ class TestLabelPlausibility(unittest.TestCase):
         report = label_plausibility(PDF, fields)
         self.assertLess(report["fraction"], 0.30, report["offenders"])
 
-    def test_finds_the_real_cross_column_header_merge_bug(self):
-        """The live detector currently merges two separate column headers
-        ("Landlord Phone #" and "Date:") across a real ~91pt column gap on
-        safer.pdf page 7 into one label. This is a genuine existing defect
-        this guard is meant to surface -- not injected, not fixed here (the
-        detector is out of scope for this change)."""
-        fields = detect(PDF)["fields"]
-        report = label_plausibility(PDF, fields)
+    def test_finds_a_cross_column_header_merge(self):
+        """Two separate column headers on safer.pdf page 7 -- "Landlord
+        Phone #" and "Date:" -- sit either side of a real column gutter.
+        A label that swallows both is a merge, and the guard must say so
+        via internal_gap.
+
+        The field here is handmade rather than taken from detect(). The
+        detector used to produce exactly this merged label and no longer
+        does (fixed by the gutter cut in R2/R5/R5b/R10); pinning the test
+        to the detector's output made it a test of the defect instead of
+        a test of the guard, so it failed the moment the defect was
+        fixed. The guard is what this file is for.
+        """
+        merged = [{
+            "id": "hand_merge", "page": 7, "type": "text",
+            "rect": [364.79, 143.46, 451.13, 157.46],
+            "label": "Landlord Phone # Date:", "rule": "R5b",
+        }]
+        report = label_plausibility(PDF, merged)
         offenders_by_label = {o["label"]: o["reasons"] for o in report["offenders"]}
         self.assertIn("Landlord Phone # Date:", offenders_by_label)
         self.assertIn("internal_gap", offenders_by_label["Landlord Phone # Date:"])
+
+    def test_live_detector_no_longer_merges_that_header(self):
+        """The regression the cut fixed: the two headers must come back as
+        two separately-named fields, never one merged label."""
+        labels = [f.get("label") for f in detect(PDF)["fields"] if f.get("page") == 7]
+        self.assertNotIn("Landlord Phone # Date:", labels)
+        self.assertIn("Landlord Phone #", labels)
+        self.assertIn("Date:", labels)
 
     def test_duplication_is_measured_not_judged(self):
         """A label repeated across several boxes on one page (here:
