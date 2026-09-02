@@ -641,6 +641,149 @@ def sec_nested_table(c, rng, x0, x1, y_top, avail, style):
     return oy_bot, widgets
 
 
+def sec_label_below(c, rng, x0, x1, y_top, avail, style):
+    """A bordered cell whose caption sits BELOW the blank writing area
+    instead of above it -- a blank line captioned 'Print Name' or 'Date'
+    along its own bottom edge, the way a signature block is laid out (minus
+    the word 'signature', which the detector's own SIGNATURE guard drops
+    outright). R2 and R12 both expect a label confined to the cell's TOP
+    band with the blank space following it down to the cell's bottom edge;
+    here the caption sits flush against the bottom border, so the space
+    R2/R12 look for below the label is a sliver or nothing, and both
+    reject -- even though the blank area above the caption is exactly as
+    obvious to a person as one printed above would be."""
+    row_h = rng.uniform(30, 46)
+    if row_h > avail:
+        return None
+    label = rng.choice(LABEL_POOL)
+    cell_w = min(rng.uniform(140, 220), x1 - x0)
+    cx0, cx1 = x0, x0 + cell_w
+    cy_top, cy_bot = y_top, y_top - row_h
+    _hrect(c, cx0, cx1, cy_top)
+    _hrect(c, cx0, cx1, cy_bot)
+    _vrect(c, cx0, cy_bot, cy_top)
+    _vrect(c, cx1, cy_bot, cy_top)
+    size = 8
+    c.setFont(style.body_font, size)
+    baseline = cy_bot + 3
+    c.drawString(cx0 + 3, baseline, label)
+    entry_bot = baseline + size + 2
+    if cy_top - 2 - entry_bot < 8 or cell_w - 4 < 15.5:
+        return None
+    widget = {"type": "text", "label": label,
+              "rect": [cx0 + 2, entry_bot, cx1 - 2, cy_top - 2]}
+    return cy_bot, [widget]
+
+
+def sec_shaded_field(c, rng, x0, x1, y_top, avail, style):
+    """A writing area that is a plain shaded rectangle with no ruled border
+    at all -- fill only, no stroke, under a normal printed caption. A
+    common look on forms designed to photocopy or fax cleanly, where a
+    ruled box would reproduce as a smudge. grid_cells() only ever treats a
+    rect as part of a table when it is THIN: height < 3 for a horizontal
+    ruling line, width < 3 for a vertical one. A filled box with real
+    height and width satisfies neither test, so it never becomes a cell
+    and no cell-walking rule (R2, R3, R4, R6, R10, R12) can reach it --
+    even though the tinted rectangle is genuinely drawn on the page and a
+    person sees exactly where to write."""
+    row_h = rng.uniform(20, 26)
+    label_h = 12
+    if row_h + label_h > avail:
+        return None
+    label = rng.choice(LABEL_POOL)
+    cell_w = min(rng.uniform(120, 200), x1 - x0)
+    size = 9
+    c.setFont(style.body_font, size)
+    label_baseline = y_top - size
+    c.drawString(x0, label_baseline, label)
+    box_top = label_baseline - 4
+    box_bot = box_top - row_h
+    if row_h - 4 < 8 or cell_w - 4 < 15.5:
+        return None
+    c.setFillColorRGB(0.85, 0.85, 0.85)
+    c.rect(x0, box_bot, cell_w, row_h, stroke=0, fill=1)
+    c.setFillColorRGB(0, 0, 0)
+    widget = {"type": "text", "label": label,
+              "rect": [x0 + 2, box_bot + 2, x0 + cell_w - 2, box_top - 2]}
+    return box_bot, [widget]
+
+
+def sec_circle_checkbox(c, rng, x0, x1, y_top, avail, style):
+    """A checkbox drawn as a hollow circle instead of a square glyph or a
+    ruled square cell. R1 only fires on the two specific Webdings/Wingdings
+    checkbox glyphs; R6 only fires on a small near-square cell rebuilt from
+    grid_cells() rects. reportlab draws a circle as a set of bezier curves,
+    which pdfplumber reports under page.curves, not page.rects -- outside
+    what either rule looks at, even though a hollow circle beside a
+    caption reads exactly like a checkbox to a person filling out the
+    form."""
+    row_h = 22.0
+    if avail < row_h:
+        return None
+    q = rng.choice(QUESTION_POOL)
+    size_txt = 10
+    baseline = y_top - 14
+    c.setFont(style.body_font, size_txt)
+    c.drawString(x0, baseline, q)
+    cursor_x = x0 + stringWidth(q, style.body_font, size_txt) + 18
+    widgets = []
+    r = 9.0
+    for opt in ("Yes", "No"):
+        if cursor_x > x1 - 60:
+            break
+        cy = baseline + 3
+        cx = cursor_x + r
+        c.setLineWidth(0.9)
+        c.circle(cx, cy, r, stroke=1, fill=0)
+        rect = [cx - r + 1, cy - r + 1, cx + r - 1, cy + r - 1]
+        widgets.append({"type": "checkbox", "label": f"{q} ({opt})", "rect": rect})
+        cursor_x += 2 * r + 4
+        c.setFont(style.body_font, size_txt)
+        c.drawString(cursor_x, baseline, opt)
+        cursor_x += stringWidth(opt, style.body_font, size_txt) + 16
+    return baseline - 10, widgets
+
+
+COMB_BOX_W = 18.0
+COMB_MIN_N, COMB_MAX_N = 6, 10
+
+
+def sec_comb_field(c, rng, x0, x1, y_top, avail, style):
+    """A comb field: one box per character, divided by full-height tick
+    marks spaced under grid_cells()'s own 20pt minimum-cell-width floor.
+    Real forms use this for SSNs, phone numbers, ZIP codes -- a fixed
+    number of ruled boxes under one caption above them. grid_cells() only
+    calls the gap between two adjacent edges a cell when it exceeds 20pt;
+    every gap here is 18pt, so the whole row yields zero cells and no
+    cell-based rule (R2/R3/R4/R6/R10/R12) ever sees it, even though the
+    boxes are fully ruled and the caption sits in the ordinary place,
+    directly above."""
+    row_h = 22.0
+    label_h = 12
+    if row_h + label_h > avail:
+        return None
+    n = rng.randint(COMB_MIN_N, COMB_MAX_N)
+    field_w = n * COMB_BOX_W
+    if field_w > x1 - x0:
+        n = int((x1 - x0) // COMB_BOX_W)
+        if n < COMB_MIN_N:
+            return None
+        field_w = n * COMB_BOX_W
+    label = rng.choice(LABEL_POOL)
+    size = 9
+    c.setFont(style.body_font, size)
+    c.drawString(x0, y_top - size, label)
+    box_top = y_top - size - 4
+    box_bot = box_top - row_h
+    _hrect(c, x0, x0 + field_w, box_top)
+    _hrect(c, x0, x0 + field_w, box_bot)
+    for i in range(n + 1):
+        _vrect(c, x0 + i * COMB_BOX_W, box_bot, box_top)
+    widget = {"type": "text", "label": label,
+              "rect": [x0 + 2, box_bot + 2, x0 + field_w - 2, box_top - 2]}
+    return box_bot, [widget]
+
+
 # ---------------------------------------------------------------------------
 # Continuation tables: a table's header prints once on the page where it
 # starts, and rows that do not fit continue at the top of the next page
@@ -814,29 +957,79 @@ def sec_legit_line(c, rng, x0, x1, y_top, avail, style):
 
 # Weighted pool: hard constructs dominate, a legit minority keeps the form
 # readable as a form rather than a pure adversarial exercise.
+#
+# sec_left_label, sec_dotted_line and sec_merged_header_table were the
+# highest-yield misses in the previous round (R10, R11 and the group-header
+# split were added to the detector specifically because this corpus exposed
+# them). The detector now reads all three, so they no longer carry the
+# difficulty their comments describe -- kept in the pool at base weight for
+# page variety and because sec_spacer_column's "office use" bait and
+# sec_left_label's tight-row variant are still occasionally missed, but no
+# longer boosted.
 HARD_FUNCS = [
     sec_wrapped_label, sec_left_label, sec_ragged_table, sec_spacer_column,
     sec_office_use_box, sec_small_checkbox_row, sec_prose_box,
     sec_underline_trap, sec_nested_table, sec_merged_header_table,
     sec_dotted_line, sec_bilingual_grid,
+    sec_label_below, sec_shaded_field, sec_circle_checkbox, sec_comb_field,
 ]
-# A modest boost for the handful of sources that measured as the cleanest,
-# highest-yield misses (see the per-feature audit in the task report) --
-# Extra turns in the pool so the harder mechanisms show up more often.
+# A modest boost for the sources that measure as the current blind spots:
+# the four new constructs above (label below its box, an unruled shaded
+# entry area, a circle checkbox, a comb field -- see each function's own
+# docstring for which detector assumption it falls outside of) plus the
+# three older constructs that are still misses on the current detector
+# (wrapped_label, nested_table, bilingual_grid all defeat R2's label-shape
+# and length guards, which have not changed).
 #
-# These weights are deliberately LOW. Cranking them to 8/6/5/4/6 reaches f1
-# 0.682, but then bilingual_grid, dotted_line, merged_header_table,
-# wrapped_label and nested_table each appear in 22-24 of every 25 forms --
-# a stress test of five tricks rather than a varied sample of real forms,
-# which would tune the detector to those five rather than to robustness.
-# At these weights only one feature reaches 90% of forms and f1 is 0.733,
-# still a wide gradient below the 0.851 the detector reached on the
-# previous corpus. Variety is worth more than the extra 0.05.
-EXTRA_WEIGHT = ([sec_dotted_line] * 2 + [sec_wrapped_label] * 2
-                + [sec_merged_header_table] * 2 + [sec_nested_table] * 1
-                + [sec_bilingual_grid] * 2)
+# Unlike the previous round, this weighting no longer needs to be timid
+# about presence: _active_pool already controls, per form, which features
+# can appear at all, so a weight here only shapes how many TIMES an
+# already-eligible feature repeats within a form that has it active -- it
+# cannot push a feature into a form that excluded it, and so cannot by
+# itself push presence over the variety cap. Measured per-feature in
+# isolation (an active pool of just that one function), sec_label_below,
+# sec_shaded_field, sec_circle_checkbox, sec_comb_field, sec_wrapped_label,
+# sec_nested_table and sec_bilingual_grid all sit at 7-15% recall -- the
+# detector essentially never reconstructs them -- while sec_dotted_line
+# (100%), sec_ragged_table (86%), sec_small_checkbox_row (68%) and
+# sec_merged_header_table (58%) are now largely or partly read by R11, the
+# 16pt column clustering, and the group-header split respectively. The boost
+# below is concentrated on the still-effective seven and left off the
+# now-mostly-handled ones, so they carry the extra density.
+EXTRA_WEIGHT = ([sec_label_below] * 6 + [sec_shaded_field] * 6
+                + [sec_circle_checkbox] * 6 + [sec_comb_field] * 6
+                + [sec_wrapped_label] * 4 + [sec_nested_table] * 4
+                + [sec_bilingual_grid] * 4)
 LEGIT_FUNCS = [sec_legit_grid, sec_legit_checkbox, sec_legit_line]
-SECTION_POOL = HARD_FUNCS * 3 + EXTRA_WEIGHT + LEGIT_FUNCS
+
+# How many of the 40-ish placement attempts a column gets, and how many
+# distinct hard constructs are even eligible in one form, together decide
+# how "presence" (does this form contain the feature at all?) behaves. With
+# every one of ~16 hard functions offered on every attempt across up to 3
+# pages, nearly all of them get drawn at least once per form purely from
+# volume -- measured, this saturated every feature above 70% of forms, no
+# matter how the weights were balanced (weight only shapes how often an
+# ALREADY-eligible function fires, not whether it ever gets a look-in).
+#
+# The fix is to restrict which functions are even eligible, per form: each
+# form draws a random subset of HARD_FUNCS (see _active_pool below) instead
+# of offering the whole roster to every attempt. A feature missing from a
+# form's subset cannot appear in it at all, so a feature's share of the
+# 25-form corpus is controlled directly by ACTIVE_FRACTION rather than by
+# how many draws a column happens to make.
+ACTIVE_MIN, ACTIVE_MAX = 7, 10   # of 16 HARD_FUNCS made eligible per form
+
+
+def _active_pool(rng):
+    """One form's eligible section pool: a random subset of HARD_FUNCS (kept
+    whole for LEGIT_FUNCS, which are not difficulty and stay available to
+    every form) plus the weighted extra turns for whichever of the boosted
+    functions happen to be in this form's subset."""
+    k = rng.randint(ACTIVE_MIN, ACTIVE_MAX)
+    active = set(rng.sample(HARD_FUNCS, k))
+    weighted = [f for f in HARD_FUNCS if f in active] * 3
+    weighted += [f for f in EXTRA_WEIGHT if f in active]
+    return weighted + LEGIT_FUNCS
 
 
 def _run_section(fn, c, rng, x0, x1, y, avail, style):
@@ -849,7 +1042,7 @@ def _tag_for(fn):
     return fn.__name__[len("sec_"):]
 
 
-def _fill_column(c, rng, x0, x1, y_top, y_floor, style, widgets_out, tags):
+def _fill_column(c, rng, x0, x1, y_top, y_floor, style, widgets_out, tags, pool):
     y = y_top
     if y - y_floor > 60 and rng.random() < 0.3:
         y = _draw_heading(c, rng, x0, x1, y, style)
@@ -857,7 +1050,7 @@ def _fill_column(c, rng, x0, x1, y_top, y_floor, style, widgets_out, tags):
     attempts = 0
     while y - y_floor > 30 and attempts < 40:
         attempts += 1
-        fn = rng.choice(SECTION_POOL)
+        fn = rng.choice(pool)
         result = _run_section(fn, c, rng, x0, x1, y, y - y_floor, style)
         if result is None:
             continue
@@ -869,7 +1062,7 @@ def _fill_column(c, rng, x0, x1, y_top, y_floor, style, widgets_out, tags):
         y = new_y - rng.uniform(6, 14)
 
 
-def _draw_page(c, rng, widgets_out, tags, page_w, page_h,
+def _draw_page(c, rng, widgets_out, tags, page_w, page_h, pool,
                carry_in=None, forced_margin=None, allow_continuation_start=False):
     """Returns (new_carry, next_page_forced_margin). new_carry is not None
     only when this page starts a continuation table that must resume,
@@ -902,12 +1095,12 @@ def _draw_page(c, rng, widgets_out, tags, page_w, page_h,
     if carry_in is None and new_carry is None and rng.random() < 0.3:
         gutter = 18
         col_w = (page_w - 2 * margin - gutter) / 2
-        _fill_column(c, rng, margin, margin + col_w, y_top, y_floor, style, widgets_out, tags)
+        _fill_column(c, rng, margin, margin + col_w, y_top, y_floor, style, widgets_out, tags, pool)
         _fill_column(c, rng, margin + col_w + gutter, page_w - margin, y_top, y_floor,
-                     style, widgets_out, tags)
+                     style, widgets_out, tags, pool)
         tags.add("twocol")
     else:
-        _fill_column(c, rng, margin, page_w - margin, y_top, y_floor, style, widgets_out, tags)
+        _fill_column(c, rng, margin, page_w - margin, y_top, y_floor, style, widgets_out, tags, pool)
 
     next_forced_margin = margin if new_carry is not None else None
     return new_carry, next_forced_margin
@@ -924,6 +1117,7 @@ def generate_hard(seed: int, out_dir) -> tuple:
 
     rng = random.Random(seed)
     num_pages = rng.randint(1, 3)
+    pool = _active_pool(rng)      # this form's eligible subset -- see _active_pool
 
     # Decide every page's orientation up front (rng draws stay in page order)
     # so a continuation table can check whether the next page matches the
@@ -953,7 +1147,7 @@ def generate_hard(seed: int, out_dir) -> tuple:
         next_same_orientation = has_next and page_specs[pno][:2] == (page_w, page_h)
         page_widgets = []
         carry, forced_margin = _draw_page(
-            c, rng, page_widgets, tags, page_w, page_h,
+            c, rng, page_widgets, tags, page_w, page_h, pool,
             carry_in=carry, forced_margin=forced_margin,
             allow_continuation_start=has_next and next_same_orientation,
         )

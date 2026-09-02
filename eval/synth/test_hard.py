@@ -2,10 +2,11 @@
     .venv/bin/python -m pytest eval/synth/test_hard.py -v
 
 Test 5 is the whole point of this module: the current, unmodified detector
-must score f1 <= 0.70 on a 25-form hard corpus. If a future change to
+must score f1 <= 0.65 on a 25-form hard corpus. If a future change to
 hard.py raises that number back up, this test is the tripwire.
 """
 import json
+from collections import Counter
 
 import pdfplumber
 import pytest
@@ -15,8 +16,15 @@ from eval.synth.hard import generate_hard
 from eval.score import score_one
 
 SCHEMA = json.load(open("eval/contracts/truth.schema.json"))
-MAX_ALLOWED_F1 = 0.78    # tripwire; corpus currently sits at 0.733    # tripwire, see note below
+# tripwire; corpus currently measures precision 0.907, recall 0.500, f1 0.645
+# on the real detector (see test_current_detector_scores_at_or_below_threshold).
+# Set just above that so ordinary float noise cannot trip it, but low enough
+# that the next merged detector improvement will.
+MAX_ALLOWED_F1 = 0.66
 FAIRNESS_MARGIN = 40  # points; matches the brief's "within 40pt" fairness bar
+# "no single difficulty feature may appear in more than about 70% of forms"
+# -- see test_feature_variety.
+MAX_FEATURE_FRACTION = 0.70
 
 
 def _iou(a, b):
@@ -101,6 +109,34 @@ def test_current_detector_scores_at_or_below_threshold(tmp_path):
     assert f1 <= MAX_ALLOWED_F1, (
         f"detector scores f1={f1:.3f} on the hard corpus (precision={precision:.3f}, "
         f"recall={recall:.3f}) -- not hard enough, must be <= {MAX_ALLOWED_F1}"
+    )
+
+
+def test_feature_variety(tmp_path):
+    """A corpus of five tricks repeated in every form trains the detector on
+    those five tricks, not on robustness -- see docs/tuning/log.md's account
+    of the previous round, where a delivered corpus reached a harder score
+    only by putting five mechanisms in 22-24 of every 25 forms, and was
+    rejected in favour of a wider, slightly easier one.
+
+    Every tag in a form's truth["family"] (each hard/legit construct that
+    fired, plus layout tags like "heading"/"twocol"/"landscape"/
+    "continuation") must appear in no more than MAX_FEATURE_FRACTION of the
+    25-form corpus."""
+    n_forms = 25
+    tag_forms = Counter()
+    for seed in range(n_forms):
+        _, truth_path = generate_hard(seed, tmp_path)
+        truth = json.loads(truth_path.read_text())
+        tags = set(truth["family"].removeprefix("synthetic-hard/").split("-"))
+        for tag in tags:
+            tag_forms[tag] += 1
+
+    limit = MAX_FEATURE_FRACTION * n_forms
+    offenders = {tag: cnt for tag, cnt in tag_forms.items() if cnt > limit}
+    assert not offenders, (
+        f"feature(s) exceed {MAX_FEATURE_FRACTION:.0%} of {n_forms} forms: "
+        f"{offenders} -- corpus is not varied enough"
     )
 
 
