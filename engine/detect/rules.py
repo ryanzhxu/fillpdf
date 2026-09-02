@@ -26,10 +26,50 @@ def slug(s, n=40):
     return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_")[:n] or "field"
 
 
+def _merge_ruling_lines(rects, gap_tol=3, span_tol=2):
+    """Collapse a single ruled line drawn as two stacked rects into one.
+
+    Measured on four line-item tables (repeated-row quantity/make-model/
+    systems columns), grid_cells() was pairing up every row TWICE: a thick
+    stroke rect (e.g. height 1.44) is immediately followed, edge to edge or
+    within a point or two, by a hairline rect (height ~0.1) spanning the
+    SAME x-range -- both pass the `height < 3` ruling-line filter, so each
+    row boundary produced two candidate `hr` tops a point or two apart, and
+    every row below got detected twice: once matching truth, once as an
+    extra false positive (or, for a non-row boundary, two false positives
+    with nothing to match).
+
+    Only merge rects whose x-span also matches closely (`span_tol`): a
+    header row's own top border and the short decorative underline below
+    each of its column headers can sit just as close vertically, but they
+    do not share the same width. Merging on gap alone (tried first) swallowed
+    that header row into the first data row and cost 21 real matches on the
+    tuning corpus. Requiring both the gap and the span to agree keeps the
+    merge to true double-strokes of one line, not any two close rects.
+    """
+    merged = []
+    for r in sorted(rects, key=lambda r: (r["top"], r["x0"])):
+        joined = False
+        for m in merged:
+            if (r["top"] <= m["bottom"] + gap_tol and r["bottom"] >= m["top"] - gap_tol
+                    and abs(r["x0"] - m["x0"]) <= span_tol
+                    and abs(r["x1"] - m["x1"]) <= span_tol):
+                m["top"] = min(m["top"], r["top"])
+                m["bottom"] = max(m["bottom"], r["bottom"])
+                m["x0"] = min(m["x0"], r["x0"])
+                m["x1"] = max(m["x1"], r["x1"])
+                joined = True
+                break
+        if not joined:
+            merged.append(dict(r))
+    return merged
+
+
 def grid_cells(page):
     """Word draws table borders as thin filled rects, not lines. Rebuild the cells."""
     v = [r for r in page.rects if r["width"] < 3 and r["height"] >= 5]
     h = [r for r in page.rects if r["height"] < 3 and r["width"] >= 5]
+    h = _merge_ruling_lines(h)
     if len(v) + len(h) > 2000:                      # complexity guard from the spec
         return []
     cells = []
