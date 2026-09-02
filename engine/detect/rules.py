@@ -451,6 +451,101 @@ def _extend_row_span(cell, cells, claimed, words, vrules):
     return x1, absorbed
 
 
+# R12: a large blank cell whose only content is the instruction introducing
+# it -- "Describe the reason(s) why you are requesting possession of the unit
+# or site:" sits at the top of a grid cell drawn hundreds of points tall, with
+# the rest of the cell left blank for a multi-line answer. R2 already
+# recognises exactly this shape (label band at the top, blank space below),
+# but two of its guards were sized for short single-line fields and reject it
+# here: R3's 70pt cap on a claimed cell, and R2's own "a label spanning more
+# than 80% of the page width is a section header, not a field label" guard --
+# every one of these full-width comment boxes trips that guard, because the
+# instruction sentence is long enough to span most of the row.
+#
+# R12 lifts both, but only for a shape guarded tightly enough to still be
+# safe at this size:
+#   - the label may wrap onto up to R12_MAX_HEADER_LINES lines (a short
+#     instruction wraps once or twice; unrelated running prose keeps going),
+#   - nothing may follow those header lines anywhere else in the cell --
+#     measured on the tuning corpus, this is what separates a real comment box
+#     from a bordered paragraph of instructional prose: the prose fills most
+#     of its box with text at every height, while a real comment box is
+#     empty below its one instruction,
+#   - the blank space left below the header must itself be large
+#     (R12_MIN_BLANK_GAP) -- a short label with only a little room below it
+#     is the shape R2 already owns, not this one,
+#   - OFFICE_USE reuses R3's regex: an office-only comment box is off limits
+#     to the applicant the same as an office-only column,
+#   - a cell that already contains a finer ruled grid (_cell_is_container) is
+#     a section wrapper, not one answer box -- left for whatever rule claims
+#     the smaller cells inside it,
+#   - width and height are bounded (R12_MIN_WIDTH_FRAC, R12_MAX_H) so neither
+#     a narrow leftover slice nor a full-page frame can be claimed.
+#
+# Measured on the tuning corpus: 16 cells match this shape, all in the real/
+# Microsoft(R) and real/Adobe families, and all 16 match truth.
+R12_MIN_H = 70              # points; below this R2/R3 already own the cell
+R12_MAX_H = 350             # points; a bound against a full-page frame
+R12_MIN_WIDTH_FRAC = 0.55   # of page width; excludes narrow leftover slices
+R12_WRAP_GAP = 20           # points; gap allowed between wrapped header lines
+R12_MAX_HEADER_LINES = 3
+R12_MAX_LABEL_LEN = 130
+R12_MIN_BLANK_GAP = 40      # points; blank room required below the header
+
+
+def _cell_is_container(cell, cells):
+    """True when a finer grid already subdivides this cell.
+
+    A large blank-looking cell that actually contains its own ruled sub-cells
+    is a section wrapper, not one answer box -- whatever rule claims the
+    smaller cells inside it should have this space, not R12.
+    """
+    x0, top, x1, bot = cell
+    area = (x1 - x0) * (bot - top)
+    for o in cells:
+        if o == cell:
+            continue
+        ox0, otop, ox1, obot = o
+        if (ox0 >= x0 - 1 and ox1 <= x1 + 1 and otop >= top - 1 and obot <= bot + 1
+                and (ox1 - ox0) * (obot - otop) < area):
+            return True
+    return False
+
+
+def _multiline_label(cell, words):
+    """The cell's own top instruction, or None if the shape is not R12's.
+
+    Returns (label, entry_top): entry_top is the y just below the last header
+    line, so the caller draws the answer box from there down and never over
+    the label itself (the same convention R2 uses).
+    """
+    x0, top, x1, bot = cell
+    inside = _text_in(words, cell)
+    if not inside:
+        return None
+    line_tops = sorted(set(round(w["top"], 1) for w in inside))
+    header_tops = [line_tops[0]]
+    for t in line_tops[1:]:
+        if t - header_tops[-1] <= R12_WRAP_GAP:
+            header_tops.append(t)
+        else:
+            break
+    if len(header_tops) > R12_MAX_HEADER_LINES:
+        return None
+    header = [w for w in inside if round(w["top"], 1) in header_tops]
+    if len(header) != len(inside):
+        return None                # text remains below the header -- not blank
+    label = " ".join(w["text"] for ln in header_tops
+                      for w in sorted((w for w in header if round(w["top"], 1) == ln),
+                                       key=lambda w: w["x0"]))
+    if not (2 <= len(label) <= R12_MAX_LABEL_LEN) or OFFICE_USE.search(label):
+        return None
+    entry_top = max(w["bottom"] for w in header) + 1
+    if bot - entry_top < R12_MIN_BLANK_GAP:
+        return None
+    return label, entry_top
+
+
 def detect(page, pno):
     H, W = page.height, page.width
     words = page.extract_words()
@@ -519,6 +614,26 @@ def detect(page, pno):
             out.append({"page": pno, "type": "text", "label": header, "rule": "R3",
                         "confidence": 0.6,
                         "rect": [x0 + 2, H - bot + 2, ext_x1 - 2, H - top - 2]})
+
+    # ---- R12  large blank cell, labelled by its own top instruction ---------
+    for cell in cells:
+        if cell in claimed:
+            continue
+        x0, top, x1, bot = cell
+        if not (R12_MIN_H <= bot - top <= R12_MAX_H) or (x1 - x0) < R12_MIN_WIDTH_FRAC * W:
+            continue
+        if _cell_is_container(cell, cells):
+            continue
+        found = _multiline_label(cell, words)
+        if found is None:
+            continue
+        label, entry_top = found
+        ext_x1, absorbed = _extend_row_span(cell, cells, claimed, words, vrules)
+        claimed.add(cell)
+        claimed.update(absorbed)
+        out.append({"page": pno, "type": "multiline", "label": label, "rule": "R12",
+                    "confidence": 0.55,
+                    "rect": [x0 + 2, H - bot + 2, ext_x1 - 2, H - entry_top - 2]})
 
     # ---- R10  blank cell whose LEFT neighbour in the same row is a label ----
     # "Last Name |          |" -- the label sits in the cell to the left of the

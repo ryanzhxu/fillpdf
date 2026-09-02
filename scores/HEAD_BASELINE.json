@@ -6,9 +6,9 @@
     "tuning": 35
   },
   "failures": [],
-  "git_sha": "945d48193bfe54e6552d3709fa1329e0280139f8",
+  "git_sha": "6ec4b455779b155453f34ab4f4d6b40f9749d02d",
   "guards": {
-    "box_over_ink": 0.12539467749210645,
+    "box_over_ink": 0.12444046553267682,
     "glyph_coverage": 1.0,
     "offenders": [
       {
@@ -252,32 +252,32 @@
         "page": 9
       }
     ],
-    "stacked_fraction": 0.01099518063617817
+    "stacked_fraction": 0.01082277929410803
   },
   "holdout": {
     "attribution_ok": true,
-    "detected": 348,
-    "f1": 0.655940594059406,
+    "detected": 349,
+    "f1": 0.6551297898640297,
     "label_accuracy": "UNAVAILABLE",
     "label_pairs": 0,
     "matched": 265,
     "near_miss": 13,
     "placement": 0.8221301665965606,
-    "precision": 0.7614942528735632,
+    "precision": 0.7593123209169055,
     "recall": 0.5760869565217391,
     "truth": 460
   },
   "overall": {
     "attribution_ok": true,
-    "detected": 1869,
-    "f1": 0.7128577919127669,
+    "detected": 1885,
+    "f1": 0.7175192394748754,
     "label_accuracy": 0.8055028462998103,
     "label_pairs": 1054,
-    "matched": 1569,
+    "matched": 1585,
     "near_miss": 27,
-    "placement": 0.8762841356066823,
-    "precision": 0.8394863563402889,
-    "recall": 0.6194236083695223,
+    "placement": 0.8769385780096713,
+    "precision": 0.8408488063660478,
+    "recall": 0.625740228977497,
     "truth": 2533
   },
   "per_family": {
@@ -296,15 +296,15 @@
     },
     "real/Adobe": {
       "attribution_ok": true,
-      "detected": 785,
-      "f1": 0.7672253258845438,
+      "detected": 787,
+      "f1": 0.7675139491630503,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
-      "matched": 618,
+      "matched": 619,
       "near_miss": 14,
-      "placement": 0.8205312587597521,
-      "precision": 0.7872611464968153,
-      "recall": 0.7481840193704601,
+      "placement": 0.8207278060387208,
+      "precision": 0.7865311308767471,
+      "recall": 0.7493946731234867,
       "truth": 826
     },
     "real/Designer": {
@@ -335,15 +335,15 @@
     },
     "real/Microsoft\u00ae": {
       "attribution_ok": true,
-      "detected": 197,
-      "f1": 0.319672131147541,
+      "detected": 212,
+      "f1": 0.3697813121272366,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
-      "matched": 78,
+      "matched": 93,
       "near_miss": 26,
-      "placement": 0.7018748339213988,
-      "precision": 0.39593908629441626,
-      "recall": 0.26804123711340205,
+      "placement": 0.7404503268803484,
+      "precision": 0.4386792452830189,
+      "recall": 0.31958762886597936,
       "truth": 291
     },
     "real/unknown": {
@@ -688,14 +688,14 @@
   "per_form": {
     "14921b7f41fc.pdf": {
       "attribution_ok": true,
-      "detected": 60,
-      "f1": 0.2545454545454545,
+      "detected": 61,
+      "f1": 0.25225225225225223,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
       "matched": 14,
       "near_miss": 11,
       "placement": 0.8808206217740336,
-      "precision": 0.23333333333333334,
+      "precision": 0.22950819672131148,
       "recall": 0.28,
       "truth": 50
     },
@@ -779,15 +779,15 @@
     },
     "834466262122.pdf": {
       "attribution_ok": true,
-      "detected": 89,
-      "f1": 0.36607142857142855,
+      "detected": 93,
+      "f1": 0.39473684210526316,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
-      "matched": 41,
+      "matched": 45,
       "near_miss": 9,
-      "placement": 0.7088817103958828,
-      "precision": 0.4606741573033708,
-      "recall": 0.3037037037037037,
+      "placement": 0.7294477636492863,
+      "precision": 0.4838709677419355,
+      "recall": 0.3333333333333333,
       "truth": 135
     },
     "86b3dc306803.pdf": {
@@ -818,15 +818,15 @@
     },
     "acbed8a48a12.pdf": {
       "attribution_ok": true,
-      "detected": 15,
-      "f1": 0.8125,
+      "detected": 16,
+      "f1": 0.8484848484848485,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
-      "matched": 13,
+      "matched": 14,
       "near_miss": 0,
-      "placement": 0.8679459417979132,
-      "precision": 0.8666666666666667,
-      "recall": 0.7647058823529411,
+      "placement": 0.873249376272443,
+      "precision": 0.875,
+      "recall": 0.8235294117647058,
       "truth": 17
     },
     "b642646180f3.pdf": {
@@ -870,15 +870,15 @@
     },
     "ced73d75e395.pdf": {
       "attribution_ok": true,
-      "detected": 108,
-      "f1": 0.28030303030303033,
+      "detected": 119,
+      "f1": 0.34909090909090906,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
-      "matched": 37,
+      "matched": 48,
       "near_miss": 17,
-      "placement": 0.6941104572875113,
-      "precision": 0.3425925925925926,
-      "recall": 0.23717948717948717,
+      "placement": 0.7507652299094693,
+      "precision": 0.40336134453781514,
+      "recall": 0.3076923076923077,
       "truth": 156
     },
     "f6b53f5f6901.pdf": {
@@ -1260,6 +1260,19 @@
       "recall": 0.0,
       "truth": 0
     },
+    "R12": {
+      "attribution_ok": false,
+      "detected": 17,
+      "f1": 0.0,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 16,
+      "near_miss": 0,
+      "placement": 0.9411148361527895,
+      "precision": 0.9411764705882353,
+      "recall": 0.0,
+      "truth": 0
+    },
     "R2": {
       "attribution_ok": false,
       "detected": 377,
@@ -1352,6 +1365,6 @@
       "truth": 2920
     }
   },
-  "started_at": "2026-09-02T10:20:29.822800+00:00",
+  "started_at": "2026-09-02T11:56:01.892171+00:00",
   "version": 1
 }
