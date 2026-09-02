@@ -5,6 +5,13 @@ CHECK_GLYPHS = {"\uf063", "\uf06f"}          # Webdings box, Wingdings box
 MASK_ONLY = set("()- $.")
 SIGNATURE = re.compile(r"signatur", re.I)      # signature lines get no input box
 
+# R9: a candidate whose area is largely covered by printed text is not a place
+# to write -- it is on top of something already printed. Measured on the real
+# corpus, 29% of emitted boxes sat on ink, which is the main precision failure.
+# Glyphs a box is SUPPOSED to cover are excluded.
+INK_EXEMPT = CHECK_GLYPHS | {"_", " ", "\xa0", ""}
+INK_REJECT_AT = 0.25
+
 
 def slug(s, n=40):
     return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_")[:n] or "field"
@@ -37,6 +44,68 @@ def _text_in(words, cell, pad=1):
     x0, top, x1, bot = cell
     return [w for w in words if w["x0"] >= x0 - pad and w["x1"] <= x1 + pad
             and w["top"] >= top - pad and w["bottom"] <= bot + pad]
+
+
+def _ink_boxes(page):
+    """Printed character boxes, in PDF points, origin bottom-left.
+
+    Excludes glyphs a field is legitimately drawn over: checkbox glyphs and
+    the underscore runs that form write-on lines.
+    """
+    H = page.height
+    return [(c["x0"], H - c["bottom"], c["x1"], H - c["top"])
+            for c in page.chars if c["text"] not in INK_EXEMPT and c["text"].strip()]
+
+
+def _runs_past(rect, page_chars, exempt):
+    """True when text covered by rect belongs to a line continuing outside it.
+
+    This is the distinction that matters. A box sitting on a heading or a
+    paragraph covers part of a line that carries on past the box edge. A box
+    that legitimately contains its own short label covers text that ends inside
+    it. Only the first is a false positive.
+    """
+    x0, y0, x1, y1 = rect
+    H = _page_height(page_chars)
+    inside_lines = set()
+    for c in page_chars:
+        if c["text"] in exempt or not c["text"].strip():
+            continue
+        cy0, cy1 = H - c["bottom"], H - c["top"]
+        if c["x1"] > x0 and c["x0"] < x1 and cy1 > y0 and cy0 < y1:
+            inside_lines.add(round(c["top"], 0))
+    if not inside_lines:
+        return False
+    for c in page_chars:
+        if c["text"] in exempt or not c["text"].strip():
+            continue
+        if round(c["top"], 0) not in inside_lines:
+            continue
+        # a character on the same line, clearly outside the box horizontally
+        if c["x1"] < x0 - 2 or c["x0"] > x1 + 2:
+            return True
+    return False
+
+
+def _page_height(page_chars):
+    return _PAGE_H[0]
+
+
+_PAGE_H = [792.0]
+
+
+def _ink_fraction(rect, ink):
+    x0, y0, x1, y1 = rect
+    area = (x1 - x0) * (y1 - y0)
+    if area <= 0:
+        return 1.0
+    covered = 0.0
+    for a0, b0, a1, b1 in ink:
+        w = min(x1, a1) - max(x0, a0)
+        h = min(y1, b1) - max(y0, b0)
+        if w > 0 and h > 0:
+            covered += w * h
+    return min(covered / area, 1.0)
 
 
 def detect(page, pno):
@@ -176,4 +245,21 @@ def detect(page, pno):
 
     # A signature must be signed, not typed. Drop those boxes rather than invite
     # someone to type a name into them.
-    return [f for f in out if not SIGNATURE.search(f["label"])]
+    out = [f for f in out if not SIGNATURE.search(f["label"])]
+
+    # R9: drop text candidates sitting on top of printed text. Checkboxes are
+    # exempt -- they are small and deliberately placed on a glyph.
+    _PAGE_H[0] = H
+    ink = _ink_boxes(page)
+    chars = page.chars
+    if ink:
+        keep = []
+        for f in out:
+            if f["type"] == "checkbox":
+                keep.append(f); continue
+            if _ink_fraction(f["rect"], ink) <= INK_REJECT_AT:
+                keep.append(f); continue
+            if not _runs_past(f["rect"], chars, INK_EXEMPT):
+                keep.append(f)          # contained label, not running text
+        out = keep
+    return out

@@ -10,28 +10,43 @@ PDF = "fixtures/safer.pdf"
 
 
 class TestBoxOverInk(unittest.TestCase):
-    def test_finds_known_bad_boxes_on_safer_pdf(self):
-        """The current detector puts a box over the '4c.' heading text on
-        page 3 of safer.pdf. box_over_ink must catch it with no answer key."""
-        result = detect(PDF)
-        report = box_over_ink(PDF, result["fields"])
+    def test_guard_still_catches_an_injected_bad_box_on_safer(self):
+        """The guard must catch a box on real printed text.
 
-        print("\n--- box_over_ink on fixtures/safer.pdf (current detector) ---")
-        print(f"fraction of boxes over ink: {report['fraction']:.4f}")
-        print(f"worst offenders ({len(report['offenders'])}):")
-        for o in report["offenders"]:
-            print(f"  {o['id']:45s} page {o['page']}  coverage {o['coverage']:.4f}")
+        This test used to assert that the live detector put boxes on the "4c."
+        heading of safer.pdf. Rule R9 now removes those, so asserting the bug
+        still exists would assert a regression. Instead, inject a box over that
+        same heading and prove the guard still finds it.
+        """
+        from engine.detect import detect
+        import pdfplumber
 
-        self.assertGreater(
-            len(report["offenders"]), 0,
-            "box_over_ink found zero offenders on safer.pdf -- the guard is "
-            "broken, not the detector. Known bad box is on page 3 (the '4c.' heading).",
-        )
-        offender_ids = {o["id"] for o in report["offenders"]}
-        self.assertIn(
-            "p3_4c_if_you_or_your_spouse_were", offender_ids,
-            "box_over_ink did not flag the known bad box over the '4c.' heading on page 3.",
-        )
+        with pdfplumber.open(PDF) as pdf:
+            page = pdf.pages[2]
+            H = page.height
+            hit = [c for c in page.chars if c["text"].strip()]
+            xs = [c["x0"] for c in hit][:1] or [100.0]
+            words = page.extract_words()
+            target = next((w for w in words if w["text"].startswith("4c")), words[0])
+            rect = [target["x0"], H - target["bottom"] - 1,
+                    target["x0"] + 220, H - target["top"] + 1]
+
+        injected = [{"id": "injected_on_heading", "page": 3, "type": "text",
+                     "rect": rect, "label": "", "origin": "user_added"}]
+        result = box_over_ink(PDF, injected)
+        self.assertGreater(result["fraction"], 0.0,
+                           "guard failed to flag a box placed on printed text")
+
+    def test_r9_keeps_the_known_safer_false_positives_gone(self):
+        """Regression guard for the two worst real false positives on safer.pdf.
+
+        Both sat on printed headings and were removed by R9. If either returns,
+        R9 has regressed.
+        """
+        from engine.detect import detect
+        ids = {f["id"] for f in detect(PDF)["fields"]}
+        self.assertNotIn("p3_4c_if_you_or_your_spouse_were", ids)
+        self.assertNotIn("p6_scan_and_upload", ids)
 
     def test_box_over_dense_paragraph_scores_high(self):
         # Page 1, right column, three dense lines of body text.
