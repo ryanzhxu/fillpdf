@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fields.json — detector output",
+  "type": "object",
+  "required": ["version", "pages", "fields"],
+  "properties": {
+    "version": {"const": 1},
+    "source": {"type": "object", "properties": {"pages": {"type": "integer"}}},
+    "pages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["page", "width", "height"],
+        "properties": {
+          "page": {"type": "integer", "minimum": 1},
+          "width": {"type": "number"},
+          "height": {"type": "number"}
+        }
+      }
+    },
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "page", "type", "rect"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Za-z0-9_]{1,64}$"},
+          "page": {"type": "integer", "minimum": 1},
+          "type": {"enum": ["text", "checkbox", "multiline"]},
+          "rect": {
+            "type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "number"},
+            "description": "[x0,y0,x1,y1] in PDF points, origin bottom-left"
+          },
+          "label": {"type": "string"},
+          "rule": {"type": "string", "description": "R1..R8, which rule fired"},
+          "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+          "origin": {"enum": ["detected", "user_added", "user_moved"]}
+        }
+      }
+    }
+  }
+}

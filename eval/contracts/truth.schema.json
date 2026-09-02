@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "truth.json — the answer key for one PDF",
+  "type": "object",
+  "required": ["version", "source_pdf", "origin", "pages", "widgets"],
+  "properties": {
+    "version": {"const": 1},
+    "source_pdf": {"type": "string", "description": "filename, not an absolute path"},
+    "origin": {
+      "enum": ["synthetic", "stripped", "hand"],
+      "description": "synthetic = generator knew the answer; stripped = widget annots from a fillable PDF; hand = human labelled"
+    },
+    "family": {"type": "string", "description": "issuer + authoring tool, for per-family reporting"},
+    "pages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["page", "width", "height"],
+        "properties": {
+          "page": {"type": "integer"}, "width": {"type": "number"}, "height": {"type": "number"}
+        }
+      }
+    },
+    "widgets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["page", "type", "rect"],
+        "properties": {
+          "page": {"type": "integer", "minimum": 1},
+          "type": {"enum": ["text", "checkbox", "multiline", "choice"]},
+          "rect": {
+            "type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "number"},
+            "description": "[x0,y0,x1,y1] in PDF points, origin bottom-left. Same system as fields.json"
+          },
+          "label": {"type": "string"},
+          "expects_rule": {"type": "string", "description": "synthetic only: which rule SHOULD find this"}
+        }
+      }
+    }
+  }
+}

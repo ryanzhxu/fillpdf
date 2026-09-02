@@ -6,3 +6,6 @@ venv/
 dist/
 out/
 *.pyc
+eval/corpus/
+eval/work/
+.env

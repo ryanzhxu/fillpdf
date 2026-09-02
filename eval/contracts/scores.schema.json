@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "scores/<git-sha>.json — one evaluation run",
+  "type": "object",
+  "required": ["version", "git_sha", "started_at", "overall", "per_rule", "per_family", "per_form"],
+  "properties": {
+    "version": {"const": 1},
+    "git_sha": {"type": "string"},
+    "started_at": {"type": "string"},
+    "corpus": {
+      "type": "object",
+      "properties": {
+        "tuning": {"type": "integer"}, "holdout": {"type": "integer"},
+        "adversarial": {"type": "integer"}, "excluded": {"type": "integer"}
+      }
+    },
+    "overall": {"$ref": "#/$defs/metrics"},
+    "holdout": {"$ref": "#/$defs/metrics"},
+    "per_rule": {"type": "object", "additionalProperties": {"$ref": "#/$defs/metrics"}},
+    "per_family": {"type": "object", "additionalProperties": {"$ref": "#/$defs/metrics"}},
+    "per_form": {"type": "object", "additionalProperties": {"$ref": "#/$defs/metrics"}},
+    "guards": {
+      "type": "object",
+      "description": "label-free signals; see eval/guards.py",
+      "properties": {
+        "box_over_ink": {"type": "number", "description": "fraction of boxes overlapping printed glyphs. LOWER IS BETTER"},
+        "glyph_coverage": {"type": "number", "description": "fraction of checkbox glyphs that got a box. HIGHER IS BETTER"}
+      }
+    },
+    "failures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["form", "reason"],
+        "properties": {
+          "form": {"type": "string"},
+          "reason": {"enum": ["timeout", "memory", "crash", "encrypted", "malformed", "excluded_unfair"]},
+          "detail": {"type": "string"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "metrics": {
+      "type": "object",
+      "required": ["truth", "detected", "matched", "precision", "recall", "f1"],
+      "properties": {
+        "truth": {"type": "integer"}, "detected": {"type": "integer"}, "matched": {"type": "integer"},
+        "precision": {"type": "number"}, "recall": {"type": "number"}, "f1": {"type": "number"},
+        "placement": {"type": "number", "description": "mean IoU over matches"},
+        "near_miss": {"type": "integer", "description": "truth with a detection at IoU 0.15-0.5"}
+      }
+    }
+  }
+}
