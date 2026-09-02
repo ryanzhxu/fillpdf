@@ -1047,3 +1047,56 @@ wrong in the falsifiable direction.
 
 `sec_gutter_left_label` names a real detector bug rather than an artificial one,
 so it feeds directly into the next iteration.
+
+## Iteration 29 — R10 reads past a blank gutter cell — MERGED
+
+`89bcac9` (fix) + `eccc794` (corpus re-weight) + baseline `eccc794`
+
+R10 named a blank cell from the closest cell to its left, and gave up when
+that cell was blank (`if not linside: continue`) rather than looking one cell
+further. So `[label][blank gutter][entry]` yielded an unnamed field, though a
+person reads straight past the gutter. The walk now crosses at most one blank
+cell, and only one narrower than 25pt — R10's own candidate-width floor.
+Anything wider is a real cell. Chaining past several would reach into an
+unrelated part of the row and invent a confident wrong label.
+
+    sec_gutter_left_label isolated recall 5.8% -> 90.8%
+    R10 on real corpora: detected 34, matched 17, P 0.500 -- UNCHANGED
+    tuning and holdout bit-for-bit identical to baseline; GATE PASSED
+    hard corpus f1 0.453 -> 0.495 -> 0.454 (after re-weight)
+
+**Merged despite zero measured benefit on the 165 real forms.** That is the
+exact ground five earlier candidates were rejected on, so the distinction has
+to be stated. Those five had a disproved premise, or added complexity for a
+wash. This is a real logic flaw; the fix is 24 lines that provably cannot fire
+except on the layout in question (confirmed: the real-corpus numbers came back
+bit-for-bit identical, so the new path never executed); and the product will
+face arbitrary user PDFs, not this corpus. A reviewer looking at
+`if not linside: continue` would call it a bug regardless of our sample.
+
+### The treadmill, stated plainly
+
+`sec_gutter_left_label` was added at 14:5x and solved by 15:2x — under an hour.
+The corpus went stale immediately, taking hard f1 to 0.495, above the 0.48
+ceiling, and `main` was knowingly red between `89bcac9` and `eccc794`.
+
+`MAX_ALLOWED_F1` was NOT raised. It has been raised twice before, and both
+times the log recorded that as bookkeeping rather than a fix. A third raise
+would have made the ceiling meaningless.
+
+What restored it was a re-weight, not new difficulty: the solved construct
+still carried a 22x boost from when it was hard, so the most-repeated construct
+in the corpus had become one the detector reads at 90.8%. De-boosting it to
+base weight is defensible maintenance — a tripwire should weight toward
+unsolved constructs — but it is a one-time move, and **this round added no new
+difficulty at all**. The set of layouts the detector fails on is unchanged.
+
+Five constructs are now spent: `dotted_line`, `ragged_table`,
+`merged_header_table`, `sec_label_below`, `sec_gutter_left_label`. Of the
+boosted difficulty only `sec_whitespace_field` is still unsolved. Headroom is
+0.454 against 0.48 — one more solved construct closes it. **Next person: add
+constructs, do not re-weight again.**
+
+Noted while verifying and deliberately not changed: `sec_label_below` is listed
+as spent yet is still boosted at 12, so the de-boosting convention this change
+cites is not applied uniformly. Settle it one way or the other.
