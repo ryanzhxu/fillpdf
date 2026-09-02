@@ -1748,6 +1748,26 @@ def detect(page, pno, carry_in=None):
         "in", "at", "and", "or", "is", "are", "was", "were", "to", "for",
         "by", "with", "as", "it", "its", "be",
     }
+    # A run of underscore/fill characters is not label text -- it is the
+    # blank itself. pdfplumber's word tokenizer can merge a run flush
+    # against real text with no space (safer.pdf p7: an underscore run
+    # tokenized as one word with the NEXT field's own caption, "___...
+    # confirm"), and a run sitting alone between two captions comes
+    # through as its own "word" with no letters at all ("___..." then
+    # "since"). FILL_CHARS mirrors eval/label.py's MARK_CHARS (checkbox
+    # glyphs, underscore, dot leaders); strip a leading/trailing run of
+    # them off each candidate word, and drop a word that is fill
+    # characters only.
+    FILL_CHARS = CHECK_GLYPHS | {"_", ".", "·", "․"}
+
+    def _strip_fill(text):
+        i, j = 0, len(text)
+        while i < j and text[i] in FILL_CHARS:
+            i += 1
+        while j > i and text[j - 1] in FILL_CHARS:
+            j -= 1
+        return text[i:j]
+
     runs, cur = [], []
     for c in sorted((c for c in page.chars if c["text"] == "_"),
                     key=lambda c: (round(c["top"]), c["x0"])):
@@ -1788,7 +1808,8 @@ def detect(page, pno, carry_in=None):
         # end-of-detect SIGNATURE filter (on the cut, final label) is the
         # right scope here, same as before this change.
         before_cut = _cut_at_gutter(before_sorted, gap_threshold, "last")
-        label = " ".join(w["text"] for w in before_cut[-6:]) or "line"
+        cleaned = [t for t in (_strip_fill(w["text"]) for w in before_cut[-6:]) if t]
+        label = " ".join(cleaned) or "line"
         out.append({"page": pno, "type": "text", "label": label[:60], "rule": "R5",
                     "confidence": 0.65,
                     "rect": [x0 + 1, H - base + 1, x1 - 1, H - top + 11]})
