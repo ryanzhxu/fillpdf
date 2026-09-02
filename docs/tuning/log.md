@@ -456,3 +456,30 @@ a claimed cell at 70pt and R2 wants a header-band-then-blank shape these
 free-text boxes lack, so no rule claims them — they moved from near-miss to no
 detection at all. A rule for large blank unruled cells as multi-line text fields
 is the next change for this family.
+
+
+## Iteration 2 re-tested on the clean corpus — REJECTED AGAIN, for a better reason
+
+Iteration 5's flag was cleared once the corpus was corrected, so iteration 2's
+rejection deserved the same re-examination. A rejection can be as wrong as an
+approval.
+
+It was not wrong. Re-applied to clean data:
+
+    tuning   f1 0.7175 -> 0.7512 (+.0337)   recall +.0616   precision -.0125
+    holdout  f1 0.6551 -> 0.6495 (-.0056)   recall unchanged
+    label_accuracy 0.8055 -> 0.7017 (-.1038)
+
+**The third line is the one that matters, and the old gate could not see it.**
+Allowing a wrapped label means concatenating two lines, and the resulting field
+NAMES are wrong 10 points more often. The change buys recall by mislabelling
+what it finds.
+
+That is exactly the failure mode label accuracy was added to catch after the
+column-clustering sweep showed f1 climbing while mislabelling rose to 10.7%.
+The first time iteration 2 was rejected, the gate did not measure names at all
+and the verdict rested on a 0.0022 holdout wobble. Now it rests on evidence.
+
+A field with the right box and the wrong name is worse than a missing field: it
+maps a stored profile value into somebody else's box. Rejected, and now for a
+reason worth trusting.
