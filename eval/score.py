@@ -50,16 +50,32 @@ def _add_bucket(acc, b):
     acc["near_miss"] += b["near_miss"]
 
 
+def _clamp(x):
+    """Metrics are fractions. A value outside [0,1] is a bug, not a result.
+
+    The clamp is a safety net, not the fix. See attribution_ok below: when a
+    per-rule bucket reports more matches than truth, its truth side was never
+    attributed and its recall and f1 are meaningless, not merely clipped.
+    """
+    return 0.0 if x < 0 else (1.0 if x > 1 else x)
+
+
 def _finalize_bucket(b):
     truth, detected, matched = b["truth"], b["detected"], b["matched"]
     precision = (matched / detected) if detected else 0.0
     recall = (matched / truth) if truth else 0.0
     f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
     placement = (b["iou_sum"] / matched) if matched else 0.0
+    # Recall needs truth attributed to the same bucket. per_rule truth comes
+    # from a truth widget's "expects_rule", which only synthetic corpora carry.
+    # On real forms there is none, so matched can exceed truth -- that bucket's
+    # recall and f1 must be read as unavailable, not as a score.
+    attribution_ok = b["truth"] >= b["matched"]
     return {
+        "attribution_ok": attribution_ok,
         "truth": truth, "detected": detected, "matched": matched,
-        "precision": precision, "recall": recall, "f1": f1,
-        "placement": placement, "near_miss": b["near_miss"],
+        "precision": _clamp(precision), "recall": _clamp(recall), "f1": _clamp(f1),
+        "placement": _clamp(placement), "near_miss": b["near_miss"],
     }
 
 
