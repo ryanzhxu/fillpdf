@@ -895,3 +895,42 @@ offenders, warn on a rise without them, no-op when either run lacks the field.
 **Cost:** a full scoring run now takes about two minutes, up from well under
 one. Worth it, but it is the reason to keep the corpus from growing without
 bound.
+
+
+## Iteration 27 — R17, caption inside a cell's bottom band: MERGED
+
+    R17: 41 detected, 41 matched, precision 1.0
+    tuning  f1 0.6330 -> 0.6390  P 0.7746 -> 0.7770  R 0.5352 -> 0.5427
+    label_accuracy 0.7009 -> 0.7255 (all 41 new label pairs agreed)
+    holdout byte-identical
+
+R2 turned upside down: the same one-line-of-text requirement, but the blank
+space is ABOVE the caption up to the cell's own top border, reached only after
+R2 has passed the cell by.
+
+### My brief was wrong and the agent corrected it
+
+I told it the shape was "airtight — every candidate matched truth, zero false
+positives", quoting the original author. That measurement was synthetic-only. On
+the full tuning+holdout corpus the naive version had **23 false positives out of
+70 detections**. Three guards, all found by measuring real forms, cleared them:
+row-mate rejection (a cell sharing its row band with another is a header or
+row-label cell — 20 of 23), a width cap for page-wide notice bars, and a 4pt
+bottom-gap floor (true matches cluster at 0.9pt; the residual false positive sat
+11.8pt clear).
+
+Passing a previous agent's claim forward as established fact was my error. Claims
+from one measurement context do not transfer to another, and the brief should
+have said "reported airtight on synthetic; verify on the full corpus".
+
+### The tripwire fired again, and the ceiling moved — deliberately
+
+R17 solves `sec_label_below`, which the hard corpus used as a difficulty source,
+so the corpus score went 0.537 -> 0.569 past its 0.55 ceiling. Ceiling raised to
+0.58.
+
+**Raising it is bookkeeping, not a fix.** The corpus has permanently lost that
+construct as difficulty. The loop is working as intended — corpus adds
+difficulty, detector solves it, corpus needs more — but the ledger has to stay
+honest about which constructs are spent. `sec_label_below` is now spent, joining
+`dotted_line`, `ragged_table` and `merged_header_table`.

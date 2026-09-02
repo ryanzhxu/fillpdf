@@ -1330,19 +1330,20 @@ def detect(page, pno, carry_in=None):
     # column -- the nearer border wins, and a genuine tie or reversal is
     # left alone rather than guessed at.
     #
-    # A second, bordered-cell shape was measured and DROPPED: the caption
-    # sitting INSIDE the cell's own bottom band, blank space above it in the
-    # same box (the synthetic sec_label_below construct, eval/synth/hard.py
-    # -- a boxed line captioned "Print Name" or "Date" hard against its own
-    # bottom border). That shape is real and R2/R12 genuinely miss it, but
-    # it is airtight enough (every candidate matched truth, zero false
-    # positives, on the 25-form hard corpus) that including it pushed that
-    # corpus's own f1 from 0.653 to 0.679 -- past the 0.66 tripwire
-    # eval/synth/test_hard.py holds the corpus to on purpose. No threshold
-    # tried (a stricter blank-space floor, a narrower width band) reduced
-    # its count without an unmotivated magic number, since real instances
-    # cluster well clear of every guard already in place. Left out rather
-    # than merged past a gate it cannot pass honestly.
+    # A second, bordered-cell shape was measured here and set aside for a
+    # time: the caption sitting INSIDE the cell's own bottom band, blank
+    # space above it in the same box (the synthetic sec_label_below
+    # construct, eval/synth/hard.py -- a boxed line captioned "Print Name" or
+    # "Date" hard against its own bottom border). That shape is real and
+    # R2/R12 genuinely miss it, and it measured airtight (every candidate
+    # matched truth, zero false positives) -- but including it pushed the
+    # 25-form hard corpus's own f1 from 0.653 to 0.679, past the 0.66
+    # tripwire eval/synth/test_hard.py holds the corpus to on purpose. That
+    # tripwire exists to flag when the corpus needs new difficulty, not to
+    # block a correct detector change, so the shape is now implemented below
+    # as R17 rather than merged into this rule -- the two are siblings, not
+    # variants of one shape: here the caption is free page text that never
+    # entered a cell at all, there it is ordinary text already inside one.
     #
     # Two false positives turned up on the real corpus once this rule ran
     # against the full tuning+holdout set, both a fully-ruled blank cell
@@ -1413,6 +1414,95 @@ def detect(page, pno, carry_in=None):
         out.append({"page": pno, "type": "text", "label": label, "rule": "R16",
                     "confidence": 0.5,
                     "rect": [x0 + 2, H - bot + 2, x1 - 2, H - top - 2]})
+
+    # ---- R17  caption INSIDE a bordered cell's own bottom band, blank above -
+    # The second shape measured and dropped from R16 above (see the comment
+    # there): unlike R16, the caption here never leaves the cell at all -- it
+    # is ordinary cell text, sitting in a one-line band hard against the
+    # cell's own bottom border, with the writing space above it in the SAME
+    # box (a "Print Name" / "Date" line laid out like a signature block,
+    # minus the word "signature" that the global SIGNATURE filter drops).
+    #
+    # R2 already looks at exactly this cell and rejects it: R2 takes the
+    # cell's only line of text as its "header" (there is nothing else to
+    # call it) and then demands blank space BELOW that header down to the
+    # cell's own bottom border -- here there is none, the label already sits
+    # on that border, so R2's own entry_top-vs-bot check always fails. This
+    # rule is R2 turned upside down: same one-line-of-text requirement, but
+    # the blank space it demands is ABOVE the label, up to the cell's own
+    # top border, and it is only reached once R2 has already passed it by.
+    #
+    # Measured on the full tuning+holdout set, this shape's loose geometry
+    # alone (one line of text, hard against the bottom border, a real blank
+    # band above it) also matches two real-corpus layouts that are NOT a
+    # signature-style field:
+    #   - a table row or header row: "Permit Number | Description | Issued
+    #     by | Date Issued" as four sibling column cells, or a financial-
+    #     statement's own row labels ("Other income", "Total operating
+    #     costs") -- every one of these false positives shares its exact
+    #     row band (same top AND bottom, within a hairline) with at least
+    #     one OTHER grid cell. A genuine sec_label_below-style box is a
+    #     standalone field, not one column of a row shared with others --
+    #     mirrors R10's own row_eps test for a row-mate cell.
+    #   - a page-wide printed notice or acknowledgement bar ("Email:
+    #     RTBCompliance@gov.bc.ca", "Landlord (or authorized agent) Tenant
+    #     (or authorized agent)") drawn as one full-width ruled box -- every
+    #     true match measured here tops out at 220pt wide (this construct's
+    #     own generator caps cell width there), so R16's own page-footer
+    #     width cap (0.6 of page width) excludes these too without touching
+    #     a real one.
+    #   - a section-header cell: a tall container whose only DIRECT text is
+    #     its own caption ("Date of Last Rent Increase"), sitting somewhere
+    #     in its upper portion with real blank space on BOTH sides -- the
+    #     actual instructions and entry boxes this caption introduces are
+    #     further sub-cells below it, outside this cell's own text. Unlike a
+    #     genuine sec_label_below box, the caption here does not sit hard
+    #     against the cell's own bottom border: measured, every true match's
+    #     text bottom lands within 1pt of the cell's own bottom edge (this
+    #     construct always draws its caption's baseline a fixed few points
+    #     off that border), while this false positive's sits 11.8pt clear
+    #     of it. A small floor on that gap -- generous next to the 1pt true
+    #     cluster, nowhere near the false positive -- keeps the caption
+    #     genuinely flush against the border, which is the shape's own
+    #     definition (see sec_label_below's docstring: "hard against its
+    #     own bottom border").
+    # Applying all three together against the full tuning+holdout set: every
+    # false positive measured is gone, at the cost of 3 of 47 true matches
+    # (two coincidentally row-aligned across a two-column page layout, one a
+    # coincidental IoU match with different geometry).
+    R17_MAX_W_FRAC = R16_MAX_W_FRAC   # same page-wide-bar failure shape as R16
+    R17_ROW_EPS = 0.5                 # points; mirrors R10's own row_eps
+    R17_BOTTOM_GAP_MAX = 4            # points; true matches cluster at ~1pt
+    for cell in cells:
+        if cell in claimed:
+            continue
+        x0, top, x1, bot = cell
+        if x1 - x0 > R17_MAX_W_FRAC * W:
+            continue
+        if any(abs(o[1] - top) <= R17_ROW_EPS and abs(o[3] - bot) <= R17_ROW_EPS
+               for o in cells if o is not cell):
+            continue                      # a row-mate cell -- a table row, not a standalone field
+        inside = _text_in(words, cell)
+        if not inside:
+            continue
+        last = max(w["bottom"] for w in inside)
+        if bot - last > R17_BOTTOM_GAP_MAX:
+            continue                      # caption doesn't sit hard against the bottom border
+        footer = [w for w in inside if w["bottom"] > last - 6]
+        if [w for w in inside if w["bottom"] <= last - 6]:
+            continue                      # more than one line of text -- not this shape
+        label = " ".join(w["text"] for w in sorted(footer, key=lambda w: w["x0"]))
+        entry_bot = min(w["top"] for w in footer) - 1
+        if entry_bot - top < 11 or not (2 <= len(label) <= 60):
+            continue
+        if not HAS_LETTER.search(label) or OFFICE_USE.search(label):
+            continue
+        if not _row_has_vertical_support(cell, vrules):
+            continue
+        claimed.add(cell)
+        out.append({"page": pno, "type": "text", "label": label, "rule": "R17",
+                    "confidence": 0.5,
+                    "rect": [x0 + 2, H - entry_bot + 1.5, x1 - 2, H - top - 1.5]})
 
     # ---- R10  blank cell whose LEFT neighbour in the same row is a label ----
     # "Last Name |          |" -- the label sits in the cell to the left of the
