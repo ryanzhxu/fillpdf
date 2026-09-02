@@ -16,12 +16,12 @@ you see is what is measured.
 
 ## Where it stands
 
-Measured on commit `eccc794`, clean tree, and reproducible with
+Measured on commit `085718d`, clean tree, and reproducible with
 `python -m eval.score --corpus eval/corpus/tuning --holdout eval/holdout`:
 
-    tuning   f1 0.6392   precision 0.7770   recall 0.5428
-    holdout  f1 0.6418   precision 0.7032   recall 0.5903
-    label_plausibility 0.3115        hard corpus f1 0.454
+    tuning   f1 0.6447   precision 0.7792   recall 0.5497
+    holdout  f1 0.6424   precision 0.7034   recall 0.5911
+    label_plausibility 0.3115        hard corpus f1 0.443
     107 tests passing
 
 Corpus: 165 real government forms (419 fetched), 6,951 fillable fields, 9
