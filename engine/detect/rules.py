@@ -1281,17 +1281,18 @@ def detect(page, pno, carry_in=None):
                     "confidence": 0.6,
                     "rect": [x0 + 1, H - base - 2, x1 - 1, H - top + 9]})
 
-    # ---- R6  small empty square cell drawn with rules, not a glyph ----------
-    for cell in cells:
-        if cell in claimed:
-            continue
-        x0, top, x1, bot = cell
-        w_, h_ = x1 - x0, bot - top
-        if 20 <= w_ <= 34 and 14 <= h_ <= 34 and abs(w_ - h_) < 14 and not _text_in(words, cell):
-            claimed.add(cell)
-            out.append({"page": pno, "type": "checkbox", "label": "", "rule": "R6",
-                        "confidence": 0.5,
-                        "rect": [x0 + 2, H - bot + 2, x0 + 14, H - bot + 14]})
+    # R6 (small empty square cell drawn with rules, not a glyph) was removed:
+    # measured on the 165-form real corpus it detected 53 boxes and matched
+    # zero of them. Diagnosis: grid_cells() reconstructs "cells" from ruling
+    # lines belonging to ordinary tables, and an empty small-square slice of
+    # one of those tables is common and looks identical to a hand-drawn
+    # checkbox square from geometry alone -- there is no signal in a blank
+    # ruled cell's size that distinguishes the two. On safer.pdf, the
+    # fixture that originally motivated this rule, its "Option 1 / Option 2"
+    # consent boxes are drawn as single filled/stroked rects (not paired
+    # ruling lines), so grid_cells() never turns them into a cell in the
+    # first place -- R6 produced zero detections there even before removal,
+    # confirming it does not, in fact, cover that fixture any more.
 
     # A signature must be signed, not typed. Drop those boxes rather than invite
     # someone to type a name into them. Checkboxes are exempt: before this
