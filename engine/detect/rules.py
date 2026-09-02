@@ -65,6 +65,51 @@ def _merge_ruling_lines(rects, gap_tol=3, span_tol=2):
     return merged
 
 
+def _merged_answer_rows(h):
+    """Rows whose top border is inherited column segmentation, not real columns.
+
+    Measured on the Microsoft(R)/Publisher forms (the real/Microsoft(R) family,
+    f1 0.26 against real/Adobe's 0.74): a wide comment/answer row sits directly
+    below a genuine multi-column header, and Word draws that row's OWN top
+    border by literally reusing the header row's bottom border -- so it comes
+    out as the same N segments, even though the answer row itself has no
+    vertical dividers and its own bottom border is one continuous bar. Every
+    per-hr cell below then inherits a header column's width instead of the
+    row's true full span, producing a near-miss box a few pixels off vertically
+    but hundreds of points too narrow horizontally.
+
+    A genuine multi-column table has matching segmentation on BOTH the top
+    and bottom border of a row (checked on the real/Adobe forms, where this
+    shape does not occur), so the tell is specific: >1 segment on top,
+    exactly 1 segment on bottom, and that one bottom segment spans the full
+    width the top segments together cover. Returns {row_top: (lo, hi, bot_top)}
+    for rows matching that shape, so the caller can emit one wide cell for
+    the whole row instead of one per inherited segment.
+    """
+    rows = {}
+    for r in h:
+        rows.setdefault(r["top"], []).append(r)
+    row_tops = sorted(rows)
+    merged = {}
+    for t in row_tops:
+        segs = rows[t]
+        if len(segs) < 2:
+            continue
+        below_tops = [bt for bt in row_tops if bt > t + 4]
+        if not below_tops:
+            continue
+        bt = min(below_tops)
+        below_segs = rows[bt]
+        if len(below_segs) != 1:
+            continue
+        lo = min(s["x0"] for s in segs)
+        hi = max(s["x1"] for s in segs)
+        b = below_segs[0]
+        if b["x0"] <= lo + 3 and b["x1"] >= hi - 3:
+            merged[t] = (lo, hi, bt)
+    return merged
+
+
 def grid_cells(page):
     """Word draws table borders as thin filled rects, not lines. Rebuild the cells."""
     v = [r for r in page.rects if r["width"] < 3 and r["height"] >= 5]
@@ -72,8 +117,19 @@ def grid_cells(page):
     h = _merge_ruling_lines(h)
     if len(v) + len(h) > 2000:                      # complexity guard from the spec
         return []
+    merged_rows = _merged_answer_rows(h)
     cells = []
+    merged_done = set()
     for hr in h:
+        if hr["top"] in merged_rows:
+            lo, hi, bt = merged_rows[hr["top"]]
+            key = (hr["top"], bt)
+            if key in merged_done:
+                continue
+            merged_done.add(key)
+            if hi - lo > 20 and bt - hr["top"] > 14:
+                cells.append((round(lo, 1), hr["top"], round(hi, 1), bt))
+            continue
         below = [b for b in h if b["top"] > hr["top"] + 4
                  and b["x0"] < hr["x1"] - 4 and b["x1"] > hr["x0"] + 4]
         if not below:
