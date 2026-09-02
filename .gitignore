@@ -9,3 +9,6 @@ out/
 eval/corpus/
 eval/work/
 .env
+
+# agent worktrees are separate checkouts, never part of this tree
+.claude/
