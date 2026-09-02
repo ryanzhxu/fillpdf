@@ -1100,3 +1100,80 @@ constructs, do not re-weight again.**
 Noted while verifying and deliberately not changed: `sec_label_below` is listed
 as spent yet is still boosted at 12, so the de-boosting convention this change
 cites is not applied uniformly. Settle it one way or the other.
+
+## Iteration 30 — standalone stroked checkbox boxes (R18) — REJECTED
+
+Branch kept: `worktree-agent-a1e4f8784aa9b4f57`. Not merged.
+
+Target: SAFER's "Option 1 / Option 2" consent boxes, undetected for the whole
+project. They are single stroked rects ~25x26pt; `grid_cells()` only treats a
+rect as a ruling line below 3pt, so a lone box never becomes a cell.
+
+The candidate detected both. It also passed the gate, kept tuning and holdout
+bit-for-bit identical, and added 128 purely additive lines. **Rejected anyway**,
+on the same ground as five earlier candidates: it does not generalize.
+
+The evidence is in its own tuning history. A first pass using bounds drawn from
+the corpus (real truth checkboxes: 90% are 8.4-18pt, aspect <= 1.07) gave:
+
+    1014 detected / 98 matched
+    tuning  P 0.777 -> 0.685
+    holdout P 0.703 -> 0.609
+
+The range was then narrowed to 20-30pt, aspect <= 1.15 — which **excludes the
+size at which real checkboxes actually occur** and admits SAFER's 25x26 boxes.
+Real-corpus detections went to zero. A rule that fires on 0 of 165 forms and
+whose size window is centered on one document is fitted to that document. R6 has
+already been through this: it fired 53 times, matched 0, and was deleted.
+
+### The real finding — the corpus cannot measure this, in either direction
+
+The agent noticed truth files that annotate no checkboxes on forms visibly
+covered in tick boxes. Checked, and it is systematic:
+
+    021b4c42bfff : original PDF has 85 /Btn fields, truth keeps 0 checkboxes
+    43b1efcebeb7 : 6 truth widgets total, 1 checkbox
+
+Corpus-wide, comparing each original fillable PDF against its truth file:
+
+    forms compared                                   165
+    original /Btn (checkbox/radio) fields          2,783
+    kept as checkbox truth                         1,285      (46%)
+    LOST to the reachability filter                1,498      (54%)
+    forms with >=5 buttons and ZERO checkbox truth    41
+
+`keep_reachable()` in `eval/label.py` drops a widget that sits over nothing a
+rule can read, and `MARK_CHARS` is `CHECK_GLYPHS | {_, ., middot}` — glyph
+checkmarks, underscores, dot leaders. **A plain stroked box matches none of
+them**, so every glyph-free box checkbox is filtered out of truth.
+
+The bias runs one way and it is severe: a rule that correctly detects a checkbox
+the filter dropped is scored as a **false positive**, because truth has no
+widget there. Checkbox precision is therefore systematically understated, and
+this candidate's "1014 false positives" are of unknown composition — an unknown
+share of them are almost certainly correct detections.
+
+So the honest statement is not "R18 is wrong". It is **"R18 is unevaluable with
+this harness"**, and merging an unevaluable 128-line rule tuned to one document
+is the wrong trade. Fix the measurement first.
+
+This is exactly the failure handover limitation #4 predicted: *"The reachability
+filter defines 'reachable' by what current rules read. A future rule reading a
+new signal will find its evidence pre-filtered."* The warning was correct and
+should now be acted on rather than restated.
+
+**Consequence worth flagging: R6's deletion rests on bad evidence.** It was
+removed for firing 53 times and matching 0 — against a truth set that had
+already deleted the widgets it was looking for. Re-run that judgement after the
+corpus is fixed.
+
+### Next step, and it is the top priority
+
+Add stroked-box detection to the reachability signal set in `eval/label.py`,
+re-admit the filtered checkbox widgets, regenerate truth, and re-baseline. Then
+re-measure R18 from the branch above with principled bounds (8-30pt), not the
+SAFER-shaped window. Only then is there evidence to merge or delete on.
+
+Do not do this at the end of a session: it moves the baseline, and the rule
+against moving the baseline while candidates are in flight exists because it
+already caused one wrong conclusion.
