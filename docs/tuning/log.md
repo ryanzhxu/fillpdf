@@ -625,3 +625,56 @@ Kept, on the earlier reasoning that both constructs do occur and the rules
 correctly declined each specific instance. But two rules out of eleven that have
 never once fired on 117 real forms is the honest state of it, and a fourth would
 not be defensible.
+
+
+## Iterations 18 and 19 — the expanded corpus changed what was worth fixing
+
+With 165 real forms instead of 16, the per-rule table showed the real problems
+were in rules already shipped, not in constructs still missing:
+
+    R6    53 detected,    0 matched   P 0.000
+    R2  1430 detected,  834 matched   P 0.583   596 false positives
+    R5b  983 detected,  557 matched   P 0.567   426 false positives
+
+### 18 — R6 DELETED
+
+53 detections, zero correct, across 165 forms. They land in the GAPS BETWEEN
+real checkboxes: phantom sub-cells that grid_cells() reconstructs from a
+surrounding table's ruling. Best IoU against truth was 0.19. "Blank and squarish
+and ruled" carries no discriminating signal — ordinary tables are full of such
+cells — so there was nothing to narrow toward.
+
+**It never worked for the case it was written for.** R6 was added in the first
+batch, when the corpus was one form, to catch safer.pdf's Option 1 / Option 2
+consent boxes. Those are single 25pt stroked rects, and grid_cells() only treats
+a rect as a ruling line below 3pt, so R6 produced zero detections on safer.pdf
+before OR after removal. Eighteen iterations passed without anyone checking.
+
+The consent boxes remain undetected and are now queued as a visible gap rather
+than hidden behind a rule that appeared to cover them.
+
+### 19 — R2 requires its label to contain a letter
+
+    R2 detected 1430 -> 1328, matched 834 -> 834, precision 0.583 -> 0.628
+    tuning  f1 0.6406 -> 0.6461  P 0.7631 -> 0.7790
+    holdout f1 0.6371 -> 0.6392  P 0.6934 -> 0.6985
+    near_miss unchanged, 262 and 139
+
+85 of 369 tuning false positives removed, and zero of 594 true positives. A
+"label" made only of currency, digits, or underscores ("$31,200", "$______",
+"1.") is already-printed data or the blank-fill line itself, never a name for a
+field. Zero overlap with any true positive.
+
+The near_miss count being unchanged is the load-bearing check: it confirms none
+of the removed detections were real fields with wrong geometry, which is the
+failure mode that would have made this a bad trade.
+
+Two other heuristics were diagnosed and deliberately NOT implemented: a
+"row has a prose-wrapping sibling" test (61 FP but 2 TP lost) and a sibling-count
+test (worse than 1:1). Both left for a future iteration under the one-change
+rule.
+
+**Lesson worth keeping.** Every rule written against a thin corpus deserves
+re-examination once the corpus thickens. R6 was written against one form and
+survived eighteen iterations doing nothing but harm. The expansion from 16 to
+165 forms was worth more than any single rule added in this run.

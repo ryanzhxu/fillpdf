@@ -5,6 +5,19 @@ CHECK_GLYPHS = {"\uf063", "\uf06f"}          # Webdings box, Wingdings box
 MASK_ONLY = set("()- $.")
 SIGNATURE = re.compile(r"signatur", re.I)      # signature lines get no input box
 
+# R2's largest false-positive group, measured on the tuning corpus: a "label"
+# made up of no actual words at all -- a printed dollar amount ("$31,200"), a
+# bare percentage, a blank-fill underscore run ("$_____________"), or a bare
+# list index ("1.", "2.", "3."). None of these NAME a field; they are either
+# already-printed data (a filled specimen table's own answer) or the visual
+# blank line itself, sitting in a table row whose real entry lives in a
+# sibling column, not in the space below THIS cell. A genuine field label
+# always contains at least one word. Measured: 85 of 369 tuning-corpus R2
+# false positives are letterless by this test, spread across all three real
+# families (Adobe, Microsoft, unknown) -- and zero of R2's 594 true positives
+# are, so this costs no matched recall.
+HAS_LETTER = re.compile(r"[A-Za-z]")
+
 # R3: a column header that marks the cells below as off-limits to the
 # applicant. Measured on the tuning corpus, every single "Office Use"-headed
 # column R3 claimed was a false positive (318 of them, 0 true positives) --
@@ -953,6 +966,8 @@ def detect(page, pno, carry_in=None):
         label = " ".join(w["text"] for w in sorted(header, key=lambda w: w["x0"]))
         entry_top = max(w["bottom"] for w in header) + 1
         if bot - entry_top < 11 or not (2 <= len(label) <= 60):
+            continue
+        if not HAS_LETTER.search(label):                          # see HAS_LETTER above
             continue
         if label.endswith(":") and (x1 - x0) > W * 0.8:           # R7
             continue
