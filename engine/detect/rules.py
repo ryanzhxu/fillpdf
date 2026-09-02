@@ -322,6 +322,57 @@ def detect(page, pno):
                     "confidence": 0.6,
                     "rect": [r["x0"] + 1, H - r["top"] + 1, r["x1"] - 1, H - r["top"] + 15]})
 
+    # ---- R11  runs of dot-leader characters are write-on lines --------------
+    # Same idea as R5 (underscores) but for "Name . . . . . ." / "Amount ....."
+    # leaders. Two specific false-positive traps, both handled below:
+    #   - a prose ellipsis ("...") is sentence punctuation, not a leader. A
+    #     width-only threshold (R5's 25pt) is not enough to rule it out on its
+    #     own -- a large enough font could clear 25pt with 3 dots -- so also
+    #     require a minimum dot COUNT, set high enough that no ordinary
+    #     ellipsis (3, or a sloppy 4-5) reaches it.
+    #   - a dotted line used as a table divider/border, not a fillable line.
+    #     Two cheap tells: it runs flush against a cell's vertical rule (the
+    #     same test R5b uses to reject a rect-drawn border), and it has no
+    #     label sitting on its baseline -- a real leader is always introduced
+    #     by a label, a decorative divider is not. Unlike R5, R11 does NOT
+    #     fall back to a generic "line" label; an unlabelled run is dropped.
+    # Geometry differs from R5 on purpose: an underscore is written ABOVE the
+    # rule, but a dot leader is written ON the dots, so the box straddles the
+    # run's baseline instead of sitting entirely above it.
+    LEADER_CHARS = {".", "·", "․"}   # period, middle dot, one-dot-leader
+    LEADER_MIN_DOTS = 6
+    runs, cur, dots = [], [], 0
+    for c in sorted((c for c in page.chars if c["text"] in LEADER_CHARS or c["text"] == " "),
+                    key=lambda c: (round(c["top"]), c["x0"])):
+        is_dot = c["text"] in LEADER_CHARS
+        if cur and abs(c["top"] - cur[-1]["top"]) < 1.5 and c["x0"] - cur[-1]["x1"] < 8:
+            cur.append(c)
+            dots += is_dot
+        else:
+            if cur and dots >= LEADER_MIN_DOTS:
+                runs.append(cur)
+            cur = [c]
+            dots = 1 if is_dot else 0
+    if cur and dots >= LEADER_MIN_DOTS:
+        runs.append(cur)
+    for run in runs:
+        x0, x1 = run[0]["x0"], run[-1]["x1"]
+        if x1 - x0 < 25:
+            continue
+        base, top = run[0]["bottom"], run[0]["top"]
+        if any(abs(x["x0"] - x0) < 3 or abs(x["x0"] - x1) < 3
+               for x in vrules
+               if x["top"] <= top + 3 and x["bottom"] >= top - 3):
+            continue                       # flush against a cell border -- a divider, not a leader
+        before = [w for w in words
+                  if abs(w["bottom"] - base) < 6 and w["x1"] <= x0 + 2 and w["x1"] > x0 - 240]
+        if not before:
+            continue                       # nothing on this baseline to its left -- decorative
+        label = " ".join(w["text"] for w in sorted(before, key=lambda w: w["x0"])[-6:])
+        out.append({"page": pno, "type": "text", "label": label[:60], "rule": "R11",
+                    "confidence": 0.6,
+                    "rect": [x0 + 1, H - base - 2, x1 - 1, H - top + 9]})
+
     # ---- R6  small empty square cell drawn with rules, not a glyph ----------
     for cell in cells:
         if cell in claimed:
