@@ -10,6 +10,7 @@ precision, and the label-free guards. The holdout is never tuned against.
 | 3 | R1 uses the glyph's real bbox | 0.5133 -> 0.5304 (+.0170) | 0.1810 (unchanged) | **MERGED** |
 | 3b | harness: per-rule metrics could exceed 1.0 | n/a | n/a | **MERGED** |
 | 4 | R3 refuses office-use columns | 0.5304 -> 0.5558 (P +.105) | unchanged | **MERGED** |
+| 5 | R10 reads the label from the cell to the left | 0.5558 -> 0.5662 (+.0103) | 0.1810 -> 0.1802 (-.0008) | **MERGED, flagged** |
 
 ## Iteration 1 — MERGED
 
@@ -108,3 +109,38 @@ author warned about. A hard absolute threshold would have blocked a change worth
 Caveats kept in view: the holdout has no office-use columns, so "not worse" is
 satisfied trivially rather than demonstrated. And 92 non-office R3 false
 positives remain, concentrated in four forms with repeated line-item rows.
+
+
+## Iteration 5 — MERGED, but flagged
+
+Forms often put the label in one cell and the writing space in the cell to its
+right. R2 wants the label inside the cell; R3 wants a column header above.
+Neither could see this layout, so its recall was 0.00.
+
+    tuning   f1 +0.0103   precision +0.0032   recall +0.0109
+    holdout  f1 -0.0008 (inside tolerance)    R10 alone: 48 of 56 correct
+
+**Why it is flagged.** On the holdout R10 fired 5 times and was wrong all 5:
+section headings reused across a data table's column widths, and option words
+like "By Email" whose right-hand cell is meant for a checkbox. Telling those
+from real labels needs semantic judgement about what a heading is, not another
+structural filter.
+
+The gate passed, so I followed it rather than overriding on a hunch — but the
+five failures are rendered into `review/iteration_05_R10/` for human review.
+This is precisely the class of error a person catches and a metric does not.
+
+Filters tried and rejected by the author, worth remembering: a minimum label
+length of 2 killed real fields (bare digit row labels in numbered tables), and
+rejecting labels ending in "?" discarded a genuine one.
+
+## Process error — do not repeat
+
+I refreshed `HEAD_BASELINE.json` after iteration 4 merged, while candidate agents
+were still in flight against the older baseline. That agent measured a
+pre-iteration-4 worktree against a post-iteration-4 baseline and reasonably
+concluded the baseline was stale. It was not — its worktree was behind.
+
+**Rule: never move the baseline while candidates are in flight.** Either freeze
+it for the batch, or re-measure every candidate on the new HEAD before judging
+it, which is what happened here.
