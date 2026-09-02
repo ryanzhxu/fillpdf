@@ -6,9 +6,9 @@
     "tuning": 35
   },
   "failures": [],
-  "git_sha": "6ec4b455779b155453f34ab4f4d6b40f9749d02d",
+  "git_sha": "6dbbce2d0a90ec42c50e4b646d291f8991a30d8b",
   "guards": {
-    "box_over_ink": 0.12444046553267682,
+    "box_over_ink": 0.12311780336581045,
     "glyph_coverage": 1.0,
     "offenders": [
       {
@@ -269,15 +269,15 @@
   },
   "overall": {
     "attribution_ok": true,
-    "detected": 1885,
-    "f1": 0.7175192394748754,
-    "label_accuracy": 0.8055028462998103,
-    "label_pairs": 1054,
-    "matched": 1585,
+    "detected": 1909,
+    "f1": 0.7244484466456551,
+    "label_accuracy": 0.8098330241187384,
+    "label_pairs": 1078,
+    "matched": 1609,
     "near_miss": 27,
-    "placement": 0.8769385780096713,
-    "precision": 0.8408488063660478,
-    "recall": 0.625740228977497,
+    "placement": 0.8780257315360022,
+    "precision": 0.8428496595075956,
+    "recall": 0.6352151598894591,
     "truth": 2533
   },
   "per_family": {
@@ -452,15 +452,15 @@
     },
     "synthetic-hard/bilingual_grid-continuation-continuation_start-dotted_line-legit_checkbox-legit_line-merged_header_table-nested_table-prose_box-ragged_table-small_checkbox_row-spacer_column-underline_trap-wrapped_label": {
       "attribution_ok": true,
-      "detected": 93,
-      "f1": 0.7964601769911505,
-      "label_accuracy": 0.7926829268292683,
-      "label_pairs": 82,
-      "matched": 90,
+      "detected": 117,
+      "f1": 0.9119999999999999,
+      "label_accuracy": 0.839622641509434,
+      "label_pairs": 106,
+      "matched": 114,
       "near_miss": 0,
-      "placement": 0.9059336605012608,
-      "precision": 0.967741935483871,
-      "recall": 0.6766917293233082,
+      "placement": 0.9151735556246657,
+      "precision": 0.9743589743589743,
+      "recall": 0.8571428571428571,
       "truth": 133
     },
     "synthetic-hard/bilingual_grid-dotted_line-heading-landscape-left_label-legit_checkbox-nested_table-office_use_box-prose_box-ragged_table-spacer_column-twocol-underline_trap-wrapped_label": {
@@ -974,15 +974,15 @@
     },
     "hard_00006.pdf": {
       "attribution_ok": true,
-      "detected": 93,
-      "f1": 0.7964601769911505,
-      "label_accuracy": 0.7926829268292683,
-      "label_pairs": 82,
-      "matched": 90,
+      "detected": 117,
+      "f1": 0.9119999999999999,
+      "label_accuracy": 0.839622641509434,
+      "label_pairs": 106,
+      "matched": 114,
       "near_miss": 0,
-      "placement": 0.9059336605012608,
-      "precision": 0.967741935483871,
-      "recall": 0.6766917293233082,
+      "placement": 0.9151735556246657,
+      "precision": 0.9743589743589743,
+      "recall": 0.8571428571428571,
       "truth": 133
     },
     "hard_00007.pdf": {
@@ -1299,6 +1299,19 @@
       "recall": 0.0,
       "truth": 0
     },
+    "R3c": {
+      "attribution_ok": false,
+      "detected": 24,
+      "f1": 0.0,
+      "label_accuracy": 1.0,
+      "label_pairs": 24,
+      "matched": 24,
+      "near_miss": 0,
+      "placement": 0.9498231623374339,
+      "precision": 1.0,
+      "recall": 0.0,
+      "truth": 0
+    },
     "R4": {
       "attribution_ok": false,
       "detected": 40,
@@ -1365,6 +1378,6 @@
       "truth": 2920
     }
   },
-  "started_at": "2026-09-02T11:56:01.892171+00:00",
+  "started_at": "2026-09-02T12:36:12.730438+00:00",
   "version": 1
 }

@@ -181,6 +181,64 @@ def _cluster_columns(cells, tol=R3_COL_TOL):
     return [g["cells"] for g in groups]
 
 
+# R3c: a continuation of an R3 table across a page break. The header row
+# prints once, on the page where the table starts; the continuation on the
+# next page repeats the column edges but no header, usually with a
+# "(continued)" note. detect() is called one page at a time, so the caller
+# (engine/detect/__init__.py) threads the previous page's still-active R3
+# column headers in as `carry_in` and gets this page's back out to hand to
+# the next.
+#
+# Tried and rejected: trusting column geometry alone (matching x0/x1 within
+# R3_COL_TOL, same column count and order, first row within
+# CARRY_TOP_MARGIN of the page top) with no cue requirement. On a
+# multi-table form that reuses a standard column layout across unrelated
+# tables (common -- many forms are built from the same 2/3-equal-column
+# template), that geometry can coincidentally match the START of a new,
+# unrelated table sitting near the top of the next page, and R3c would then
+# hand it someone else's header -- a confidently wrong field name, worse
+# than leaving the row undetected. Requiring the cue costs recall on real
+# forms that omit it, but it is the difference between "carried" and
+# "guessed", and label_accuracy is gated on exactly this kind of mistake.
+CARRY_TOP_MARGIN = 120   # points; how close to the page top a continuation
+                         # table's first row must start
+CARRY_CUE_ZONE = 160     # points; where a "(continued)" cue is looked for
+CARRY_HEADER_ROW_TOL = 2 # points; same-row tolerance for the multi-column
+                         # corroboration check in detect()'s R3 section
+CONTINUED_CUE = re.compile(r"\bcontinu(?:ed|ation)\b", re.I)
+
+
+def _match_carried_columns(groups, carry_in, words):
+    """Match this page's blank, near-top column bands against the header
+    columns carried from the previous page. All-or-nothing: every carried
+    column must find a same-position, same-order match on this page, and
+    the page must carry a "(continued)"-style cue near its top. Returns
+    {id(group): spec} (the matching carry_in entry) for the groups that
+    qualify -- see R3c above.
+    """
+    if not carry_in:
+        return {}
+    if not any(CONTINUED_CUE.search(w["text"]) for w in words if w["top"] <= CARRY_CUE_ZONE):
+        return {}
+    candidates = []
+    for g in groups:
+        top = min(c[1] for c in g)
+        if top > CARRY_TOP_MARGIN:
+            continue
+        topmost = min(g, key=lambda c: c[1])
+        if _text_in(words, topmost):
+            continue                      # this band already prints its own header
+        candidates.append((g, topmost))
+    if len(candidates) != len(carry_in):
+        return {}
+    matches = {}
+    for (g, cell), spec in zip(candidates, carry_in):
+        if abs(cell[0] - spec["x0"]) > R3_COL_TOL or abs(cell[2] - spec["x1"]) > R3_COL_TOL:
+            return {}
+        matches[id(g)] = spec
+    return matches
+
+
 def _text_in(words, cell, pad=1):
     x0, top, x1, bot = cell
     return [w for w in words if w["x0"] >= x0 - pad and w["x1"] <= x1 + pad
@@ -546,7 +604,13 @@ def _multiline_label(cell, words):
     return label, entry_top
 
 
-def detect(page, pno):
+def detect(page, pno, carry_in=None):
+    """Detect fields on one page.
+
+    `carry_in` is the previous page's R3 column headers (see R3c below),
+    or None. Returns (fields, carry_out) -- carry_out is this page's own
+    still-active R3 column headers, for the caller to pass to the next page.
+    """
     H, W = page.height, page.width
     words = page.extract_words()
     out = []
@@ -590,9 +654,28 @@ def detect(page, pno):
                     "rect": [x0 + 2, H - bot + 1.5, ext_x1 - 2, H - entry_top - 1.5]})
 
     # ---- R3  empty cell, name inherited from the column header above --------
-    for group in _cluster_columns(cells):
+    groups = _cluster_columns(cells)
+    for group in groups:
         group.sort(key=lambda c: c[1])
-        header = None
+    groups.sort(key=lambda g: min(c[0] for c in g))
+    carry_matches = _match_carried_columns(groups, carry_in, words)
+    raw_carry = []          # (header_top or None, x0, x1, label) per group, before the
+                             # multi-column corroboration filter below
+    for group in groups:
+        seeded = carry_matches.get(id(group))
+        header = seeded["label"] if seeded else None
+        # (x0, x1) of the specific cell that carries `header` -- the header's
+        # OWN box, not the column-band's page-wide extent. _cluster_columns
+        # groups purely by x0 proximity, so one page-wide band can span a
+        # real table column AND, lower down the same page, an unrelated
+        # wide cell (a comment box, a prose paragraph) that merely starts at
+        # the same left margin. Using the band's aggregate min/max would
+        # inherit that unrelated cell's width -- the header's own box never
+        # does.
+        header_extent = (seeded["x0"], seeded["x1"]) if seeded else None
+        header_top = None    # top of the cell that most recently SET header on
+                             # this page; None if header is still just the seed
+        carried = seeded is not None
         for cell in group:
             txt = _text_in(words, cell)
             if txt:
@@ -601,7 +684,12 @@ def detect(page, pno):
                     # An "office use" header marks its column off-limits: no
                     # blank cell below it should be claimed as a field until
                     # a real header appears further down.
-                    header = None if OFFICE_USE.search(label) else label
+                    if OFFICE_USE.search(label):
+                        header, header_top, header_extent = None, None, None
+                    else:
+                        header, header_top = label, cell[1]
+                        header_extent = (cell[0], cell[2])
+                carried = False           # a header printed on this page always wins
                 continue
             x0, top, x1, bot = cell
             if header is None or cell in claimed:
@@ -611,9 +699,33 @@ def detect(page, pno):
             ext_x1, absorbed = _extend_row_span(cell, cells, claimed, words, vrules)
             claimed.add(cell)
             claimed.update(absorbed)
-            out.append({"page": pno, "type": "text", "label": header, "rule": "R3",
-                        "confidence": 0.6,
+            out.append({"page": pno, "type": "text", "label": header,
+                        "rule": "R3c" if carried else "R3",
+                        "confidence": 0.55 if carried else 0.6,
                         "rect": [x0 + 2, H - bot + 2, ext_x1 - 2, H - top - 2]})
+        if header is not None:
+            raw_carry.append((header_top, header_extent[0], header_extent[1], header))
+
+    # A header is only worth carrying to the next page when it is part of a
+    # genuine multi-column header ROW -- another column on this same page
+    # whose header was set at (essentially) the same top. Page-wide column
+    # clustering (_cluster_columns) groups cells purely by x-position, so an
+    # isolated, unrelated single-column label (a wrapped_label's own caption,
+    # a nested sub-field, ...) can land in its own x-band and still look like
+    # an "active header" at the bottom of the page. Carrying THAT to the next
+    # page is exactly the false-positive this rule must avoid: it would hand
+    # a confidently wrong name to a real continuation table that merely
+    # shares that column's x-position by coincidence. A header carried IN
+    # from a previous page (header_top is None -- nothing on this page set
+    # it) already passed this same check when it was first carried, so it is
+    # exempt: forward it as-is for a table that spans 3+ pages.
+    fresh_tops = [ht for ht, *_ in raw_carry if ht is not None]
+    carry_out = [
+        {"x0": x0, "x1": x1, "label": label}
+        for header_top, x0, x1, label in raw_carry
+        if header_top is None
+        or sum(abs(header_top - t) <= CARRY_HEADER_ROW_TOL for t in fresh_tops) > 1
+    ]
 
     # ---- R12  large blank cell, labelled by its own top instruction ---------
     for cell in cells:
@@ -825,4 +937,4 @@ def detect(page, pno):
             if not _runs_past(f["rect"], chars, INK_EXEMPT):
                 keep.append(f)          # contained label, not running text
         out = keep
-    return out
+    return out, carry_out

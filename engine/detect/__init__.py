@@ -16,10 +16,15 @@ def detect(pdf_path: Union[str, Path]) -> dict:
     Returns the shape defined in eval/contracts/fields.schema.json.
     """
     fields, pages = [], []
+    carry, prev_width = None, None
     with pdfplumber.open(str(pdf_path)) as pdf:
         for i, pg in enumerate(pdf.pages, 1):
             pages.append({"page": i, "width": float(pg.width), "height": float(pg.height)})
-            fields += _detect_page(pg, i)
+            if prev_width is not None and abs(pg.width - prev_width) > 1:
+                carry = None      # a page-size/orientation change breaks column geometry
+            page_fields, carry = _detect_page(pg, i, carry_in=carry)
+            fields += page_fields
+            prev_width = pg.width
 
     seen: dict = {}
     for f in fields:
