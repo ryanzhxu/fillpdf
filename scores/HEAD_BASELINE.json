@@ -2,13 +2,13 @@
   "corpus": {
     "adversarial": 0,
     "excluded": 0,
-    "holdout": 39,
-    "tuning": 103
+    "holdout": 55,
+    "tuning": 135
   },
   "failures": [],
-  "git_sha": "19fe9fb352c2ae291adccfbe6cda14e79fd0422a",
+  "git_sha": "d3864184d2e2f3f16c26c4e4f262101a57a7f38c",
   "guards": {
-    "box_over_ink": 0.08203875021818817,
+    "box_over_ink": 0.07805101573239652,
     "glyph_coverage": 1.0,
     "offenders": [
       {
@@ -252,33 +252,33 @@
         "page": 9
       }
     ],
-    "stacked_fraction": 0.04103130132956202
+    "stacked_fraction": 0.035230906576578416
   },
   "holdout": {
     "attribution_ok": true,
-    "detected": 1386,
-    "f1": 0.6740188128446318,
+    "detected": 2335,
+    "f1": 0.6350710900473934,
     "label_accuracy": "UNAVAILABLE",
     "label_pairs": 0,
-    "matched": 1039,
-    "near_miss": 98,
-    "placement": 0.7746511571396878,
-    "precision": 0.7496392496392497,
-    "recall": 0.6122569239835003,
-    "truth": 1697
+    "matched": 1608,
+    "near_miss": 145,
+    "placement": 0.7586386714173051,
+    "precision": 0.6886509635974304,
+    "recall": 0.5892268230120924,
+    "truth": 2729
   },
   "overall": {
     "attribution_ok": true,
-    "detected": 4343,
-    "f1": 0.6477526947325605,
+    "detected": 4212,
+    "f1": 0.6382211538461537,
     "label_accuracy": 0.8843441466854725,
     "label_pairs": 709,
-    "matched": 3185,
-    "near_miss": 244,
-    "placement": 0.7973887403320379,
-    "precision": 0.7333640340778264,
-    "recall": 0.5800400655618284,
-    "truth": 5491
+    "matched": 3186,
+    "near_miss": 276,
+    "placement": 0.8025549886917015,
+    "precision": 0.7564102564102564,
+    "recall": 0.5519750519750519,
+    "truth": 5772
   },
   "per_family": {
     "real/Acrobat": {
@@ -296,16 +296,16 @@
     },
     "real/Adobe": {
       "attribution_ok": true,
-      "detected": 3100,
-      "f1": 0.7187206020696142,
+      "detected": 3553,
+      "f1": 0.6656163844033084,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
-      "matched": 2292,
-      "near_miss": 220,
-      "placement": 0.7663680671279973,
-      "precision": 0.7393548387096774,
-      "recall": 0.6992068334350213,
-      "truth": 3278
+      "matched": 2535,
+      "near_miss": 288,
+      "placement": 0.765350418914523,
+      "precision": 0.7134815648747538,
+      "recall": 0.62376968503937,
+      "truth": 4064
     },
     "real/Corel": {
       "attribution_ok": true,
@@ -331,7 +331,7 @@
       "placement": 0.0,
       "precision": 0.0,
       "recall": 0.0,
-      "truth": 65
+      "truth": 126
     },
     "real/GPL": {
       "attribution_ok": true,
@@ -361,29 +361,29 @@
     },
     "real/Microsoft\u00ae": {
       "attribution_ok": true,
-      "detected": 1103,
-      "f1": 0.6853503184713375,
+      "detected": 1468,
+      "f1": 0.7159090909090909,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
-      "matched": 807,
-      "near_miss": 68,
-      "placement": 0.763565201470314,
-      "precision": 0.7316409791477788,
-      "recall": 0.6445686900958466,
-      "truth": 1252
+      "matched": 1134,
+      "near_miss": 79,
+      "placement": 0.7626410078313136,
+      "precision": 0.7724795640326976,
+      "recall": 0.6670588235294118,
+      "truth": 1700
     },
     "real/QuarkXPress(R)": {
       "attribution_ok": true,
       "detected": 12,
-      "f1": 0.3287671232876712,
+      "f1": 0.26373626373626374,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
       "matched": 12,
       "near_miss": 0,
       "placement": 0.6296184297422912,
       "precision": 1.0,
-      "recall": 0.19672131147540983,
-      "truth": 61
+      "recall": 0.1518987341772152,
+      "truth": 79
     },
     "real/unknown": {
       "attribution_ok": true,
@@ -738,6 +738,19 @@
       "recall": 0.0,
       "truth": 22
     },
+    "035b8cec3f20.pdf": {
+      "attribution_ok": true,
+      "detected": 29,
+      "f1": 0.39999999999999997,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 17,
+      "near_miss": 2,
+      "placement": 0.7682201175295653,
+      "precision": 0.5862068965517241,
+      "recall": 0.30357142857142855,
+      "truth": 56
+    },
     "067faa30db82.pdf": {
       "attribution_ok": true,
       "detected": 12,
@@ -789,6 +802,19 @@
       "precision": 0.6785714285714286,
       "recall": 0.3114754098360656,
       "truth": 61
+    },
+    "07c51f75e3b4.pdf": {
+      "attribution_ok": true,
+      "detected": 7,
+      "f1": 0.5,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 5,
+      "near_miss": 0,
+      "placement": 0.8070838181371395,
+      "precision": 0.7142857142857143,
+      "recall": 0.38461538461538464,
+      "truth": 13
     },
     "0b7c460527c6.pdf": {
       "attribution_ok": true,
@@ -842,6 +868,32 @@
       "recall": 0.28,
       "truth": 50
     },
+    "16ad6c8a75e1.pdf": {
+      "attribution_ok": true,
+      "detected": 31,
+      "f1": 0.7999999999999999,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 24,
+      "near_miss": 4,
+      "placement": 0.7960250768077705,
+      "precision": 0.7741935483870968,
+      "recall": 0.8275862068965517,
+      "truth": 29
+    },
+    "1783d04b260c.pdf": {
+      "attribution_ok": true,
+      "detected": 0,
+      "f1": 0.0,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 0,
+      "near_miss": 0,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 15
+    },
     "1887dffccd8b.pdf": {
       "attribution_ok": true,
       "detected": 6,
@@ -854,6 +906,19 @@
       "precision": 1.0,
       "recall": 0.3,
       "truth": 20
+    },
+    "19554a607907.pdf": {
+      "attribution_ok": true,
+      "detected": 3,
+      "f1": 0.3333333333333333,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 2,
+      "near_miss": 1,
+      "placement": 0.606202887303995,
+      "precision": 0.6666666666666666,
+      "recall": 0.2222222222222222,
+      "truth": 9
     },
     "1c221e4ff952.pdf": {
       "attribution_ok": true,
@@ -1050,6 +1115,32 @@
       "recall": 0.96,
       "truth": 50
     },
+    "2a3693c8cee5.pdf": {
+      "attribution_ok": true,
+      "detected": 33,
+      "f1": 0.39999999999999997,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 12,
+      "near_miss": 14,
+      "placement": 0.7364977410197673,
+      "precision": 0.36363636363636365,
+      "recall": 0.4444444444444444,
+      "truth": 27
+    },
+    "2b5d4a25dc9d.pdf": {
+      "attribution_ok": true,
+      "detected": 23,
+      "f1": 0.8837209302325583,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 19,
+      "near_miss": 0,
+      "placement": 0.6962252726868084,
+      "precision": 0.8260869565217391,
+      "recall": 0.95,
+      "truth": 20
+    },
     "2b9c4b64dd7c.pdf": {
       "attribution_ok": true,
       "detected": 11,
@@ -1062,6 +1153,19 @@
       "precision": 0.2727272727272727,
       "recall": 0.3,
       "truth": 10
+    },
+    "2b9e192a38f1.pdf": {
+      "attribution_ok": true,
+      "detected": 10,
+      "f1": 0.29629629629629634,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 4,
+      "near_miss": 1,
+      "placement": 0.5623938522522981,
+      "precision": 0.4,
+      "recall": 0.23529411764705882,
+      "truth": 17
     },
     "2c5f89f13df6.pdf": {
       "attribution_ok": true,
@@ -1088,6 +1192,19 @@
       "precision": 0.39622641509433965,
       "recall": 0.29577464788732394,
       "truth": 71
+    },
+    "31151f3702b3.pdf": {
+      "attribution_ok": true,
+      "detected": 0,
+      "f1": 0.0,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 0,
+      "near_miss": 0,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 17
     },
     "3784d9bfd2c6.pdf": {
       "attribution_ok": true,
@@ -1128,6 +1245,32 @@
       "recall": 0.18181818181818182,
       "truth": 22
     },
+    "3aab50fae7c3.pdf": {
+      "attribution_ok": true,
+      "detected": 48,
+      "f1": 0.18181818181818182,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 14,
+      "near_miss": 13,
+      "placement": 0.7414568983620337,
+      "precision": 0.2916666666666667,
+      "recall": 0.1320754716981132,
+      "truth": 106
+    },
+    "3ba5f12e662e.pdf": {
+      "attribution_ok": true,
+      "detected": 0,
+      "f1": 0.0,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 0,
+      "near_miss": 0,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 5
+    },
     "3d2127cdcb3e.pdf": {
       "attribution_ok": true,
       "detected": 10,
@@ -1140,6 +1283,32 @@
       "precision": 0.2,
       "recall": 0.18181818181818182,
       "truth": 11
+    },
+    "3e4a7b4a2ab9.pdf": {
+      "attribution_ok": true,
+      "detected": 3,
+      "f1": 0.3157894736842105,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 3,
+      "near_miss": 0,
+      "placement": 0.9170763195053918,
+      "precision": 1.0,
+      "recall": 0.1875,
+      "truth": 16
+    },
+    "4286988ae080.pdf": {
+      "attribution_ok": true,
+      "detected": 0,
+      "f1": 0.0,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 0,
+      "near_miss": 0,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 25
     },
     "43b1efcebeb7.pdf": {
       "attribution_ok": true,
@@ -1258,6 +1427,19 @@
       "recall": 0.9642857142857143,
       "truth": 28
     },
+    "5ad636c299bb.pdf": {
+      "attribution_ok": true,
+      "detected": 14,
+      "f1": 0.15384615384615383,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 2,
+      "near_miss": 0,
+      "placement": 0.7952199853119447,
+      "precision": 0.14285714285714285,
+      "recall": 0.16666666666666666,
+      "truth": 12
+    },
     "5c3e1f5fb4d9.pdf": {
       "attribution_ok": true,
       "detected": 11,
@@ -1270,6 +1452,19 @@
       "precision": 0.8181818181818182,
       "recall": 0.45,
       "truth": 20
+    },
+    "5cd16365cbf3.pdf": {
+      "attribution_ok": true,
+      "detected": 32,
+      "f1": 0.7450980392156863,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 19,
+      "near_miss": 0,
+      "placement": 0.7538782697907296,
+      "precision": 0.59375,
+      "recall": 1.0,
+      "truth": 19
     },
     "5e9df96ba7a1.pdf": {
       "attribution_ok": true,
@@ -1284,6 +1479,19 @@
       "recall": 0.2,
       "truth": 5
     },
+    "617f5789e6b0.pdf": {
+      "attribution_ok": true,
+      "detected": 0,
+      "f1": 0.0,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 0,
+      "near_miss": 0,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 10
+    },
     "620da0ea7705.pdf": {
       "attribution_ok": true,
       "detected": 33,
@@ -1296,6 +1504,19 @@
       "precision": 0.30303030303030304,
       "recall": 0.10638297872340426,
       "truth": 94
+    },
+    "63d383a1290d.pdf": {
+      "attribution_ok": true,
+      "detected": 3,
+      "f1": 0.4,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 2,
+      "near_miss": 0,
+      "placement": 0.8023348959807268,
+      "precision": 0.6666666666666666,
+      "recall": 0.2857142857142857,
+      "truth": 7
     },
     "6501d09092aa.pdf": {
       "attribution_ok": true,
@@ -1375,6 +1596,19 @@
       "recall": 0.7777777777777778,
       "truth": 18
     },
+    "737b34ff749d.pdf": {
+      "attribution_ok": true,
+      "detected": 29,
+      "f1": 0.5074626865671642,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 17,
+      "near_miss": 2,
+      "placement": 0.7645060173577172,
+      "precision": 0.5862068965517241,
+      "recall": 0.4473684210526316,
+      "truth": 38
+    },
     "741655e96b58.pdf": {
       "attribution_ok": true,
       "detected": 44,
@@ -1388,6 +1622,32 @@
       "recall": 0.6290322580645161,
       "truth": 62
     },
+    "7521a928c45f.pdf": {
+      "attribution_ok": true,
+      "detected": 4,
+      "f1": 0.08247422680412372,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 4,
+      "near_miss": 0,
+      "placement": 0.961459025171911,
+      "precision": 1.0,
+      "recall": 0.043010752688172046,
+      "truth": 93
+    },
+    "79b6022fd0ec.pdf": {
+      "attribution_ok": true,
+      "detected": 21,
+      "f1": 0.2608695652173913,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 6,
+      "near_miss": 13,
+      "placement": 0.6391853384430689,
+      "precision": 0.2857142857142857,
+      "recall": 0.24,
+      "truth": 25
+    },
     "7cf89d93333d.pdf": {
       "attribution_ok": true,
       "detected": 12,
@@ -1399,6 +1659,19 @@
       "placement": 0.5729896903793074,
       "precision": 0.75,
       "recall": 0.9,
+      "truth": 10
+    },
+    "7d9b88a20e8c.pdf": {
+      "attribution_ok": true,
+      "detected": 5,
+      "f1": 0.4,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 3,
+      "near_miss": 0,
+      "placement": 0.937108540762612,
+      "precision": 0.6,
+      "recall": 0.3,
       "truth": 10
     },
     "7ea3974dbc15.pdf": {
@@ -1505,6 +1778,45 @@
       "recall": 0.8771929824561403,
       "truth": 114
     },
+    "8ed0c3390716.pdf": {
+      "attribution_ok": true,
+      "detected": 10,
+      "f1": 0.7368421052631577,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 7,
+      "near_miss": 0,
+      "placement": 0.6589154256939638,
+      "precision": 0.7,
+      "recall": 0.7777777777777778,
+      "truth": 9
+    },
+    "8f464402de3d.pdf": {
+      "attribution_ok": true,
+      "detected": 0,
+      "f1": 0.0,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 0,
+      "near_miss": 0,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 12
+    },
+    "8f5d0f9b1472.pdf": {
+      "attribution_ok": true,
+      "detected": 34,
+      "f1": 0.4262295081967213,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 13,
+      "near_miss": 13,
+      "placement": 0.7028923985556249,
+      "precision": 0.38235294117647056,
+      "recall": 0.48148148148148145,
+      "truth": 27
+    },
     "8f7cf212b5d7.pdf": {
       "attribution_ok": true,
       "detected": 65,
@@ -1543,6 +1855,19 @@
       "precision": 0.0,
       "recall": 0.0,
       "truth": 8
+    },
+    "97e5bba5f55e.pdf": {
+      "attribution_ok": true,
+      "detected": 0,
+      "f1": 0.0,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 0,
+      "near_miss": 0,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 16
     },
     "9896f9bec560.pdf": {
       "attribution_ok": true,
@@ -1596,6 +1921,19 @@
       "recall": 0.6666666666666666,
       "truth": 6
     },
+    "a41e97b2132d.pdf": {
+      "attribution_ok": true,
+      "detected": 23,
+      "f1": 0.6101694915254238,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 18,
+      "near_miss": 2,
+      "placement": 0.6080253812012112,
+      "precision": 0.782608695652174,
+      "recall": 0.5,
+      "truth": 36
+    },
     "a4ae63e72639.pdf": {
       "attribution_ok": true,
       "detected": 10,
@@ -1634,6 +1972,45 @@
       "precision": 0.0,
       "recall": 0.0,
       "truth": 8
+    },
+    "a7d3cc2d2ab5.pdf": {
+      "attribution_ok": true,
+      "detected": 2,
+      "f1": 0.33333333333333337,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 2,
+      "near_miss": 0,
+      "placement": 0.6647053600834889,
+      "precision": 1.0,
+      "recall": 0.2,
+      "truth": 10
+    },
+    "a807fd436657.pdf": {
+      "attribution_ok": true,
+      "detected": 30,
+      "f1": 0.8405797101449275,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 29,
+      "near_miss": 0,
+      "placement": 0.8977421752641749,
+      "precision": 0.9666666666666667,
+      "recall": 0.7435897435897436,
+      "truth": 39
+    },
+    "a8b8d56db832.pdf": {
+      "attribution_ok": true,
+      "detected": 0,
+      "f1": 0.0,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 0,
+      "near_miss": 0,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 17
     },
     "aab2882c5776.pdf": {
       "attribution_ok": true,
@@ -1739,6 +2116,19 @@
       "recall": 0.8571428571428571,
       "truth": 14
     },
+    "b551e45bf66a.pdf": {
+      "attribution_ok": true,
+      "detected": 35,
+      "f1": 0.7666666666666667,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 23,
+      "near_miss": 0,
+      "placement": 0.7997265642981624,
+      "precision": 0.6571428571428571,
+      "recall": 0.92,
+      "truth": 25
+    },
     "b642646180f3.pdf": {
       "attribution_ok": true,
       "detected": 0,
@@ -1751,6 +2141,32 @@
       "precision": 0.0,
       "recall": 0.0,
       "truth": 15
+    },
+    "b7304091e6c9.pdf": {
+      "attribution_ok": true,
+      "detected": 4,
+      "f1": 0.26666666666666666,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 2,
+      "near_miss": 0,
+      "placement": 0.8982763849249285,
+      "precision": 0.5,
+      "recall": 0.18181818181818182,
+      "truth": 11
+    },
+    "b82f5403d4b8.pdf": {
+      "attribution_ok": true,
+      "detected": 31,
+      "f1": 0.6938775510204082,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 17,
+      "near_miss": 0,
+      "placement": 0.8422794764256657,
+      "precision": 0.5483870967741935,
+      "recall": 0.9444444444444444,
+      "truth": 18
     },
     "b867991fc8b7.pdf": {
       "attribution_ok": true,
@@ -1778,6 +2194,19 @@
       "recall": 0.0,
       "truth": 11
     },
+    "b8e6fba652d2.pdf": {
+      "attribution_ok": true,
+      "detected": 0,
+      "f1": 0.0,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 0,
+      "near_miss": 0,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 5
+    },
     "b9875f59c887.pdf": {
       "attribution_ok": true,
       "detected": 142,
@@ -1790,6 +2219,19 @@
       "precision": 0.9084507042253521,
       "recall": 0.9555555555555556,
       "truth": 135
+    },
+    "bb38d0ed4006.pdf": {
+      "attribution_ok": true,
+      "detected": 31,
+      "f1": 0.6382978723404255,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 15,
+      "near_miss": 0,
+      "placement": 0.7227519853240857,
+      "precision": 0.4838709677419355,
+      "recall": 0.9375,
+      "truth": 16
     },
     "bbe157935f8a.pdf": {
       "attribution_ok": true,
@@ -1869,6 +2311,19 @@
       "recall": 0.0847457627118644,
       "truth": 59
     },
+    "c2d70ba35e5e.pdf": {
+      "attribution_ok": true,
+      "detected": 0,
+      "f1": 0.0,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 0,
+      "near_miss": 0,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 6
+    },
     "c336b87d545a.pdf": {
       "attribution_ok": true,
       "detected": 79,
@@ -1933,6 +2388,71 @@
       "precision": 0.5,
       "recall": 0.4444444444444444,
       "truth": 9
+    },
+    "caf48c5b1223.pdf": {
+      "attribution_ok": true,
+      "detected": 0,
+      "f1": 0.0,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 0,
+      "near_miss": 0,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 19
+    },
+    "cc00dbff9dd4.pdf": {
+      "attribution_ok": true,
+      "detected": 27,
+      "f1": 0.47500000000000003,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 19,
+      "near_miss": 6,
+      "placement": 0.721170508767933,
+      "precision": 0.7037037037037037,
+      "recall": 0.3584905660377358,
+      "truth": 53
+    },
+    "cc15fd260573.pdf": {
+      "attribution_ok": true,
+      "detected": 0,
+      "f1": 0.0,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 0,
+      "near_miss": 0,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 18
+    },
+    "cc8aaee424ee.pdf": {
+      "attribution_ok": true,
+      "detected": 0,
+      "f1": 0.0,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 0,
+      "near_miss": 0,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 16
+    },
+    "ccee57500c21.pdf": {
+      "attribution_ok": true,
+      "detected": 263,
+      "f1": 0.9866156787762906,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 258,
+      "near_miss": 0,
+      "placement": 0.7570699783749268,
+      "precision": 0.9809885931558935,
+      "recall": 0.9923076923076923,
+      "truth": 260
     },
     "ce39d13249bd.pdf": {
       "attribution_ok": true,
@@ -2025,6 +2545,19 @@
       "recall": 0.725,
       "truth": 40
     },
+    "d2a733f19394.pdf": {
+      "attribution_ok": true,
+      "detected": 0,
+      "f1": 0.0,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 0,
+      "near_miss": 0,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 18
+    },
     "d63b22132e60.pdf": {
       "attribution_ok": true,
       "detected": 30,
@@ -2077,6 +2610,45 @@
       "recall": 0.0,
       "truth": 7
     },
+    "dffb34bebfdd.pdf": {
+      "attribution_ok": true,
+      "detected": 7,
+      "f1": 0.0,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 0,
+      "near_miss": 7,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 12
+    },
+    "e0ec1099062f.pdf": {
+      "attribution_ok": true,
+      "detected": 3,
+      "f1": 0.36363636363636365,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 2,
+      "near_miss": 0,
+      "placement": 0.855158598041286,
+      "precision": 0.6666666666666666,
+      "recall": 0.25,
+      "truth": 8
+    },
+    "e4140e16ce5c.pdf": {
+      "attribution_ok": true,
+      "detected": 23,
+      "f1": 0.4444444444444444,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 12,
+      "near_miss": 1,
+      "placement": 0.6894071655403174,
+      "precision": 0.5217391304347826,
+      "recall": 0.3870967741935484,
+      "truth": 31
+    },
     "e861c5848e24.pdf": {
       "attribution_ok": true,
       "detected": 0,
@@ -2102,6 +2674,19 @@
       "precision": 0.6052631578947368,
       "recall": 0.3709677419354839,
       "truth": 62
+    },
+    "eab08a935843.pdf": {
+      "attribution_ok": true,
+      "detected": 0,
+      "f1": 0.0,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 0,
+      "near_miss": 0,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 16
     },
     "edced64b0626.pdf": {
       "attribution_ok": true,
@@ -2141,6 +2726,19 @@
       "precision": 0.5517241379310345,
       "recall": 0.64,
       "truth": 25
+    },
+    "f303bb4265f7.pdf": {
+      "attribution_ok": true,
+      "detected": 0,
+      "f1": 0.0,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 0,
+      "near_miss": 0,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 22
     },
     "f5704094c93a.pdf": {
       "attribution_ok": true,
@@ -2193,6 +2791,32 @@
       "precision": 0.8863636363636364,
       "recall": 0.8478260869565217,
       "truth": 46
+    },
+    "f71dd37c1cff.pdf": {
+      "attribution_ok": true,
+      "detected": 0,
+      "f1": 0.0,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 0,
+      "near_miss": 0,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 12
+    },
+    "f78d952c20b2.pdf": {
+      "attribution_ok": true,
+      "detected": 0,
+      "f1": 0.0,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 0,
+      "near_miss": 0,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 12
     },
     "fa6aaf4c2c55.pdf": {
       "attribution_ok": true,
@@ -2581,47 +3205,47 @@
       "label_pairs": 69,
       "matched": 614,
       "near_miss": 0,
-      "placement": 0.893158397678281,
+      "placement": 0.8931583976782809,
       "precision": 0.941717791411043,
       "recall": 1.0,
       "truth": 42
     },
     "R10": {
       "attribution_ok": false,
-      "detected": 40,
+      "detected": 41,
       "f1": 0.0,
       "label_accuracy": 0.9473684210526315,
       "label_pairs": 19,
       "matched": 25,
       "near_miss": 0,
       "placement": 0.9061377872243582,
-      "precision": 0.625,
+      "precision": 0.6097560975609756,
       "recall": 0.0,
       "truth": 0
     },
     "R11": {
       "attribution_ok": false,
-      "detected": 33,
+      "detected": 38,
       "f1": 0.0,
       "label_accuracy": 0.9696969696969697,
       "label_pairs": 33,
       "matched": 33,
       "near_miss": 0,
       "placement": 0.5637232153296095,
-      "precision": 1.0,
+      "precision": 0.868421052631579,
       "recall": 0.0,
       "truth": 0
     },
     "R12": {
       "attribution_ok": false,
-      "detected": 24,
+      "detected": 38,
       "f1": 0.0,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
-      "matched": 21,
+      "matched": 35,
       "near_miss": 0,
-      "placement": 0.9432039394766659,
-      "precision": 0.875,
+      "placement": 0.9348856350589526,
+      "precision": 0.9210526315789473,
       "recall": 0.0,
       "truth": 0
     },
@@ -2640,27 +3264,27 @@
     },
     "R2": {
       "attribution_ok": false,
-      "detected": 1155,
+      "detected": 1430,
       "f1": 1.0,
       "label_accuracy": 0.9777777777777777,
       "label_pairs": 45,
-      "matched": 675,
+      "matched": 834,
       "near_miss": 0,
-      "placement": 0.7438555213353354,
-      "precision": 0.5844155844155844,
+      "placement": 0.7372928549213831,
+      "precision": 0.5832167832167832,
       "recall": 1.0,
       "truth": 41
     },
     "R3": {
       "attribution_ok": false,
-      "detected": 1569,
+      "detected": 1958,
       "f1": 0.0,
       "label_accuracy": 0.8712374581939799,
       "label_pairs": 598,
-      "matched": 1302,
+      "matched": 1597,
       "near_miss": 0,
-      "placement": 0.8873491569850771,
-      "precision": 0.8298279158699808,
+      "placement": 0.867174038202497,
+      "precision": 0.8156281920326864,
       "recall": 0.0,
       "truth": 0
     },
@@ -2679,33 +3303,33 @@
     },
     "R5": {
       "attribution_ok": false,
-      "detected": 1189,
+      "detected": 1287,
       "f1": 1.0,
       "label_accuracy": 0.8181818181818182,
       "label_pairs": 11,
-      "matched": 952,
+      "matched": 1038,
       "near_miss": 0,
-      "placement": 0.6680769473379851,
-      "precision": 0.80067283431455,
+      "placement": 0.6750363108595145,
+      "precision": 0.8065268065268065,
       "recall": 1.0,
       "truth": 11
     },
     "R5b": {
       "attribution_ok": false,
-      "detected": 949,
+      "detected": 983,
       "f1": 0.0,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
-      "matched": 541,
+      "matched": 557,
       "near_miss": 0,
-      "placement": 0.7267434755508337,
-      "precision": 0.5700737618545838,
+      "placement": 0.7280313386638158,
+      "precision": 0.5666327568667345,
       "recall": 0.0,
       "truth": 0
     },
     "R6": {
       "attribution_ok": true,
-      "detected": 51,
+      "detected": 53,
       "f1": 0.0,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
@@ -2723,13 +3347,13 @@
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
       "matched": 0,
-      "near_miss": 342,
+      "near_miss": 421,
       "placement": 0.0,
       "precision": 0.0,
       "recall": 0.0,
-      "truth": 7094
+      "truth": 8407
     }
   },
-  "started_at": "2026-09-02T14:57:10.445577+00:00",
+  "started_at": "2026-09-02T15:02:15.538809+00:00",
   "version": 1
 }
