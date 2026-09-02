@@ -678,3 +678,39 @@ rule.
 re-examination once the corpus thickens. R6 was written against one form and
 survived eighteen iterations doing nothing but harm. The expansion from 16 to
 165 forms was worth more than any single rule added in this run.
+
+
+## Iteration 20 — R2 row-label guard: REJECTED for complexity without generalisation
+
+    tuning   f1 0.6461 -> 0.6475 (+.0014)   21 FPs removed, 0 TPs lost
+    holdout  f1 0.6392 -> 0.6392 (unchanged), 2 real fields lost
+    cost     +66 lines, three tuned constants (35%, 40pt, 96 chars)
+    gate     PASSED
+
+Rejected despite passing. The tuning gain is +0.0014, the holdout gain is
+exactly zero, and it destroys two real fields on a holdout form ("Date
+(DD/MM/YYYY)" and "Time", whose row gap of 44.7pt just cleared a 40pt
+threshold). Three constants chosen to make the tuning numbers work, delivering
+nothing on unseen forms, is a heuristic fitted to the tuning set rather than a
+mechanism.
+
+The earlier probe suggested 61 FPs for 2 TPs. The tuned implementation delivered
+21 for 0 on tuning — because a single "sibling wraps at all" test caught 62 FPs
+but cost 21 TPs, so size floors had to be added. That gap between probe and
+implementation is itself the signal: the clean version does not exist here.
+
+**Complexity is a cost no gate measures.** rules.py is 1,318 lines. Adding 66
+more with three magic numbers, for zero holdout movement, makes the detector
+harder to reason about and no better at its job.
+
+### Worth keeping from the attempt
+
+The failure mode of the simple version is documented: "sibling wraps to more
+than one line" is geometrically identical for real instructional prose and for
+short wraps like "Prov: AB" or "AM PM" split across two lines. Any future
+attempt needs to separate those by content, not by geometry, and the numbers to
+beat are 62 FP / 21 TP for the naive test.
+
+The author also declined to nudge the 40pt threshold to recover its two holdout
+losses, correctly identifying that as tuning against the holdout. That was the
+right call even though it made its own result look worse.
