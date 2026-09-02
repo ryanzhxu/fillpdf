@@ -189,3 +189,55 @@ strengthen the generator, which is queued.
 
 For reference the easy corpus sits at f1 0.949 and has not moved, so the hard
 corpus is still doing its job — just with less headroom than it had.
+
+
+## Harness round 2 — label accuracy, and a harder corpus
+
+Two measurement changes, no detector change. Detector f1 was 0.6277 before and
+after on the old corpus.
+
+### Label accuracy is now measured and gated
+
+The scorer never compared label text, so a box with the right rectangle and the
+wrong NAME scored as a perfect match. Now tracked per bucket and gated at a 0.02
+drop, but only when measurable in both runs — real stripped forms carry no truth
+labels, so it reports UNAVAILABLE rather than a fabricated 1.0.
+
+Normalisation is deliberately narrow: trailing colon, trailing date-placeholder
+parenthetical, whitespace, case. Other parentheticals are NOT collapsed, because
+truth uses "(Yes)"/"(No)" for checkbox questions and detections carry
+"(optional)" — collapsing them would hide real distinctions.
+
+**Checkbox pairs are excluded from the gated figure.** The detector gives
+checkboxes no label at all, so R1 sits at a permanent 0%. Including them would
+let a change that merely shifts the checkbox/text mix move the gate without
+touching naming accuracy — the same false alarm as an absolute box_over_ink
+threshold. Excluded from the form-level number (0.8936 -> 0.9857), still counted
+per rule so R1=0.0 stays visible.
+
+**That 0% is a product bug, queued.** A checkbox with no label means a person
+cannot tell what they are ticking and profile mapping cannot reach it. On
+safer.pdf that is 81 of 242 fields.
+
+### The hard corpus was rebuilt
+
+The detector had outgrown it — 0.644 at creation, 0.851 after four merged
+changes. New difficulty: merged group headers with no internal divider,
+dot-leader write-on lines, bilingual captions, and continuation tables whose
+header sits on the previous page.
+
+**Variety was chosen over difficulty.** The delivered version reached f1 0.682,
+but only by weighting five mechanisms so heavily that each appeared in 22-24 of
+25 forms — a stress test of five tricks, which would tune the detector to those
+tricks rather than to robustness. Dialing the weights back gives f1 0.733 with
+only one feature reaching 90% of forms. The gradient from 0.851 is what matters,
+not the last 0.05.
+
+One feature flagged as borderline by its author and kept after review:
+continuation tables exploit that detection considers one page at a time. That is
+a real detector limitation rather than a page-content trick, and the widget
+itself is an ordinary bordered cell, so it is a fair test.
+
+New baseline on the harder corpus: tuning f1 0.5387, label_accuracy 0.7984
+(down from 0.9857 — the new difficulty exposes naming failures the old corpus
+could not reach). Holdout unchanged at 0.1919, being real forms.

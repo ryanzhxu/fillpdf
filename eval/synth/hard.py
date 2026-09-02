@@ -73,6 +73,20 @@ LONG_LABELS = [
 
 NESTED_SUBFIELDS = ["Street Number and Name", "City or Town", "State and ZIP Code"]
 
+# English caption + Spanish translation on one line, as many real benefits
+# and government forms print bilingual captions. Combined with " / " this
+# reliably clears R2's 60-char label sanity cap (a guard against mistaking
+# a paragraph for a label), even though a person reads it as one short
+# caption in two languages.
+BILINGUAL_PAIRS = [
+    ("Name of Employer or Business If Self-Employed", "Nombre del Empleador o Negocio Propio"),
+    ("Complete Mailing Address Including Apartment", "Direccion Postal Completa Incluyendo Apartamento"),
+    ("Reason for Requesting This Change", "Motivo para Solicitar Este Cambio"),
+    ("Type of Income Received This Month", "Tipo de Ingreso Recibido Este Mes"),
+    ("Relationship of This Person to the Applicant", "Parentesco de Esta Persona con el Solicitante"),
+    ("Date of Your Last Certification Renewal", "Fecha de su Ultima Renovacion de Certificacion"),
+]
+
 QUESTION_POOL = [
     "Are you a U.S. citizen?", "Have you filed a return this year?",
     "Do you have dependents?", "Are you currently employed?",
@@ -284,7 +298,7 @@ def sec_ragged_table(c, rng, x0, x1, y_top, avail, style):
         row_bot = row_top - row_h
         edges = [x0]
         for i in range(1, ncols):
-            jitter = rng.uniform(-16, 16)
+            jitter = rng.uniform(-20, 20)
             edges.append(min(max(base_edges[i] + jitter, edges[-1] + 30), x1 - 30 * (ncols - i)))
         edges.append(x1)
         _hrect(c, x0, x1, row_top)
@@ -467,6 +481,124 @@ def sec_underline_trap(c, rng, x0, x1, y_top, avail, style):
     return y - 20, []
 
 
+def sec_merged_header_table(c, rng, x0, x1, y_top, avail, style):
+    """A group header row with no internal divider (one wide cell), with a
+    per-column caption typeset inside it at each data column's own x
+    position -- exactly how real forms print a merged header band, tabbed
+    or centred captions and no ruled sub-columns until the data rows begin.
+    grid_cells needs an internal vertical rule to split a row into cells;
+    there is none in the header band, so it reconstructs as a single wide
+    cell. R3's column clustering assigns that cell (by its own left edge)
+    to the leftmost data column only -- every other column never sees a
+    header cell in its own group and its blank cells go unclaimed, even
+    though a person reads the aligned caption above each column exactly as
+    intended."""
+    ncols = rng.choice([2, 3, 3])
+    headers = next((h for h in COLUMN_HEADER_SETS if len(h) == ncols), COLUMN_HEADER_SETS[0])
+    header_h = 20.0
+    row_h = rng.uniform(18, 24)
+    nrows = rng.randint(3, 5)
+    table_h = header_h + row_h * nrows
+    if table_h > avail:
+        nrows = int((avail - header_h) // row_h)
+        if nrows < 3:
+            return None
+        table_h = header_h + row_h * nrows
+    edges = [x0 + (x1 - x0) * i / ncols for i in range(ncols + 1)]
+    y_bottom = y_top - table_h
+
+    _hrect(c, x0, x1, y_top)
+    header_bot = y_top - header_h
+    _hrect(c, x0, x1, header_bot)
+    _vrect(c, x0, y_bottom, y_top)   # outer verticals span the whole table,
+    _vrect(c, x1, y_bottom, y_top)   # including the undivided header band
+    c.setFont(style.bold_font, 9)
+    for ci, htext in enumerate(headers):
+        c.drawString(edges[ci] + 3, y_top - header_h + 7, htext)
+
+    widgets = []
+    row_top = header_bot
+    for r in range(nrows):
+        row_bot = row_top - row_h
+        _hrect(c, x0, x1, row_bot)
+        for xx in edges[1:-1]:
+            _vrect(c, xx, row_bot, row_top)
+        for ci in range(ncols):
+            cx0, cx1 = edges[ci], edges[ci + 1]
+            widgets.append({"type": "text", "label": headers[ci],
+                             "rect": [cx0 + 2, row_bot + 2, cx1 - 2, row_top - 2]})
+        row_top = row_bot
+    return y_bottom, widgets
+
+
+def sec_dotted_line(c, rng, x0, x1, y_top, avail, style):
+    """A write-on line drawn as a dot leader (". . . . .") instead of
+    underscores -- a common real-forms convention. R5 only recognises runs
+    of literal underscore characters and R4 only fires inside a bordered
+    grid cell; a free-floating dot leader with a label to its left matches
+    neither rule, so nothing is ever proposed here even though the blank
+    space after the label is exactly as obvious to a human as an
+    underscore line would be."""
+    row_h = 24.0
+    if avail < row_h:
+        return None
+    size = 10
+    label = rng.choice(LABEL_POOL)
+    baseline = y_top - 14
+    c.setFont(style.body_font, size)
+    prefix = f"{label}: "
+    c.drawString(x0, baseline, prefix)
+    pw = stringWidth(prefix, style.body_font, size)
+    line_x0 = x0 + pw
+    max_w = (x1 - x0) - pw - 4
+    if max_w < 30:
+        return baseline - 10, []
+    dot = ". "
+    dw = stringWidth(dot, style.body_font, size)
+    n = max(8, int((rng.uniform(0.4, 0.85) * max_w) / dw))
+    leader = dot * n
+    c.drawString(line_x0, baseline, leader)
+    line_x1 = line_x0 + stringWidth(leader, style.body_font, size)
+    if line_x1 - line_x0 < 15.5:
+        return baseline - 10, []
+    widget = {"type": "text", "label": label,
+              "rect": [line_x0 + 1, baseline, line_x1 - 1, baseline + 12]}
+    return baseline - 10, [widget]
+
+
+def sec_bilingual_grid(c, rng, x0, x1, y_top, avail, style):
+    """A labelled cell whose header prints an English caption followed by
+    its Spanish translation on the same line -- e.g. "Reason for This
+    Request / Motivo de Esta Solicitud" -- exactly the standard-practice
+    look of a real bilingual benefits form. R2's label-length sanity cap
+    (which exists to reject a whole paragraph mistaken for a caption)
+    rejects the combined bilingual caption too, even though it reads as
+    one short label in two languages sitting on a single line."""
+    row_h = rng.uniform(28, 38)
+    if row_h > avail:
+        return None
+    y_bot = y_top - row_h
+    _hrect(c, x0, x1, y_top)
+    _hrect(c, x0, x1, y_bot)
+    _vrect(c, x0, y_bot, y_top)
+    _vrect(c, x1, y_bot, y_top)
+    size = 8
+    en, es = rng.choice(BILINGUAL_PAIRS)
+    label = f"{en} / {es}"
+    c.setFont(style.body_font, size)
+    label_baseline = y_top - 3 - size * 0.8
+    fitted = label
+    while stringWidth(fitted, style.body_font, size) > (x1 - x0 - 6) and len(fitted) > 3:
+        fitted = fitted[:-1]
+    c.drawString(x0 + 3, label_baseline, fitted)
+    entry_top = label_baseline - size * 0.3
+    if entry_top - y_bot < 11 or (x1 - x0 - 4) < 15.5:
+        return y_bot, []
+    widget = {"type": "text", "label": label,
+              "rect": [x0 + 2, y_bot + 2, x1 - 2, entry_top - 1.5]}
+    return y_bot, [widget]
+
+
 def sec_nested_table(c, rng, x0, x1, y_top, avail, style):
     """An address block: one outer bordered cell containing a 1x3 nested
     table of narrow sub-fields (street / city / state+zip) whose own
@@ -507,6 +639,86 @@ def sec_nested_table(c, rng, x0, x1, y_top, avail, style):
         widgets.append({"type": "text", "label": sub,
                          "rect": [cx0 + 2, oy_bot + 2, cx1 - 2, entry_top]})
     return oy_bot, widgets
+
+
+# ---------------------------------------------------------------------------
+# Continuation tables: a table's header prints once on the page where it
+# starts, and rows that do not fit continue at the top of the next page
+# with no header repeated -- a standard real multi-page-form convention
+# ("continued" list, no re-printed column names). The detector runs one
+# page at a time (engine/detect/rules.py:detect(page, pno)), so the header
+# on page N is simply not visible while page N+1 is scored: R3 has no
+# header cell to inherit for the continuation rows. This is dispatched
+# directly from _draw_page/generate_hard (not through SECTION_POOL)
+# because it must hand a "carry" spec across the c.showPage() boundary.
+# ---------------------------------------------------------------------------
+
+def _start_continuation_table(c, rng, x0, x1, y_top, avail, style):
+    """Draw a normal, cleanly-divided header and a few data rows -- deliberately
+    not the whole table -- and return a carry spec so the caller can continue
+    the same columns, unheaded, at the top of the next page."""
+    ncols = rng.randint(2, 3)
+    headers = next((h for h in COLUMN_HEADER_SETS if len(h) == ncols), COLUMN_HEADER_SETS[0])
+    header_h = 20.0
+    row_h = rng.uniform(18, 24)
+    max_rows = int((avail - header_h) // row_h)
+    if max_rows < 2:
+        return None
+    nrows = min(max_rows, rng.randint(2, 4))
+    edges = [x0 + (x1 - x0) * i / ncols for i in range(ncols + 1)]
+    y_bottom = y_top - header_h - nrows * row_h
+
+    _hrect(c, x0, x1, y_top)
+    _hrect(c, x0, x1, y_top - header_h)
+    for xx in edges:
+        _vrect(c, xx, y_bottom, y_top)
+    c.setFont(style.bold_font, 9)
+    for ci, htext in enumerate(headers):
+        c.drawString(edges[ci] + 3, y_top - header_h + 7, htext)
+
+    widgets = []
+    row_top = y_top - header_h
+    for r in range(nrows):
+        row_bot = row_top - row_h
+        _hrect(c, x0, x1, row_bot)
+        for ci in range(ncols):
+            cx0, cx1 = edges[ci], edges[ci + 1]
+            widgets.append({"type": "text", "label": headers[ci],
+                             "rect": [cx0 + 2, row_bot + 2, cx1 - 2, row_top - 2]})
+        row_top = row_bot
+
+    italic_font = "Helvetica-Oblique" if style.body_font == "Helvetica" else "Times-Italic"
+    c.setFont(italic_font, 8)
+    c.drawString(x0, y_bottom - 10, "(list continues on next page)")
+
+    carry = {"edges": edges, "row_h": row_h,
+             "nrows": rng.randint(3, 6), "headers": headers}
+    return y_bottom - 18, widgets, carry
+
+
+def _draw_carried_rows(c, x0, x1, y_top, style, widgets_out, carry):
+    """Top-of-page continuation of a table whose header was on the previous
+    page: same column edges, no header text, a small italic '(continued)'
+    note above the first row -- exactly what a person sees leafing from one
+    page of a real multi-page list to the next."""
+    edges, row_h = carry["edges"], carry["row_h"]
+    nrows, headers = carry["nrows"], carry["headers"]
+    italic_font = "Helvetica-Oblique" if style.body_font == "Helvetica" else "Times-Italic"
+    c.setFont(italic_font, 8)
+    c.drawString(x0, y_top - 8, "(continued)")
+    row_top = y_top - 14
+    _hrect(c, x0, x1, row_top)
+    for r in range(nrows):
+        row_bot = row_top - row_h
+        _hrect(c, x0, x1, row_bot)
+        for xx in edges:
+            _vrect(c, xx, row_bot, row_top)
+        for ci in range(len(headers)):
+            cx0, cx1 = edges[ci], edges[ci + 1]
+            widgets_out.append({"type": "text", "label": headers[ci],
+                                 "rect": [cx0 + 2, row_bot + 2, cx1 - 2, row_top - 2]})
+        row_top = row_bot
+    return row_top
 
 
 # ---------------------------------------------------------------------------
@@ -605,10 +817,26 @@ def sec_legit_line(c, rng, x0, x1, y_top, avail, style):
 HARD_FUNCS = [
     sec_wrapped_label, sec_left_label, sec_ragged_table, sec_spacer_column,
     sec_office_use_box, sec_small_checkbox_row, sec_prose_box,
-    sec_underline_trap, sec_nested_table,
+    sec_underline_trap, sec_nested_table, sec_merged_header_table,
+    sec_dotted_line, sec_bilingual_grid,
 ]
+# A modest boost for the handful of sources that measured as the cleanest,
+# highest-yield misses (see the per-feature audit in the task report) --
+# Extra turns in the pool so the harder mechanisms show up more often.
+#
+# These weights are deliberately LOW. Cranking them to 8/6/5/4/6 reaches f1
+# 0.682, but then bilingual_grid, dotted_line, merged_header_table,
+# wrapped_label and nested_table each appear in 22-24 of every 25 forms --
+# a stress test of five tricks rather than a varied sample of real forms,
+# which would tune the detector to those five rather than to robustness.
+# At these weights only one feature reaches 90% of forms and f1 is 0.733,
+# still a wide gradient below the 0.851 the detector reached on the
+# previous corpus. Variety is worth more than the extra 0.05.
+EXTRA_WEIGHT = ([sec_dotted_line] * 2 + [sec_wrapped_label] * 2
+                + [sec_merged_header_table] * 2 + [sec_nested_table] * 1
+                + [sec_bilingual_grid] * 2)
 LEGIT_FUNCS = [sec_legit_grid, sec_legit_checkbox, sec_legit_line]
-SECTION_POOL = HARD_FUNCS * 3 + LEGIT_FUNCS
+SECTION_POOL = HARD_FUNCS * 3 + EXTRA_WEIGHT + LEGIT_FUNCS
 
 
 def _run_section(fn, c, rng, x0, x1, y, avail, style):
@@ -641,13 +869,37 @@ def _fill_column(c, rng, x0, x1, y_top, y_floor, style, widgets_out, tags):
         y = new_y - rng.uniform(6, 14)
 
 
-def _draw_page(c, rng, widgets_out, tags, page_w, page_h):
-    margin = rng.choice([36, 45, 54])
+def _draw_page(c, rng, widgets_out, tags, page_w, page_h,
+               carry_in=None, forced_margin=None, allow_continuation_start=False):
+    """Returns (new_carry, next_page_forced_margin). new_carry is not None
+    only when this page starts a continuation table that must resume,
+    unheaded, at the top of the next page -- see the continuation-table
+    block above sec_legit_grid. Carries are single-hop: a page consuming
+    carry_in never itself starts a new one, so there is at most one
+    outstanding carry at a time."""
+    margin = forced_margin if forced_margin is not None else rng.choice([36, 45, 54])
     body_font = rng.choice(BODY_FONTS)
     style = Style(body_font)
     y_top = page_h - margin
     y_floor = margin
-    if rng.random() < 0.3:
+
+    if carry_in is not None:
+        y_top = _draw_carried_rows(c, margin, page_w - margin, y_top, style, widgets_out, carry_in)
+        tags.add("continuation")
+
+    new_carry = None
+    if (carry_in is None and allow_continuation_start
+            and (y_top - y_floor) > 90 and rng.random() < 0.65):
+        result = _start_continuation_table(c, rng, margin, page_w - margin, y_top,
+                                            y_top - y_floor, style)
+        if result is not None:
+            new_y, widgets, spec = result
+            widgets_out.extend(widgets)
+            tags.add("continuation_start")
+            y_top = new_y - rng.uniform(6, 14)
+            new_carry = spec
+
+    if carry_in is None and new_carry is None and rng.random() < 0.3:
         gutter = 18
         col_w = (page_w - 2 * margin - gutter) / 2
         _fill_column(c, rng, margin, margin + col_w, y_top, y_floor, style, widgets_out, tags)
@@ -656,6 +908,9 @@ def _draw_page(c, rng, widgets_out, tags, page_w, page_h):
         tags.add("twocol")
     else:
         _fill_column(c, rng, margin, page_w - margin, y_top, y_floor, style, widgets_out, tags)
+
+    next_forced_margin = margin if new_carry is not None else None
+    return new_carry, next_forced_margin
 
 
 def generate_hard(seed: int, out_dir) -> tuple:
@@ -670,21 +925,38 @@ def generate_hard(seed: int, out_dir) -> tuple:
     rng = random.Random(seed)
     num_pages = rng.randint(1, 3)
 
+    # Decide every page's orientation up front (rng draws stay in page order)
+    # so a continuation table can check whether the next page matches the
+    # current one before committing to carry column edges across the
+    # showPage() boundary.
+    page_specs = []
+    for pno in range(1, num_pages + 1):
+        landscape = num_pages > 1 and rng.random() < 0.15
+        page_w, page_h = (PAGE_H, PAGE_W) if landscape else (PAGE_W, PAGE_H)
+        page_specs.append((page_w, page_h, landscape))
+
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=(PAGE_W, PAGE_H), invariant=1, pageCompression=1)
 
     all_widgets = []
     tags = set()
     page_dims = []
+    carry = None
+    forced_margin = None
     for pno in range(1, num_pages + 1):
-        landscape = num_pages > 1 and rng.random() < 0.15
-        page_w, page_h = (PAGE_H, PAGE_W) if landscape else (PAGE_W, PAGE_H)
+        page_w, page_h, landscape = page_specs[pno - 1]
         c.setPageSize((page_w, page_h))
         page_dims.append((pno, page_w, page_h))
         if landscape:
             tags.add("landscape")
+        has_next = pno < num_pages
+        next_same_orientation = has_next and page_specs[pno][:2] == (page_w, page_h)
         page_widgets = []
-        _draw_page(c, rng, page_widgets, tags, page_w, page_h)
+        carry, forced_margin = _draw_page(
+            c, rng, page_widgets, tags, page_w, page_h,
+            carry_in=carry, forced_margin=forced_margin,
+            allow_continuation_start=has_next and next_same_orientation,
+        )
         for w in page_widgets:
             w["page"] = pno
         all_widgets.extend(page_widgets)
