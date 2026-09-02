@@ -11,6 +11,7 @@ precision, and the label-free guards. The holdout is never tuned against.
 | 3b | harness: per-rule metrics could exceed 1.0 | n/a | n/a | **MERGED** |
 | 4 | R3 refuses office-use columns | 0.5304 -> 0.5558 (P +.105) | unchanged | **MERGED** |
 | 5 | R10 reads the label from the cell to the left | 0.5558 -> 0.5662 (+.0103) | 0.1810 -> 0.1802 (-.0008) | **MERGED, flagged** |
+| 6 | R3 clusters ragged columns (tol 16pt) | 0.5662 -> 0.6277 (+.0616) | 0.1802 -> 0.1919 (+.0116) | **MERGED** |
 
 ## Iteration 1 — MERGED
 
@@ -144,3 +145,47 @@ concluded the baseline was stale. It was not — its worktree was behind.
 **Rule: never move the baseline while candidates are in flight.** Either freeze
 it for the batch, or re-measure every candidate on the new HEAD before judging
 it, which is what happened here.
+
+
+## Iteration 6 — MERGED, best change of the run
+
+R3 grouped cells into columns by exact match on the left x coordinate. Real
+tables are ragged, so one logical column scattered into single-cell groups with
+no header above them. Clustering at 16pt tolerance:
+
+    tuning   f1 0.5662 -> 0.6277 (+.0616)   precision +.0180   recall +.0683
+    holdout  f1 0.1802 -> 0.1919 (+.0116)   precision +.0104   recall +.0096
+
+The first change to improve the holdout on all three metrics.
+
+### The finding that matters more than the change
+
+**The gate is structurally blind to mislabelling.** `eval/match.py` compares
+page, type family and rect IoU. It never compares label text. A detection that
+merges two adjacent columns under the WRONG header scores as a perfect match.
+
+Sweeping the tolerance, f1 climbed smoothly all the way to tol=60 with no
+precision penalty, while an independent label-accuracy check showed mislabelling
+rising to 10.7% with a cliff between 40 and 50. The author chose tol=16 on that
+evidence (1.34% mislabel) rather than the value the gate rewarded.
+
+Field names are not cosmetic. A wrongly named field maps a stored profile value
+into the wrong box on somebody's application. **Label accuracy must become a
+tracked metric and a gate condition.** Queued.
+
+Also rejected and worth keeping: clustering on both x0 and x1 was strictly worse
+on precision AND recall — a ragged column's right edge does not drift in
+lock-step with its left.
+
+### The hard corpus is exhausted
+
+The detector now scores f1 0.851 on the hard corpus, up from 0.644, against a
+0.85 ceiling. That is the detector outgrowing the corpus, not a regression.
+
+The assertion is re-scoped as an explicit **generator-quality tripwire**: it
+fires when the generator needs new difficulty, never as a reason to make the
+detector worse. Raising its threshold is only legitimate alongside work to
+strengthen the generator, which is queued.
+
+For reference the easy corpus sits at f1 0.949 and has not moved, so the hard
+corpus is still doing its job — just with less headroom than it had.
