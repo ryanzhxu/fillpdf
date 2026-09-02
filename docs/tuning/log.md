@@ -1177,3 +1177,42 @@ SAFER-shaped window. Only then is there evidence to merge or delete on.
 Do not do this at the end of a session: it moves the baseline, and the rule
 against moving the baseline while candidates are in flight exists because it
 already caused one wrong conclusion.
+
+## Iteration 30b — two new hard-corpus constructs — MERGED
+
+`57774aa`
+
+    hard corpus f1 0.454 -> 0.428   (P 0.892, R 0.282)
+    MAX_ALLOWED_F1 unchanged at 0.48; 107 tests
+
+Difficulty **added**, not re-weighted. The previous round bought headroom by
+de-boosting a solved construct — legitimate maintenance, but a one-time move
+that left the corpus with a single unsolved boosted construct and 0.026 of
+headroom. This restores it properly.
+
+**`sec_bracket_checkbox`** — a checkbox written as literal ASCII, `"[ ] Yes"`.
+R1 fires only on the two Webdings/Wingdings codepoints in `CHECK_GLYPHS`, and
+no rect is drawn at all, so no cell-walking rule reaches it either. Isolated
+recall 5.0%. Ordinary on plain-text and faxed forms, and on forms transcribed
+to accessible plain text for screen readers.
+
+**`sec_short_underscore_field`** — a ~20pt underscore run, `"Middle Initial:
+____"`. R5 requires a run of at least 25pt, a guard against decorative
+mid-sentence underscores, so a genuine one-character field falls under the floor
+and is silently skipped. Isolated recall 8.4%. Ordinary on ID, tax, and
+voter-registration forms.
+
+The second names a real detector limitation, not merely a synthetic one:
+single-character fields — middle initial, suffix, apartment number,
+province code — are common and currently unreachable by R5 at any width below
+its floor. Taken up immediately as the next iteration.
+
+Both measured in isolation before being believed, using the module's own method.
+Two constructs earlier in this project measured the *opposite* of their intent
+and were caught only this way.
+
+Considered and not built: a `"Circle One: Yes No"` bare-text choice. It would
+exploit the same code path as `sec_bracket_checkbox` — no rect, no glyph —
+rather than a structurally distinct blind spot. Rejected on reasoning before
+implementation, so there is no measurement for it, and it is recorded here as a
+reasoning-only rejection rather than an empirical one.
