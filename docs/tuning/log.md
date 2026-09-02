@@ -805,3 +805,44 @@ Scores now carry `git_dirty` and a `detector_fingerprint` (sha256 of
 engine/detect/*.py as it was on disk). The fingerprint identifies the code that
 actually produced the numbers; git_dirty says whether the sha can be trusted
 alone.
+
+
+## Iteration 25 — R3 inherits a header from free-floating page text: MERGED
+
+    10 of 185 flagged widgets recovered, 0 false positives
+    tuning  f1 0.6528 -> 0.6541  P 0.7894 -> 0.7899  R 0.5565 -> 0.5582
+    holdout completely unchanged; label_accuracy bit-identical
+    near_miss unchanged at 261
+
+R3 could only read a column header off a `grid_cells()` cell, so a heading that
+prints as free page text with no ruling around it was invisible — though a person
+reading the page sees it plainly. Four guards together: tight horizontal
+alignment to the column's own first row (6pt), vertical proximity (24pt),
+heading shape, and corroboration by an adjacent column at the same line-top.
+
+### The finding that matters more than the change
+
+Two earlier versions recovered MORE fields and were discarded. The corroboration-
+only version added 17 matches, but on `0b7c460527c6.pdf` those matches carried
+labels like "ADDRESS OF" and "BEING RENTED TO TENANT(s)" — fragments of one
+run-on sentence straddling a column boundary, not field names.
+
+**The scorer would have counted every one of them as a recall gain**, because
+box-IoU matching is all it does on real forms. Real stripped forms carry no truth
+labels, so `label_accuracy` reports UNAVAILABLE for them and cannot see this.
+
+So there is a live blind spot: **on real forms, label quality is unmeasured**. A
+change can raise recall while silently attaching nonsense names, and only manual
+inspection catches it. This is the same class of failure as the original
+label-blindness fixed in harness round 2, but scoped to exactly the corpus where
+truth labels do not exist — which is now 165 of the forms.
+
+The fix that caught it is worth naming: reject a candidate when a floating word
+on the shared line overlaps the physical GAP between two cells. A real header row
+has words inside each column; a run-on sentence has a word bridging them.
+
+### Yield note
+
+10 of 185 is a low recovery rate, deliberately. The remaining 175 need signals
+this rule refuses to guess at. Zero holdout effect because no holdout form
+triggers it at all.

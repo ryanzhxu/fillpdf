@@ -5,12 +5,12 @@
     "holdout": 55,
     "tuning": 135
   },
-  "detector_fingerprint": "d20bb644b157",
+  "detector_fingerprint": "a03b7a25f3c7",
   "failures": [],
   "git_dirty": true,
-  "git_sha": "e4f15673f202d0a3b43b8b44103335279489b1d4",
+  "git_sha": "3679033960d06683838cec88dcb843300b339879",
   "guards": {
-    "box_over_ink": 0.07048458149779736,
+    "box_over_ink": 0.07037386113729187,
     "glyph_coverage": 1.0,
     "offenders": [
       {
@@ -271,15 +271,15 @@
   },
   "overall": {
     "attribution_ok": true,
-    "detected": 4069,
-    "f1": 0.6527791891067981,
+    "detected": 4079,
+    "f1": 0.6541467871282104,
     "label_accuracy": 0.8843441466854725,
     "label_pairs": 709,
-    "matched": 3212,
+    "matched": 3222,
     "near_miss": 261,
-    "placement": 0.8036025029507081,
-    "precision": 0.7893831408208405,
-    "recall": 0.5564795564795565,
+    "placement": 0.8035687709672443,
+    "precision": 0.7898994851679333,
+    "recall": 0.5582120582120582,
     "truth": 5772
   },
   "per_family": {
@@ -298,15 +298,15 @@
     },
     "real/Adobe": {
       "attribution_ok": true,
-      "detected": 3443,
-      "f1": 0.681497269215399,
+      "detected": 3453,
+      "f1": 0.6832512970599973,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
-      "matched": 2558,
+      "matched": 2568,
       "near_miss": 267,
-      "placement": 0.7668964421901625,
-      "precision": 0.7429567237873947,
-      "recall": 0.6294291338582677,
+      "placement": 0.7669970559584199,
+      "precision": 0.7437011294526499,
+      "recall": 0.6318897637795275,
       "truth": 4064
     },
     "real/Corel": {
@@ -794,15 +794,15 @@
     },
     "077cfa584877.pdf": {
       "attribution_ok": true,
-      "detected": 23,
-      "f1": 0.4523809523809524,
+      "detected": 33,
+      "f1": 0.6170212765957447,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
-      "matched": 19,
+      "matched": 29,
       "near_miss": 0,
-      "placement": 0.7993409606681509,
-      "precision": 0.8260869565217391,
-      "recall": 0.3114754098360656,
+      "placement": 0.7970627183269531,
+      "precision": 0.8787878787878788,
+      "recall": 0.47540983606557374,
       "truth": 61
     },
     "07c51f75e3b4.pdf": {
@@ -3279,14 +3279,14 @@
     },
     "R3": {
       "attribution_ok": false,
-      "detected": 1958,
+      "detected": 1968,
       "f1": 0.0,
       "label_accuracy": 0.8712374581939799,
       "label_pairs": 598,
-      "matched": 1597,
+      "matched": 1607,
       "near_miss": 0,
-      "placement": 0.867174038202497,
-      "precision": 0.8156281920326864,
+      "placement": 0.8667108149273021,
+      "precision": 0.8165650406504065,
       "recall": 0.0,
       "truth": 0
     },
@@ -3343,6 +3343,6 @@
       "truth": 8407
     }
   },
-  "started_at": "2026-09-02T18:02:12.987849+00:00",
+  "started_at": "2026-09-02T18:44:54.876337+00:00",
   "version": 1
 }

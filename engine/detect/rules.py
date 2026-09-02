@@ -444,6 +444,122 @@ def _group_header_splits(cells, words):
     return wide_labels, seeds
 
 
+# R3 floating header: a column heading that prints as ordinary page text,
+# enclosed by no ruling at all, directly above a column whose first ruled
+# row is blank. Measured in the missed-fields diagnosis: 185 widgets sit in
+# a correctly-ruled, correctly-claimed column whose true header exists on
+# the page as free text, but grid_cells() never turns it into a cell, so
+# R3's per-cell scan (the `if txt:` branch in detect()) never sees it.
+#
+# Loose x-band matching is not safe on its own: diagnosed on
+# 077cfa584877.pdf page 1, where the nearest above-and-aligned text for one
+# column was unrelated address-line text from a different section that
+# merely shared its x-position. Guards apply together, and the last one is
+# the strongest:
+#   - tight horizontal alignment to the column's OWN first-row cell, not
+#     the page-wide cluster tolerance (FLOAT_COL_TOL, well under R3_COL_TOL)
+#   - tight vertical proximity: the text must sit just above that row, not
+#     merely higher up the page (FLOAT_GAP_MAX)
+#   - heading shape: short and word-like, not a sentence (a length cap, a
+#     word-count cap, and a ban on sentence-final punctuation)
+#   - corroboration: a real header row supplies headers for several
+#     ADJACENT columns from the SAME text line at once; a stray aligned
+#     line, by construction, only ever matches one column. A candidate is
+#     kept only when its immediate neighbor (left or right) also has a
+#     candidate at essentially the same top -- a lone match is discarded,
+#     full stop, regardless of how heading-like it looks.
+#   - no bridging word: even two adjacent columns both getting a candidate
+#     is not enough on its own. Measured on two further tuning forms
+#     (741655e96b58.pdf, 8cc1430f0065.pdf): a single continuous title/
+#     sentence ("Name of Person / Summons given to", "Requires Service of
+#     Process Under...") can straddle a real column boundary, dropping a
+#     mid-sentence word (the one that would not fit either column's tight
+#     window) and leaving what LOOKS like two clean, corroborating headers
+#     on either side of it. The tell is that dropped word: it sits, on the
+#     same line, in the actual gap between the two cells themselves ("of
+#     Process" spanning the gap in the Illinois example). A genuine two-
+#     column header has nothing printed in that gap -- the whole point of
+#     drawing two columns is that the two headings are separate phrases.
+#     So a pair is only accepted as corroborating when no floating word on
+#     their shared line overlaps the space between their two cells.
+FLOAT_COL_TOL = 6      # points; tight column-alignment window, see above
+FLOAT_GAP_MAX = 24     # points; header must sit just above its first row
+FLOAT_ROW_TOL = 3      # points; "same text line" window for corroboration
+FLOAT_MAX_WORDS = 6    # a heading is a few words, not a sentence
+
+
+def _floating_headers(groups, cells, words):
+    """Seed a header for a column whose own cells never carry text, read
+    from free page text sitting just above its first row -- see R3 floating
+    header above. `groups` must already be sorted so each group's cells are
+    ordered top to bottom (as detect() does before calling this).
+
+    Returns {id(group): {"label", "x0", "x1", "top"}} for the columns whose
+    candidate survives the corroboration check.
+    """
+    in_cell = set()
+    for c in cells:
+        for w in _text_in(words, c):
+            in_cell.add(id(w))
+    floating = [w for w in words if id(w) not in in_cell]
+
+    candidates = []
+    for g in groups:
+        top_cell = g[0]
+        if _text_in(words, top_cell):
+            continue                 # own cell already carries text
+        x0, top, x1, _bot = top_cell
+        band = [w for w in floating
+                if w["bottom"] <= top and w["bottom"] >= top - FLOAT_GAP_MAX
+                and w["x0"] >= x0 - FLOAT_COL_TOL and w["x1"] <= x1 + FLOAT_COL_TOL]
+        if not band:
+            continue
+        line_top = max(w["top"] for w in band)     # nearest line above the row
+        line = sorted((w for w in band if abs(w["top"] - line_top) <= FLOAT_ROW_TOL),
+                      key=lambda w: w["x0"])
+        if len(line) > FLOAT_MAX_WORDS:
+            continue
+        label = " ".join(w["text"] for w in line)
+        if not (2 <= len(label) <= 40):
+            continue
+        if not HAS_LETTER.search(label) or OFFICE_USE.search(label):
+            continue
+        if label.rstrip()[-1:] in ".?":
+            continue
+        if "=" in label:
+            # A column captioned with an equation ("Column F = Col. E -
+            # Col. D") names a COMPUTED result, not a field the applicant
+            # fills in by hand -- measured on 077cfa584877.pdf, the one
+            # tuning form where this pattern occurs: the real header row
+            # legitimately corroborates (Column D | Column E | the formula
+            # column, all from one clean line, no bridging word), but truth
+            # carries no widget at all under the formula column, so the
+            # heading-shape guards above do not, on their own, keep this out.
+            continue
+        # x0/x1 here are the CELL's own edges (not the label's word span) --
+        # bridged() below needs the actual ruled gap between columns.
+        candidates.append({"group": g, "label": label, "top": line_top, "x0": x0, "x1": x1})
+
+    candidates.sort(key=lambda c: c["x0"])
+
+    def bridged(a, b):
+        lo, hi = a["x1"], b["x0"]
+        line_top = (a["top"] + b["top"]) / 2
+        return any(abs(w["top"] - line_top) <= FLOAT_ROW_TOL and w["x0"] < hi and w["x1"] > lo
+                   for w in floating)
+
+    seeds = {}
+    for i, c in enumerate(candidates):
+        prev_ok = (i > 0 and abs(candidates[i - 1]["top"] - c["top"]) <= FLOAT_ROW_TOL
+                   and not bridged(candidates[i - 1], c))
+        next_ok = (i + 1 < len(candidates) and abs(candidates[i + 1]["top"] - c["top"]) <= FLOAT_ROW_TOL
+                   and not bridged(c, candidates[i + 1]))
+        if not (prev_ok or next_ok):
+            continue
+        seeds[id(c["group"])] = {"label": c["label"], "x0": c["x0"], "x1": c["x1"], "top": c["top"]}
+    return seeds
+
+
 # R1 label: a checkbox's option text sits right next to its glyph, usually to
 # the right ("[x] Yes"), sometimes to the left ("Yes [x]"). Measured on this
 # corpus, the gap from a glyph to its own label word, and the gap between two
@@ -1016,6 +1132,10 @@ def detect(page, pno, carry_in=None):
                 split_seed_by_group[id(g)] = {"label": label, "x0": sub_cell[0], "x1": sub_cell[2],
                                                "top": wide_top}
                 break
+    # A floating header (see _floating_headers above) only fills a column
+    # that gets no header from any other source -- a real header row, split
+    # header, or carried-in header always takes precedence.
+    float_seed_by_group = _floating_headers(groups, cells, words)
     raw_carry = []          # (header_top or None, x0, x1, label) per group, before the
                              # multi-column corroboration filter below
     for group in groups:
@@ -1024,7 +1144,9 @@ def detect(page, pno, carry_in=None):
         # previous page -- carry_in already passed this same corroboration
         # check once, and takes precedence.
         split_seed = split_seed_by_group.get(id(group)) if seeded is None else None
-        active_seed = seeded or split_seed
+        float_seed = (float_seed_by_group.get(id(group))
+                      if seeded is None and split_seed is None else None)
+        active_seed = seeded or split_seed or float_seed
         header = active_seed["label"] if active_seed else None
         # (x0, x1) of the specific cell that carries `header` -- the header's
         # OWN box, not the column-band's page-wide extent. _cluster_columns
@@ -1037,10 +1159,16 @@ def detect(page, pno, carry_in=None):
         header_extent = (active_seed["x0"], active_seed["x1"]) if active_seed else None
         # top of the cell that most recently SET header on this page; None if
         # header is still just a carried-in seed. A group-header split seed
-        # is NOT carried in -- its header_top is the wide row's own top, so
-        # it corroborates its sibling columns exactly like a real multi-
-        # column header row would (see the carry_out filter below).
-        header_top = split_seed["top"] if split_seed is not None else None
+        # and a floating-header seed are NOT carried in -- their header_top
+        # is the source line's own top, so each corroborates its sibling
+        # columns exactly like a real multi-column header row would (see
+        # the carry_out filter below).
+        if split_seed is not None:
+            header_top = split_seed["top"]
+        elif float_seed is not None:
+            header_top = float_seed["top"]
+        else:
+            header_top = None
         carried = seeded is not None
         # This column's own row-pitch baseline since `header` was last set.
         # `pending` is one accepted row's height not yet corroborated by a
