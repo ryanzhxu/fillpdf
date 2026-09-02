@@ -7,6 +7,8 @@ precision, and the label-free guards. The holdout is never tuned against.
 |---|---|---|---|---|
 | 1 | R9 rejects boxes on running text | 0.6274 -> 0.6360 | 0.2803 (+.0303) | **MERGED** |
 | 2 | R2 accepts multi-line labels | 0.5133 -> 0.5622 (+.0488) | 0.1810 -> 0.1788 (-.0022) | **REJECTED** |
+| 3 | R1 uses the glyph's real bbox | 0.5133 -> 0.5304 (+.0170) | 0.1810 (unchanged) | **MERGED** |
+| 3b | harness: per-rule metrics could exceed 1.0 | n/a | n/a | **MERGED** |
 
 ## Iteration 1 — MERGED
 
@@ -50,3 +52,30 @@ at the moment it first blocks a change of mine would have made every later
 result untrustworthy. The correct response to "the holdout is too small to
 adjudicate" was to grow the holdout, which is what happened -- 9 forms became
 21, and the verdict did not change.
+
+
+## Iteration 3 — MERGED
+
+R1 emitted a fixed 10x10 rect anchored at the glyph's bottom-left rather than the
+glyph's real bounding box. It only ever looked correct because every checkbox
+glyph on safer.pdf is exactly 10pt. R1 precision went 0.6093 -> 1.0000.
+
+Found by the hard-mode corpus, which varies glyph size from 8pt to 14pt. Neither
+the easy corpus nor safer.pdf could have surfaced it, since both are uniformly
+10pt. That is the hard corpus earning its keep.
+
+## Iteration 3b — harness fix
+
+Iteration 3 printed "R1 only f1 1.5330, recall 3.2826". A fraction above 1.0 is
+a bug, not a result.
+
+per_rule counts matches by the detection's rule but counts truth from the truth
+widget's `expects_rule`, which only synthetic corpora carry. On real stripped
+forms there is no rule attribution on the truth side, so matched exceeds truth.
+
+Clamping to [0,1] alone would have reported recall 1.0 — a lie dressed as a fix.
+Buckets now carry `attribution_ok`, false whenever matched exceeds truth, so an
+unavailable recall reads as unavailable rather than as a perfect score.
+
+**Read per_rule as diagnostic only.** Gating uses overall, holdout, per_family,
+precision and the guards, none of which are affected.
