@@ -1632,10 +1632,32 @@ def detect(page, pno, carry_in=None):
         left = max(left_cands, key=lambda o: o[2])
         if left in claimed:
             continue          # already its own field (R2) -- don't reuse the label
-        lx0, ltop, lx1, lbot = left
         linside = _text_in(words, left)
         if not linside:
-            continue
+            # `left` may be a narrow, purely decorative gutter column --
+            # some grid-template forms keep every row's entry box aligned
+            # by inserting a fixed-width blank cell between the label and
+            # the box, rather than sizing the label cell to fit. A gutter
+            # is narrower than R10's own 25pt floor for a candidate field
+            # (see below); anything that wide is a real cell, not a
+            # gutter, so do not walk past it. Only one such cell is
+            # crossed -- chaining past more than one blank cell risks
+            # reaching into an unrelated part of the row and inventing a
+            # confident wrong label.
+            glx0, gltop, glx1, glbot = left
+            if (glx1 - glx0) >= 25:
+                continue
+            further_cands = [o for o in cells if o[2] <= glx0 + row_eps
+                              and abs(o[1] - gltop) <= row_eps and abs(o[3] - glbot) <= row_eps]
+            if not further_cands:
+                continue
+            left = max(further_cands, key=lambda o: o[2])
+            if left in claimed:
+                continue
+            linside = _text_in(words, left)
+            if not linside:
+                continue
+        lx0, ltop, lx1, lbot = left
         lines = {}
         for w in linside:
             lines.setdefault(round(w["top"] / 3), []).append(w)
