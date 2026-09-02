@@ -16,13 +16,16 @@ you see is what is measured.
 
 ## Where it stands
 
-Measured on commit `085718d`, clean tree, and reproducible with
+Measured on commit `1c0d02b`, clean tree, and reproducible with
 `python -m eval.score --corpus eval/corpus/tuning --holdout eval/holdout`:
 
     tuning   f1 0.6447   precision 0.7792   recall 0.5497
     holdout  f1 0.6424   precision 0.7034   recall 0.5911
-    label_plausibility 0.3115        hard corpus f1 0.443
+    label_plausibility 0.3262        hard corpus f1 0.443
     107 tests passing
+
+`label_plausibility` ROSE from 0.3115, and that is not a regression — see
+limitation 6. Do not compare it across that commit.
 
 Corpus: 165 real government forms (419 fetched), 6,951 fillable fields, 9
 producer families. 110 forms tuning, 55 holdout. Plus 25 synthetic hard forms.
@@ -141,6 +144,17 @@ Two design decisions in it were learned the hard way and should not be undone:
 5. **Score files record `git_sha` at scoring time**, which is usually before the
    commit. Trust `detector_fingerprint` and `git_dirty` instead.
 
+6. **`label_plausibility` is blind to labels made of fill characters, and the
+   number just moved because of it.** The detector emits labels that are
+   ENTIRELY underscores — 77 of them corpus-wide at commit `085718d`, seven on
+   `067faa30db82.pdf` page 1 alone. The guard's gap and truncation checks
+   exempt blank/fill spans as "not prose", so a pure-underscore label matches
+   its own page trivially and is never flagged. Iteration 32 fixed the R5 case;
+   those labels fall back to the `"line"` placeholder, which honestly is not on
+   the page, so the guard flags it and the metric rose 0.3115 -> 0.3262. **The
+   output got more honest, not worse.** Values either side of `fb58183` are not
+   comparable.
+
 ## Queued, with numbers already measured
 
 **Done since the last handover** (do not re-do these): the caption-in-bottom-band
@@ -148,6 +162,19 @@ rule landed as R17 (`8250261`); the `label_plausibility` mislabelling — includ
 `'Landlord Phone # Date:'` on safer.pdf — was fixed by the gutter cut in
 `feaca36`; R10 now reads past a blank gutter cell (`89bcac9`).
 
+- **Finish the fill-character label fix — specified, measured, and reverted for
+  scope, so it is ready to pick up.** Iteration 32 fixed R5 only. The full fix
+  is: (1) add a `fill_only` signal to `eval/guards.py` flagging any label with
+  no alphabetic character; (2) move the strip out of R5 into ONE sanitisation
+  pass at the end of `detect()`, since other rules do it too (`R4` emits
+  `'....................................'` on `hard_00010.pdf`); (3) re-baseline
+  `label_plausibility`; (4) reset
+  `test_spares_ordinary_labels_the_live_detector_produces` (asserts < 0.30)
+  against the honest number. Measured when built: `fill_only` went to 0 on
+  safer.pdf, `not_found_on_page` rose 22 -> 39, safer's fraction 0.2238 ->
+  0.3357. It was backed out only because changing a rule, a guard and a test
+  threshold together needs a session that can re-baseline — not because it was
+  wrong.
 - **Fix checkbox truth first — see limitation 4.** 1,498 of 2,783 checkbox
   widgets are filtered out of ground truth. Until that is fixed no checkbox
   rule can be judged, and a rejected candidate for standalone stroked boxes is
