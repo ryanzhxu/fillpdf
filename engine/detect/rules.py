@@ -147,6 +147,75 @@ def grid_cells(page):
 
 R3_COL_TOL = 16    # points; see R3 column clustering below
 
+# R3 table-break guard: _cluster_columns groups cells page-wide by left edge
+# alone (see above), so a column-cluster can span TWO unrelated things that
+# merely start at the same x0 -- a real table, and, further down the page,
+# some other cell that happens to share its left margin (a heading's
+# underline row, a different table's column, a comment box). Walking that
+# cluster top to bottom, R3 must stop inheriting a header once the table it
+# belongs to has actually ended, or it hands that header to a cell that has
+# nothing to do with it.
+#
+# Neither signal alone is safe, and each covers the other's blind spot:
+#
+# A row-height heuristic (a candidate row's height compared against the
+# column's own established pitch) catches both known false positives -- the
+# "Name of Sponsor" and "Landlord Name" break rows measure 1.50x and 0.65x
+# their column's real rows. But height alone also flags a real, genuinely
+# ruled row that is legitimately larger than its neighbours: measured on a
+# holdout Alberta form, a truth-matched freeform "please describe" box runs
+# 183pt in a column whose other rows run 50-60pt (3.5x) -- rejecting purely
+# on height there deletes a real field, and no ratio threshold separates
+# that case from the two real breaks (its deviation is larger, not smaller).
+#
+# A vertical-ruling check (does a real vertical rule span this row's full
+# height on both edges?) directly targets the actual mechanism: grid_cells()
+# builds a row by pairing a horizontal ruling line with the CLOSEST one
+# below it that overlaps in x; when a table's real last row has no further
+# ruling below it, that pairing reaches past the table onto some unrelated
+# rule, and no vertical spans the manufactured row because the table's own
+# verticals stopped at its true end. This correctly clears the holdout
+# form's tall freeform row (it IS ruled on both edges, same as its
+# neighbours) and correctly flags both safer.pdf breaks (neither is ruled).
+# But used alone it also fires on ordinary rows in *other* tables where a
+# row's vertical happens to fall a point or two outside the matching
+# window -- real fields the height check would have left alone, since nothing
+# about their height looked wrong.
+#
+# So: require BOTH. A row only ends the table when its height breaks the
+# column's own established pitch AND it lacks the vertical support its
+# column's other rows have shown. A height anomaly with real ruling behind
+# it is a genuine oversized/undersized row, not a break; ruling noise on a
+# row of ordinary height is not treated as a break either, since only the
+# height check can trigger the question in the first place.
+R3_ROW_PITCH_TOL = 1.4     # ratio; see the two-agreeing-rows note below
+R3_VRULE_TOL_X = 2         # points; x-position match, mirrors grid_cells'
+                           # own vertical-rule window (see grid_cells above)
+R3_VRULE_TOL_Y = 3         # points; top/bottom coverage slack, mirrors
+                           # grid_cells' own hr/bot pairing tolerance
+
+# A single leading row is not enough to establish a column's pitch: the
+# first row a header inherits can itself be a stray member of the same
+# page-wide x0 cluster (measured on a second holdout form: a narrow row-
+# number box sits directly above eight genuine full-width answer rows, and
+# its height has nothing to do with theirs). So the pitch is only
+# ESTABLISHED once two consecutive accepted rows agree with each other
+# (within R3_ROW_PITCH_TOL); before that, a disagreement is not judged as a
+# break -- there is no baseline yet to break from -- and the row is simply
+# accepted, becoming the new thing the next row is compared to.
+
+
+def _row_has_vertical_support(cell, vrules):
+    """True if a real vertical rule spans this cell's full height on BOTH
+    its left and right edge -- see the R3 table-break guard above."""
+    x0, top, x1, bot = cell
+    def edge(x):
+        return any(abs(v["x0"] - x) <= R3_VRULE_TOL_X
+                   and v["top"] <= top + R3_VRULE_TOL_Y
+                   and v["bottom"] >= bot - R3_VRULE_TOL_Y
+                   for v in vrules)
+    return edge(x0) and edge(x1)
+
 
 def _cluster_columns(cells, tol=R3_COL_TOL):
     """Group grid cells into columns by proximity of the left edge.
@@ -813,6 +882,12 @@ def detect(page, pno, carry_in=None):
         # column header row would (see the carry_out filter below).
         header_top = split_seed["top"] if split_seed is not None else None
         carried = seeded is not None
+        # This column's own row-pitch baseline since `header` was last set.
+        # `pending` is one accepted row's height not yet corroborated by a
+        # second; `established` is the pitch once two rows have agreed --
+        # see the two-agreeing-rows note above R3_ROW_PITCH_TOL.
+        pending = None
+        established = None
         for cell in group:
             txt = _text_in(words, cell)
             if txt:
@@ -830,6 +905,7 @@ def detect(page, pno, carry_in=None):
                     else:
                         header, header_top = label, cell[1]
                         header_extent = own_extent
+                    pending, established = None, None   # new header -- old baseline no longer applies
                 carried = False           # a header printed on this page always wins
                 continue
             x0, top, x1, bot = cell
@@ -837,6 +913,29 @@ def detect(page, pno, carry_in=None):
                 continue
             if not (11 <= bot - top <= 70) or (x1 - x0) < 30:
                 continue
+            height = bot - top
+            height_breaks_pitch = False
+            if established is not None:
+                height_breaks_pitch = (height > established * R3_ROW_PITCH_TOL
+                                        or height < established / R3_ROW_PITCH_TOL)
+            elif pending is not None:
+                if pending * R3_ROW_PITCH_TOL >= height >= pending / R3_ROW_PITCH_TOL:
+                    established = (pending + height) / 2    # two rows agree -- pitch is now trusted
+            if height_breaks_pitch and not _row_has_vertical_support(cell, vrules):
+                # Both signals agree: this row breaks the column's own
+                # established pitch AND lacks the ruling its real rows have
+                # -- grid_cells has latched onto ruling past the table's
+                # real end. The table is over; stop inheriting.
+                header, header_top, header_extent = None, None, None
+                continue
+            if not height_breaks_pitch:
+                # A row that passed the pitch check (or that there was no
+                # baseline yet to check it against) feeds the baseline.
+                # A row only accepted on the strength of its ruling is a
+                # deliberate one-off (e.g. a freeform box) and is left out,
+                # so it cannot drag the pitch toward its own outlier size.
+                if established is None:
+                    pending = height
             ext_x1, absorbed = _extend_row_span(cell, cells, claimed, words, vrules)
             claimed.add(cell)
             claimed.update(absorbed)
