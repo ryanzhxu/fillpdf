@@ -10,8 +10,11 @@ is not, decorative heading underlines placed to bait the R5b write-on-line
 rule, checkboxes at sizes the detector's R6 window does not cover, a
 nested sub-table inside a cell, a caption governing a GROUP of separate
 blank strips rather than one, a rotated caption sitting outside a box's
-own border in an unbordered margin gutter, and a continuation table whose
-columns reflow to different widths across the page break.
+own border in an unbordered margin gutter, a continuation table whose
+columns reflow to different widths across the page break, a blank ruled
+column separating a row's label from its own entry box, and a field whose
+only cue is the blank space after a printed label -- no rule, box, or dot
+of any kind.
 
 Every truth widget still corresponds to something a human would obviously
 read as "write here": a bordered blank cell, a blank cell under a printed
@@ -1096,6 +1099,130 @@ def sec_legit_line(c, rng, x0, x1, y_top, avail, style):
     return baseline - 10, [widget]
 
 
+def sec_gutter_left_label(c, rng, x0, x1, y_top, avail, style):
+    """Like sec_left_label, but with a third, wholly blank ruled cell
+    inserted BETWEEN the label cell and the entry cell -- a narrow, purely
+    decorative gutter column with no text of its own at all, drawn so that
+    every row's entry box starts at the same x regardless of how long that
+    row's own label is (a fixed-width template column rather than one sized
+    to fit the label).
+
+    R10 reads a blank cell's label from "the cell to the left, sharing this
+    row's exact top/bottom" -- but it takes the CLOSEST such cell, not the
+    nearest one with actual text, and it places NO upper bound on how far
+    away that cell may sit. An early version of this construct picked the
+    gutter's width from the same range grid_cells() itself uses as its own
+    cell-width floor (20pt) and measured only 30% recall on the intent --
+    because three-quarters of the time the gutter fell narrower than 20pt,
+    grid_cells() never turned it into a cell of its own at all, and R10's
+    "closest cell to the left" then resolved straight past the empty gap to
+    the real label cell, exactly as if the gutter were not there. The gutter
+    width here (21-24pt) is chosen to sit ABOVE grid_cells()'s 20pt cell
+    floor (so it reliably becomes its own real, blank cell) but BELOW R10's
+    own 25pt floor for how wide a candidate field may be (so R10 never tries
+    to treat the gutter as a field in its own right) -- guaranteeing the
+    gutter is always the nearest real cell to the entry box's left, and it
+    always carries no text, so R10 gives up right there
+    (`if not linside: continue`) without ever looking one cell further left
+    to the real label. A person reading the row does not stop at the
+    gutter -- they read the label two cells over and write in the box at the
+    end of the row exactly the same as if the gutter were not there.
+
+    Real form family: forms built from a rigid multi-column grid template
+    where a fixed blank column keeps every entry box's left edge aligned
+    down the page no matter how long each row's own label runs -- a common
+    layout choice on typeset (not hand-drawn) government and utility forms,
+    where "Name" and "Complete Mailing Address" sit in the same-width label
+    column and the entry boxes still all start at the same x.
+    """
+    row_h = rng.uniform(16, 26)
+    if row_h > avail:
+        return None
+    label = rng.choice(LABEL_POOL)
+    label_w = min(rng.uniform(70, 120), (x1 - x0) * 0.35)
+    gutter_w = rng.uniform(21, 24)
+    entry_x0 = x0 + label_w + gutter_w
+    if x1 - entry_x0 < 40:
+        return None
+    _hrect(c, x0, x1, y_top)
+    _hrect(c, x0, x1, y_top - row_h)
+    _vrect(c, x0, y_top - row_h, y_top)
+    _vrect(c, x0 + label_w, y_top - row_h, y_top)
+    _vrect(c, entry_x0, y_top - row_h, y_top)
+    _vrect(c, x1, y_top - row_h, y_top)
+    size = 9
+    c.setFont(style.body_font, size)
+    baseline = y_top - row_h / 2 - size * 0.35
+    label_txt = label
+    while stringWidth(label_txt, style.body_font, size) > label_w - 6 and len(label_txt) > 3:
+        label_txt = label_txt[:-1]
+    c.drawString(x0 + 3, baseline, label_txt)
+    entry_top, entry_bot = y_top - 1, y_top - row_h + 1
+    if entry_top - entry_bot < 8 or x1 - entry_x0 - 4 < 15.5:
+        return None
+    widget = {"type": "text", "label": label,
+              "rect": [entry_x0 + 2, entry_bot, x1 - 2, entry_top]}
+    return y_top - row_h, [widget]
+
+
+def sec_whitespace_field(c, rng, x0, x1, y_top, avail, style):
+    """A label followed by nothing but printed blank space -- no underscore
+    run, no dot leader, no ruled line, no box of any kind -- before either
+    the next inline label or the row's own right margin. The oldest,
+    plainest write-on convention there is: "Name:                City:",
+    where the applicant writes directly in the gap after the colon, the way
+    a typewriter-era form or a simple carbon-copy intake sheet is laid out.
+
+    Every current write-on-line rule needs something DRAWN to key off: R5
+    scans literal underscore characters, R5b scans thin drawn rects, R11
+    scans dot-leader characters, and R2/R3/R4/R10/R12/R14/R16/R17 all walk
+    grid_cells(), which is built entirely from rects. This construct draws
+    no rect at all and no fill-character of any kind -- only two ordinary
+    strings on one line with a gap between them -- so none of those signals
+    exists anywhere near the field, even though a person reads the blank
+    stretch after "Name:" exactly as obviously as an underscore line.
+
+    Real form family: plain text-only forms common on older or low-budget
+    government and clinic intake sheets, and on forms transcribed to plain
+    text/typewriter layout, where two or more short fields share one line
+    as "Label:  <blank>   Label:  <blank>" with no rule drawn anywhere.
+    """
+    row_h = 22.0
+    if avail < row_h:
+        return None
+    size = 10
+    label = rng.choice(LABEL_POOL)
+    baseline = y_top - 14
+    c.setFont(style.body_font, size)
+    prefix = f"{label}: "
+    c.drawString(x0, baseline, prefix)
+    pw = stringWidth(prefix, style.body_font, size)
+    gap_start = x0 + pw
+    max_total = x1 - x0 - pw
+    if max_total < 30:
+        return baseline - 10, []
+    widgets = []
+    if rng.random() < 0.5 and max_total > 220:
+        label2 = rng.choice(LABEL_POOL)
+        gap1_w = rng.uniform(60, 120)
+        gap1_end = gap_start + gap1_w
+        suffix2 = f"{label2}: "
+        c.setFont(style.body_font, size)
+        c.drawString(gap1_end, baseline, suffix2)
+        pw2 = stringWidth(suffix2, style.body_font, size)
+        gap2_start = gap1_end + pw2
+        if gap1_w - 4 >= 15.5:
+            widgets.append({"type": "text", "label": label,
+                             "rect": [gap_start + 1, baseline - 1, gap1_end - 3, baseline + 11]})
+        if x1 - gap2_start - 4 >= 15.5:
+            widgets.append({"type": "text", "label": label2,
+                             "rect": [gap2_start + 1, baseline - 1, x1 - 3, baseline + 11]})
+    elif max_total - 4 >= 15.5:
+        widgets.append({"type": "text", "label": label,
+                         "rect": [gap_start + 1, baseline - 1, x1 - 3, baseline + 11]})
+    return baseline - 10, widgets
+
+
 # Weighted pool: hard constructs dominate, a legit minority keeps the form
 # readable as a form rather than a pure adversarial exercise.
 #
@@ -1114,6 +1241,7 @@ HARD_FUNCS = [
     sec_dotted_line, sec_bilingual_grid,
     sec_label_below, sec_shaded_field, sec_circle_checkbox, sec_comb_field,
     sec_group_caption, sec_margin_caption,
+    sec_gutter_left_label, sec_whitespace_field,
 ]
 # A modest boost for the sources that measure as the current blind spots:
 # the four constructs (label below its box, an unruled shaded entry area, a
@@ -1145,11 +1273,28 @@ HARD_FUNCS = [
 # 16pt column clustering, and the group-header split respectively. The boost
 # below is concentrated on the still-effective nine and left off the
 # now-mostly-handled ones, so they carry the extra density.
+#
+# Two more constructs were added because those nine, plus the already-solved
+# four (dotted_line, ragged_table, merged_header_table, sec_label_below --
+# see R11, the 16pt column clustering, the group-header split and R17), left
+# the corpus's difficulty resting on an ever-narrower set of R2-label-shape
+# tricks. sec_gutter_left_label and sec_whitespace_field instead target R10's
+# closest-left-neighbour assumption and the write-on-line rules' shared
+# assumption that SOMETHING is drawn (a rect, an underscore, a dot)
+# respectively -- two different structural assumptions, not more variations
+# on label shape. A third candidate, a single-column ruled list with its
+# caption floating above it (meant to target R3's floating-header
+# corroboration requirement), was designed, measured, and DROPPED: see
+# docs/tuning/log.md's account of this round for why it does not survive
+# contact with grid_cells()'s own unbounded rule-pairing. Both surviving
+# constructs are boosted at the same density as the strongest of the
+# existing nine.
 EXTRA_WEIGHT = ([sec_label_below] * 12 + [sec_shaded_field] * 12
                 + [sec_circle_checkbox] * 12 + [sec_comb_field] * 12
                 + [sec_wrapped_label] * 10 + [sec_nested_table] * 10
                 + [sec_bilingual_grid] * 10
-                + [sec_group_caption] * 22 + [sec_margin_caption] * 22)
+                + [sec_group_caption] * 22 + [sec_margin_caption] * 22
+                + [sec_gutter_left_label] * 22 + [sec_whitespace_field] * 22)
 LEGIT_FUNCS = [sec_legit_grid, sec_legit_checkbox, sec_legit_line]
 
 # How many of the 40-ish placement attempts a column gets, and how many

@@ -2,7 +2,7 @@
     .venv/bin/python -m pytest eval/synth/test_hard.py -v
 
 Test 5 is the whole point of this module: the current, unmodified detector
-must score f1 <= 0.55 on a 25-form hard corpus. If a future change to
+must score f1 <= 0.45 on a 25-form hard corpus. If a future change to
 hard.py raises that number back up, this test is the tripwire.
 """
 import json
@@ -16,18 +16,26 @@ from eval.synth.hard import generate_hard
 from eval.score import score_one
 
 SCHEMA = json.load(open("eval/contracts/truth.schema.json"))
-# tripwire; corpus currently measures precision 0.898, recall 0.383, f1 0.537
+# tripwire; corpus currently measures precision 0.881, recall 0.305, f1 0.453
 # on the real detector (see test_current_detector_scores_at_or_below_threshold).
 # Set just above that so ordinary float noise cannot trip it, but low enough
-# that the next merged detector improvement will. Raised from a prior 0.66
-# ceiling: the corpus had been exhausted again (f1 0.653, with a correct
-# change in flight expected to push it to ~0.679), so three new constructs
-# were added -- sec_group_caption (a caption governing a GROUP of separate
-# blank strips), sec_margin_caption (a rotated caption sitting outside a
-# box's own border, in an unbordered margin gutter) and a continuation
-# table whose columns reflow to different widths across the page break
-# (see docs/tuning/log.md for the account of this round).
-MAX_ALLOWED_F1 = 0.58    # raised from 0.55 when R17 solved sec_label_below; see docs/tuning/log.md
+# that the next merged detector improvement will.
+#
+# Lowered from a prior 0.58 ceiling (f1 0.569 measured just before this
+# round): dotted_line, ragged_table, merged_header_table and sec_label_below
+# were all spent (each solved by R11, the 16pt column clustering, the
+# group-header split and R17 respectively), so the corpus's difficulty had
+# narrowed to variations on R2's label-shape guards. Two new constructs
+# restore it, targeting different detector assumptions entirely:
+# sec_gutter_left_label (a blank ruled gutter column between a row's label
+# and its entry box, defeating R10's closest-left-neighbour rule) and
+# sec_whitespace_field (a label followed only by printed blank space -- no
+# rule, box, or dot of any kind -- defeating every write-on-line rule at
+# once, since all of them key off something drawn). See docs/tuning/log.md
+# for the account of this round, including a third candidate construct
+# (a single-column ruled list with a floating caption) that was designed,
+# measured, and dropped for not surviving contact with the data.
+MAX_ALLOWED_F1 = 0.48   # lowered from 0.58; see docs/tuning/log.md
 FAIRNESS_MARGIN = 40  # points; matches the brief's "within 40pt" fairness bar
 # "no single difficulty feature may appear in more than about 70% of forms"
 # -- see test_feature_variety.
