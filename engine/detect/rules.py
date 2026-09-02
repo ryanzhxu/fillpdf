@@ -183,6 +183,49 @@ def detect(page, pno):
                         "confidence": 0.6,
                         "rect": [x0 + 2, H - bot + 2, x1 - 2, H - top - 2]})
 
+    # ---- R10  blank cell whose LEFT neighbour in the same row is a label ----
+    # "Last Name |          |" -- the label sits in the cell to the left of the
+    # entry cell instead of inside it. Grid cells sharing a row band come from
+    # the same pair of horizontal rules, so top/bot match exactly (row_eps
+    # only guards float noise). A blank cell to the right of some text is a
+    # common shape that is NOT a field -- table gutters, "TOTAL" summary rows
+    # that reuse a data column's width, sentence fragments split across table
+    # cells -- so this rule is deliberately narrow: short label, same-row
+    # height capped to what real single/short-wrapped labels measured at on
+    # this corpus, and a hard reject on a label that starts mid-sentence
+    # (lowercase first letter) or is itself a Yes/No option marker.
+    row_eps = 0.5
+    for cell in cells:
+        if cell in claimed:
+            continue
+        x0, top, x1, bot = cell
+        if bot - top > 65 or _text_in(words, cell):
+            continue
+        left_cands = [o for o in cells if o[2] <= x0 + row_eps
+                      and abs(o[1] - top) <= row_eps and abs(o[3] - bot) <= row_eps]
+        if not left_cands:
+            continue
+        left = max(left_cands, key=lambda o: o[2])
+        if left in claimed:
+            continue          # already its own field (R2) -- don't reuse the label
+        lx0, ltop, lx1, lbot = left
+        linside = _text_in(words, left)
+        if not linside:
+            continue
+        lines = {}
+        for w in linside:
+            lines.setdefault(round(w["top"] / 3), []).append(w)
+        label = " ".join(" ".join(w["text"] for w in sorted(ws, key=lambda w: w["x0"]))
+                          for _, ws in sorted(lines.items()))
+        if not (1 <= len(label) <= 60) or (x1 - x0) < 25:
+            continue
+        if label[0].islower() or label.strip().lower() in ("yes", "no"):
+            continue          # a sentence fragment split across cells, or an option marker
+        claimed.add(cell)
+        out.append({"page": pno, "type": "text", "label": label, "rule": "R10",
+                    "confidence": 0.55,
+                    "rect": [x0 + 2, H - bot + 2, x1 - 2, H - top - 2]})
+
     # ---- R4  cell holding only a mask, e.g. "(   ) -" or "$" ---------------
     for cell in cells:
         if cell in claimed:
