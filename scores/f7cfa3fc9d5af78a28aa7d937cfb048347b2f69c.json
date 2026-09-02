@@ -1,0 +1,218 @@
+{
+  "corpus": {
+    "adversarial": 0,
+    "excluded": 0,
+    "holdout": 0,
+    "tuning": 9
+  },
+  "failures": [],
+  "git_sha": "f7cfa3fc9d5af78a28aa7d937cfb048347b2f69c",
+  "holdout": {
+    "detected": 0,
+    "f1": 0.0,
+    "matched": 0,
+    "near_miss": 0,
+    "placement": 0.0,
+    "precision": 0.0,
+    "recall": 0.0,
+    "truth": 0
+  },
+  "overall": {
+    "detected": 1269,
+    "f1": 0.5235683677444487,
+    "matched": 672,
+    "near_miss": 70,
+    "placement": 0.8048808403595544,
+    "precision": 0.5295508274231678,
+    "recall": 0.5177195685670262,
+    "truth": 1298
+  },
+  "per_family": {
+    "real/Adobe": {
+      "detected": 905,
+      "f1": 0.6271008403361344,
+      "matched": 597,
+      "near_miss": 25,
+      "placement": 0.818614679507093,
+      "precision": 0.6596685082872928,
+      "recall": 0.5975975975975976,
+      "truth": 999
+    },
+    "real/Microsoft\u00ae": {
+      "detected": 364,
+      "f1": 0.22624434389140272,
+      "matched": 75,
+      "near_miss": 45,
+      "placement": 0.6955594807451484,
+      "precision": 0.20604395604395603,
+      "recall": 0.2508361204013378,
+      "truth": 299
+    }
+  },
+  "per_form": {
+    "14921b7f41fc.pdf": {
+      "detected": 72,
+      "f1": 0.17834394904458598,
+      "matched": 14,
+      "near_miss": 11,
+      "placement": 0.8808206217740336,
+      "precision": 0.19444444444444445,
+      "recall": 0.16470588235294117,
+      "truth": 85
+    },
+    "2303930e0569.pdf": {
+      "detected": 31,
+      "f1": 0.24836601307189543,
+      "matched": 19,
+      "near_miss": 0,
+      "placement": 0.7964042139250423,
+      "precision": 0.6129032258064516,
+      "recall": 0.1557377049180328,
+      "truth": 122
+    },
+    "6f3b4dd6e072.pdf": {
+      "detected": 98,
+      "f1": 0.39024390243902435,
+      "matched": 40,
+      "near_miss": 3,
+      "placement": 0.5746705422117367,
+      "precision": 0.40816326530612246,
+      "recall": 0.37383177570093457,
+      "truth": 107
+    },
+    "834466262122.pdf": {
+      "detected": 162,
+      "f1": 0.26490066225165565,
+      "matched": 40,
+      "near_miss": 15,
+      "placement": 0.6995927137215826,
+      "precision": 0.24691358024691357,
+      "recall": 0.2857142857142857,
+      "truth": 140
+    },
+    "86b3dc306803.pdf": {
+      "detected": 421,
+      "f1": 0.7820512820512822,
+      "matched": 305,
+      "near_miss": 2,
+      "placement": 0.8203003390469004,
+      "precision": 0.7244655581947743,
+      "recall": 0.8495821727019499,
+      "truth": 359
+    },
+    "acbed8a48a12.pdf": {
+      "detected": 21,
+      "f1": 0.49056603773584906,
+      "matched": 13,
+      "near_miss": 0,
+      "placement": 0.8679459417979132,
+      "precision": 0.6190476190476191,
+      "recall": 0.40625,
+      "truth": 32
+    },
+    "c9a8b63fd70b.pdf": {
+      "detected": 29,
+      "f1": 0.33766233766233766,
+      "matched": 13,
+      "near_miss": 0,
+      "placement": 0.7064422269878415,
+      "precision": 0.4482758620689655,
+      "recall": 0.2708333333333333,
+      "truth": 48
+    },
+    "ced73d75e395.pdf": {
+      "detected": 202,
+      "f1": 0.19390581717451524,
+      "matched": 35,
+      "near_miss": 30,
+      "placement": 0.6909500716292235,
+      "precision": 0.17326732673267325,
+      "recall": 0.22012578616352202,
+      "truth": 159
+    },
+    "f6b53f5f6901.pdf": {
+      "detected": 233,
+      "f1": 0.8058455114822547,
+      "matched": 193,
+      "near_miss": 9,
+      "placement": 0.8684161844784107,
+      "precision": 0.8283261802575107,
+      "recall": 0.7845528455284553,
+      "truth": 246
+    }
+  },
+  "per_rule": {
+    "R2": {
+      "detected": 377,
+      "f1": 0.0,
+      "matched": 157,
+      "near_miss": 0,
+      "placement": 0.6703246667858421,
+      "precision": 0.41644562334217505,
+      "recall": 0.0,
+      "truth": 0
+    },
+    "R3": {
+      "detected": 581,
+      "f1": 0.0,
+      "matched": 434,
+      "near_miss": 0,
+      "placement": 0.8638492302197454,
+      "precision": 0.7469879518072289,
+      "recall": 0.0,
+      "truth": 0
+    },
+    "R4": {
+      "detected": 40,
+      "f1": 0.0,
+      "matched": 39,
+      "near_miss": 0,
+      "placement": 0.787274984907563,
+      "precision": 0.975,
+      "recall": 0.0,
+      "truth": 0
+    },
+    "R5": {
+      "detected": 41,
+      "f1": 0.0,
+      "matched": 36,
+      "near_miss": 0,
+      "placement": 0.6951863605348138,
+      "precision": 0.8780487804878049,
+      "recall": 0.0,
+      "truth": 0
+    },
+    "R5b": {
+      "detected": 222,
+      "f1": 0.0,
+      "matched": 6,
+      "near_miss": 0,
+      "placement": 0.8329921217042143,
+      "precision": 0.02702702702702703,
+      "recall": 0.0,
+      "truth": 0
+    },
+    "R6": {
+      "detected": 8,
+      "f1": 0.0,
+      "matched": 0,
+      "near_miss": 0,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 0
+    },
+    "unknown": {
+      "detected": 0,
+      "f1": 0.0,
+      "matched": 0,
+      "near_miss": 70,
+      "placement": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "truth": 1298
+    }
+  },
+  "started_at": "2026-09-02T07:05:34.615242+00:00",
+  "version": 1
+}
