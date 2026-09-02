@@ -1226,6 +1226,16 @@ def detect(page, pno, carry_in=None):
     # A cell border has vertical rules standing at its endpoints. A write-on line
     # has none. That single test separates them cleanly on this corpus.
     #
+    # Two office-only guards it borrows from siblings, made consistent rather
+    # than reimplemented:
+    #   - grid_cells() already merges a visual line drawn as 2-3 stacked thin
+    #     rects (a thick stroke plus a hairline over the same x-range) via
+    #     _merge_ruling_lines(); R5b used to scan raw rects instead and could
+    #     emit the same line more than once (confirmed on bd17a3fe43d6.pdf,
+    #     which draws each line as 3 stacked rects).
+    #   - R2, R3, R12 and R14 all reject a label matching OFFICE_USE; R5b did
+    #     not, so it could claim a write-on line sitting inside an office-only
+    #     block.
     # R5b's largest false-positive group, measured on the tuning corpus: a rule
     # that is a decorative underline drawn beneath ALREADY-PRINTED text (a
     # heading, a caption, a filled specimen value), not blank space for someone
@@ -1246,14 +1256,16 @@ def detect(page, pno, carry_in=None):
     ON_RULE_TOL_Y = 3
     ON_RULE_MAX_COVER = 0.35
     vrules = [r for r in page.rects if r["width"] < 3 and r["height"] >= 5]
-    for r in page.rects:
-        if r["height"] >= 3 or not (40 <= r["width"] <= W * 0.77):
+    hrules = _merge_ruling_lines(
+        [r for r in page.rects if r["height"] < 3 and r["width"] >= 5])
+    for r in hrules:
+        rule_w = r["x1"] - r["x0"]
+        if not (40 <= rule_w <= W * 0.77):
             continue
         if any(abs(x["x0"] - r["x0"]) < 3 or abs(x["x0"] - r["x1"]) < 3
                for x in vrules
                if x["top"] <= r["top"] + 3 and x["bottom"] >= r["top"] - 3):
             continue
-        rule_w = r["x1"] - r["x0"]
         covered = sum(max(0.0, min(w["x1"], r["x1"]) - max(w["x0"], r["x0"]))
                       for w in words if abs(w["bottom"] - r["top"]) < ON_RULE_TOL_Y)
         if rule_w > 0 and min(covered, rule_w) / rule_w >= ON_RULE_MAX_COVER:
@@ -1265,6 +1277,8 @@ def detect(page, pno, carry_in=None):
         src = sorted(left, key=lambda w: w["x0"])[-7:] or sorted(under, key=lambda w: w["x0"])
         label = " ".join(w["text"] for w in src).strip()
         if not label:                      # unlabelled rules are decorative
+            continue
+        if OFFICE_USE.search(label):       # office-only block -- not for the applicant
             continue
         out.append({"page": pno, "type": "text", "label": label[:60], "rule": "R5b",
                     "confidence": 0.6,
