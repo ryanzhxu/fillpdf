@@ -1271,3 +1271,77 @@ also right: the detector got genuinely better both times, and the corpus is
 bookkeeping. Difficulty was really added in 30b, so this de-boost draws on
 real difficulty rather than substituting for it. `sec_bracket_checkbox` remains
 boosted and unsolved.
+
+## Iteration 32 — R5 never names a field after the blank itself — MERGED
+
+`fb58183`
+
+R5 built labels from page words without noticing those "words" were the
+underscore run that marks the field. `extract_words()` merges a run flush
+against text with no space, and a run sitting between two captions arrives as
+its own letterless word.
+
+    '__________________________________confirm that I am renting'
+        -> 'confirm that I am renting'
+    '___________________________________________________ since'  ->  'since'
+
+`FILL_CHARS` (mirroring `eval/label.py`'s `MARK_CHARS`) is stripped off each
+candidate word's edges, and a fill-only word is dropped. Geometry cannot move:
+only label strings change. Tuning and holdout came back byte-identical, gate
+passed, 107 tests.
+
+### The metric moved the WRONG way, and that is the interesting part
+
+`label_plausibility` 0.3093 -> **0.3262**, and the gate warned. I verified the
+cause instead of accepting the agent's account.
+
+**At baseline the detector emits 77 labels made entirely of underscores** —
+seven on `067faa30db82.pdf` page 1 alone. `label_plausibility`'s gap and
+truncation checks deliberately exempt blank/fill spans as "not prose", so a
+pure-underscore label matched its own page trivially and **was never flagged**.
+The guard was structurally blind to the exact defect this iteration fixes.
+
+Emptying those labels falls through to R5's pre-existing `"line"` placeholder,
+which honestly does not occur on the page, so the guard flags it as
+`not_found_on_page`. The number rose because the output became honest.
+
+This is the second time a guard has been found blind to a whole class of defect
+— `label_accuracy` was blind to mislabelling on real forms, which is why
+`label_plausibility` exists at all. A truth-free proxy can only penalise what it
+can see, and the failure mode is always the same: the metric rewards output that
+is confidently wrong over output that admits it does not know.
+
+### Attempted and reverted within the iteration
+
+Nulling a label that reduces to a bare function word (`'I'`, `'To'`). Measured,
+made `label_plausibility` worse with no offsetting gain, reverted before
+reporting. `'I'` and `'To'` are real page words that pass the provenance check
+trivially, so replacing them with `"line"` looks worse to the guard while
+reading better to a person — the same inversion as above.
+
+### Attempted by me, and reverted for scope discipline
+
+I built the real fix and backed it out. It was: (1) a `fill_only` signal in
+`eval/guards.py` flagging any label with no alphabetic character, and (2) moving
+the strip out of R5 into a single sanitisation pass over every rule's labels at
+the end of `detect()`, since R5 is not the only rule doing this (`R4` produces
+`'....................................'` on `hard_00010.pdf`).
+
+Measured, it worked: `fill_only` went to 0 on safer.pdf. But `not_found_on_page`
+rose 22 -> 39 as those labels became `"line"`, taking safer's fraction 0.2238 ->
+0.3357 and breaking
+`test_spares_ordinary_labels_the_live_detector_produces` (asserts < 0.30).
+
+That threshold was set against numbers the guard could not see past. Fixing it
+properly means changing a rule, a guard, and a test threshold together and
+re-baselining — too many moving parts to verify at the end of a session, and the
+standing rule here is not to move the measurement at session end. Backed out to
+the verified R5-only scope, which is green.
+
+**Next session, do this first — it is now specified and measured:**
+1. Add the `fill_only` signal to `eval/guards.py`.
+2. Move the fill strip to one pass at the end of `detect()` so every rule gets
+   it, not just R5.
+3. Re-baseline `label_plausibility`; old and new values are NOT comparable.
+4. Reset `test_spares_ordinary_labels...` against the honest number, recording
+   that it rose because measurement improved.
