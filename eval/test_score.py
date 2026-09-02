@@ -52,6 +52,7 @@ def _perfect_detect_fn(truth_doc):
             fields.append({
                 "id": f"f{i}", "page": w["page"], "type": w["type"],
                 "rect": list(w["rect"]), "rule": w.get("expects_rule", "R1"),
+                "label": w.get("label", ""),
             })
         return {"version": 1, "pages": truth_doc["pages"], "fields": fields}
     return _fn
@@ -81,6 +82,92 @@ class TestScoreOne(unittest.TestCase):
             self.assertEqual(metrics["f1"], 0.0)
             self.assertEqual(metrics["matched"], 0)
             self.assertEqual(metrics["placement"], 0.0)
+
+
+class TestLabelAccuracy(unittest.TestCase):
+    """label_accuracy/label_pairs: the metric that catches a matched pair
+    whose rect and type are right but whose NAME is wrong -- the blind spot
+    rect-IoU-only matching cannot see.
+    """
+
+    def test_no_truth_labels_reports_unavailable_not_1_or_0(self):
+        # A "stripped" (real-form) truth doc: widgets carry no "label" key at
+        # all. This must never read as a perfect (1.0) or failing (0.0) score.
+        with tempfile.TemporaryDirectory() as tmp:
+            doc = _truth_doc(widgets=[
+                {"page": 1, "type": "text", "rect": [10, 10, 110, 30]},
+                {"page": 1, "type": "checkbox", "rect": [200, 200, 220, 220]},
+            ])
+            form = _TmpForm(tmp, truth_doc=doc)
+            metrics = score_one(form.pdf_path, form.truth_path, detect_fn=_perfect_detect_fn(form.truth_doc))
+            self.assertEqual(metrics["matched"], 2)  # rects still match fine
+            self.assertEqual(metrics["label_accuracy"], "UNAVAILABLE")
+            self.assertEqual(metrics["label_pairs"], 0)
+
+    def test_matched_labels_agree_counts_as_1_0(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            doc = _truth_doc(widgets=[
+                {"page": 1, "type": "text", "rect": [10, 10, 110, 30], "label": "Quantity"},
+            ])
+            form = _TmpForm(tmp, truth_doc=doc)
+            metrics = score_one(form.pdf_path, form.truth_path, detect_fn=_perfect_detect_fn(form.truth_doc))
+            self.assertEqual(metrics["label_pairs"], 1)
+            self.assertEqual(metrics["label_accuracy"], 1.0)
+
+    def test_matched_pair_with_wrong_label_counts_as_disagreement(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            doc = _truth_doc(widgets=[
+                {"page": 1, "type": "text", "rect": [10, 10, 110, 30], "label": "Quantity"},
+            ])
+            form = _TmpForm(tmp, truth_doc=doc)
+
+            def wrong_label_detect(pdf_path):
+                return {"version": 1, "pages": doc["pages"], "fields": [
+                    {"id": "f0", "page": 1, "type": "text", "rect": [10, 10, 110, 30],
+                     "label": "Amount", "rule": "R1"},
+                ]}
+
+            metrics = score_one(form.pdf_path, form.truth_path, detect_fn=wrong_label_detect)
+            self.assertEqual(metrics["matched"], 1)  # rect/type still matched
+            self.assertEqual(metrics["label_pairs"], 1)
+            self.assertEqual(metrics["label_accuracy"], 0.0)
+
+    def test_label_normalisation_noise_does_not_count_as_disagreement(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            doc = _truth_doc(widgets=[
+                {"page": 1, "type": "text", "rect": [10, 10, 110, 30], "label": "Relationship"},
+            ])
+            form = _TmpForm(tmp, truth_doc=doc)
+
+            def noisy_label_detect(pdf_path):
+                return {"version": 1, "pages": doc["pages"], "fields": [
+                    {"id": "f0", "page": 1, "type": "text", "rect": [10, 10, 110, 30],
+                     "label": "Relationship:", "rule": "R2"},
+                ]}
+
+            metrics = score_one(form.pdf_path, form.truth_path, detect_fn=noisy_label_detect)
+            self.assertEqual(metrics["label_pairs"], 1)
+            self.assertEqual(metrics["label_accuracy"], 1.0)
+
+    def test_mixed_matched_pairs_average_correctly(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            doc = _truth_doc(widgets=[
+                {"page": 1, "type": "text", "rect": [10, 10, 110, 30], "label": "Quantity"},
+                {"page": 1, "type": "text", "rect": [200, 10, 300, 30], "label": "Amount"},
+            ])
+            form = _TmpForm(tmp, truth_doc=doc)
+
+            def half_wrong_detect(pdf_path):
+                return {"version": 1, "pages": doc["pages"], "fields": [
+                    {"id": "f0", "page": 1, "type": "text", "rect": [10, 10, 110, 30],
+                     "label": "Quantity", "rule": "R2"},
+                    {"id": "f1", "page": 1, "type": "text", "rect": [200, 10, 300, 30],
+                     "label": "Quantity", "rule": "R3"},  # column-merge style mislabel
+                ]}
+
+            metrics = score_one(form.pdf_path, form.truth_path, detect_fn=half_wrong_detect)
+            self.assertEqual(metrics["label_pairs"], 2)
+            self.assertAlmostEqual(metrics["label_accuracy"], 0.5)
 
 
 class TestScoreCorpusSubprocess(unittest.TestCase):

@@ -19,6 +19,13 @@ A change is accepted only when ALL of these hold:
   3. No form family drops more than 0.02 f1.
   4. No new crash, timeout, or memory failure that was not in the baseline.
   5. Precision does not drop below the baseline precision.
+  6. Overall label_accuracy does not drop more than 0.02 below baseline --
+     but only when it was actually measurable (label_pairs > 0) in BOTH
+     runs. Real stripped forms carry no truth labels at all, so a run
+     scored only against those cannot be label-guarded; that is reported as
+     a loud warning, never as a silent pass. This check exists because rect
+     IoU alone cannot see a detection that lands on the right box with the
+     wrong field name -- see eval/match.py's normalize_label.
 
 Guards are handled separately, and deliberately not folded into a single
 absolute threshold on box_over_ink -- see _check_guards.
@@ -32,6 +39,7 @@ F1_TOLERANCE = 0.002
 FAMILY_DROP_LIMIT = 0.02
 BOX_OVER_INK_RISE_LIMIT = 0.01
 GLYPH_COVERAGE_FLOOR = 0.98
+LABEL_ACCURACY_DROP_LIMIT = 0.02
 CRASH_REASONS = {"crash", "timeout", "memory"}
 
 
@@ -70,6 +78,33 @@ def _check_holdout_f1(candidate, baseline, reasons, warnings):
         reasons.append(
             f"holdout f1 dropped {delta:+.4f} "
             f"(baseline {base_f1:.4f} -> candidate {cand_f1:.4f})"
+        )
+
+
+def _check_label_accuracy(candidate, baseline, reasons, warnings):
+    cand_overall = candidate.get("overall") or {}
+    base_overall = baseline.get("overall") or {}
+    cand_pairs = cand_overall.get("label_pairs", 0)
+    base_pairs = base_overall.get("label_pairs", 0)
+    cand_acc = cand_overall.get("label_accuracy")
+    base_acc = base_overall.get("label_accuracy")
+    measurable = (
+        cand_pairs and base_pairs
+        and isinstance(cand_acc, (int, float)) and isinstance(base_acc, (int, float))
+    )
+    if not measurable:
+        warnings.append(
+            "LABEL ACCURACY CHECK DID NOT RUN: label_accuracy is unavailable "
+            f"(candidate label_pairs={cand_pairs}, baseline label_pairs={base_pairs}). "
+            "This gate result is NOT label-guarded -- do not mistake it for one "
+            "that is."
+        )
+        return
+    delta = cand_acc - base_acc
+    if delta < -LABEL_ACCURACY_DROP_LIMIT:
+        reasons.append(
+            f"label_accuracy dropped {delta:+.4f} "
+            f"(baseline {base_acc:.4f} -> candidate {cand_acc:.4f})"
         )
 
 
@@ -173,6 +208,7 @@ def gate(candidate_scores, baseline_scores) -> dict:
     _check_family_drops(candidate_scores, baseline_scores, reasons)
     _check_new_crashes(candidate_scores, baseline_scores, reasons)
     _check_precision(candidate_scores, baseline_scores, reasons)
+    _check_label_accuracy(candidate_scores, baseline_scores, reasons, warnings)
     _check_guards(candidate_scores, baseline_scores, reasons, warnings)
 
     return {"passed": len(reasons) == 0, "reasons": reasons, "warnings": warnings}

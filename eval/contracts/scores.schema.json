@@ -48,7 +48,15 @@
         "truth": {"type": "integer"}, "detected": {"type": "integer"}, "matched": {"type": "integer"},
         "precision": {"type": "number"}, "recall": {"type": "number"}, "f1": {"type": "number"},
         "placement": {"type": "number", "description": "mean IoU over matches"},
-        "near_miss": {"type": "integer", "description": "truth with a detection at IoU 0.15-0.5"}
+        "near_miss": {"type": "integer", "description": "truth with a detection at IoU 0.15-0.5"},
+        "label_accuracy": {
+          "description": "fraction of matched pairs whose (normalised) labels agree. The literal string \"UNAVAILABLE\" means no matched pair in this bucket had a truth label to check against -- only synthetic corpora carry truth labels, so a real/stripped-only run reports this, never 1.0 or 0.0.",
+          "anyOf": [{"type": "number"}, {"const": "UNAVAILABLE"}]
+        },
+        "label_pairs": {
+          "type": "integer",
+          "description": "matched pairs where the truth widget carried a label and could be checked against the detection's label"
+        }
       }
     }
   }

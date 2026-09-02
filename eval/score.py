@@ -23,7 +23,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from eval.match import match
+from eval.match import match, normalize_label
 
 DEFAULT_TIMEOUT_S = 30
 DEFAULT_MEM_LIMIT_MB = 512
@@ -39,7 +39,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # ---------------------------------------------------------------------------
 
 def _empty_bucket():
-    return {"truth": 0, "detected": 0, "matched": 0, "iou_sum": 0.0, "near_miss": 0}
+    return {"truth": 0, "detected": 0, "matched": 0, "iou_sum": 0.0, "near_miss": 0,
+            "label_pairs": 0, "label_agree": 0}
 
 
 def _add_bucket(acc, b):
@@ -48,6 +49,8 @@ def _add_bucket(acc, b):
     acc["matched"] += b["matched"]
     acc["iou_sum"] += b["iou_sum"]
     acc["near_miss"] += b["near_miss"]
+    acc["label_pairs"] += b.get("label_pairs", 0)
+    acc["label_agree"] += b.get("label_agree", 0)
 
 
 def _clamp(x):
@@ -71,11 +74,18 @@ def _finalize_bucket(b):
     # On real forms there is none, so matched can exceed truth -- that bucket's
     # recall and f1 must be read as unavailable, not as a score.
     attribution_ok = b["truth"] >= b["matched"]
+    # label_accuracy needs a truth "label" to check against, which only
+    # synthetic corpora carry (real stripped forms have none at all). When no
+    # matched pair in this bucket had one to check, report UNAVAILABLE --
+    # never 1.0 (vacuously "all agree") or 0.0 (looks like total failure).
+    label_pairs = b.get("label_pairs", 0)
+    label_accuracy = (b.get("label_agree", 0) / label_pairs) if label_pairs else "UNAVAILABLE"
     return {
         "attribution_ok": attribution_ok,
         "truth": truth, "detected": detected, "matched": matched,
         "precision": _clamp(precision), "recall": _clamp(recall), "f1": _clamp(f1),
         "placement": _clamp(placement), "near_miss": b["near_miss"],
+        "label_accuracy": label_accuracy, "label_pairs": label_pairs,
     }
 
 
@@ -106,6 +116,20 @@ def _score_detections(detections, truth_widgets):
         rb = bucket(detections[di].get("rule", "unknown"))
         rb["matched"] += 1
         rb["iou_sum"] += iou_val
+        t_label = truth_widgets[ti].get("label")
+        if t_label:  # only synthetic truth carries a label to check against
+            agree = normalize_label(t_label) == normalize_label(detections[di].get("label", ""))
+            # Per-rule always counts, so the checkbox gap stays visible as R1=0.0.
+            rb["label_pairs"] += 1
+            rb["label_agree"] += int(agree)
+            # The form-level figure excludes checkboxes. The detector gives them
+            # no label at all, so they are a permanent 0% floor: including them
+            # would let a change that merely shifts the checkbox/text mix move
+            # the gated number without touching naming accuracy at all. Same
+            # class of false alarm as gating on an absolute box_over_ink value.
+            if detections[di].get("type") != "checkbox":
+                form["label_pairs"] += 1
+                form["label_agree"] += int(agree)
     for ti in result["near_miss"]:
         bucket(truth_widgets[ti].get("expects_rule", "unknown"))["near_miss"] += 1
 

@@ -3,7 +3,7 @@
 """
 import unittest
 
-from eval.match import iou, match
+from eval.match import iou, match, normalize_label
 
 
 class TestIou(unittest.TestCase):
@@ -129,6 +129,53 @@ class TestNearMiss(unittest.TestCase):
         result = match(detections, truth)
         self.assertEqual(result["matches"], [])
         self.assertEqual(result["near_miss"], [])
+
+
+class TestNormalizeLabel(unittest.TestCase):
+    def test_identical_labels_agree(self):
+        self.assertEqual(normalize_label("Quantity"), normalize_label("Quantity"))
+
+    def test_clearly_different_headers_disagree(self):
+        self.assertNotEqual(normalize_label("Quantity"), normalize_label("Amount"))
+
+    def test_case_difference_normalised(self):
+        self.assertEqual(normalize_label("NAME"), normalize_label("name"))
+
+    def test_surrounding_whitespace_normalised(self):
+        self.assertEqual(normalize_label("  Name  "), normalize_label("Name"))
+
+    def test_internal_whitespace_run_normalised(self):
+        self.assertEqual(normalize_label("City   or Town"), normalize_label("City or Town"))
+
+    def test_trailing_colon_normalised(self):
+        self.assertEqual(normalize_label("Relationship:"), normalize_label("Relationship"))
+
+    def test_trailing_date_hint_normalised(self):
+        self.assertEqual(normalize_label("Date (DD/MM/YYYY)"), normalize_label("Date"))
+        self.assertEqual(normalize_label("Date (dd-mm-yyyy)"), normalize_label("Date"))
+
+    def test_trailing_colon_and_date_hint_combined(self):
+        self.assertEqual(normalize_label("Date (DD/MM/YYYY):"), normalize_label("Date"))
+
+    def test_yes_no_parenthetical_not_collapsed(self):
+        # These must stay distinguishable -- they are different truth widgets
+        # (the Yes-arm and the No-arm of the same checkbox question), and
+        # collapsing them would hide a real labelling failure.
+        self.assertNotEqual(
+            normalize_label("Are you married? (Yes)"),
+            normalize_label("Are you married? (No)"),
+        )
+
+    def test_other_parenthetical_content_not_collapsed(self):
+        # "(required)"/"(optional)" etc. are not date-format hints and carry
+        # real content, so they must not be stripped like "(DD/MM/YYYY)" is.
+        self.assertNotEqual(
+            normalize_label("Email Address (optional)"),
+            normalize_label("Email Address"),
+        )
+
+    def test_empty_label_normalises_to_empty(self):
+        self.assertEqual(normalize_label(""), "")
 
 
 if __name__ == "__main__":

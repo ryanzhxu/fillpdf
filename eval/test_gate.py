@@ -6,11 +6,19 @@ import unittest
 from eval.gate import gate
 
 
-def _metrics(truth=100, detected=100, matched=90, precision=0.9, recall=0.9, f1=0.9):
-    return {
+def _metrics(truth=100, detected=100, matched=90, precision=0.9, recall=0.9, f1=0.9,
+             label_accuracy=None, label_pairs=0):
+    m = {
         "truth": truth, "detected": detected, "matched": matched,
         "precision": precision, "recall": recall, "f1": f1,
     }
+    # Only set when a test asks for it -- omitting these two keys reproduces
+    # a real run where label_accuracy could not be measured at all, which
+    # must keep passing every other pre-existing gate test unchanged.
+    if label_accuracy is not None:
+        m["label_accuracy"] = label_accuracy
+        m["label_pairs"] = label_pairs
+    return m
 
 
 def _scores(overall=None, holdout=None, per_family=None, failures=None, guards=None):
@@ -127,6 +135,37 @@ class TestGate(unittest.TestCase):
         result = gate(candidate, baseline)
         self.assertTrue(result["passed"])
         self.assertTrue(any("HOLDOUT CHECK DID NOT RUN" in w for w in result["warnings"]), result["warnings"])
+
+    def test_label_accuracy_drop_fails_when_measurable_in_both(self):
+        baseline = _scores(overall=_metrics(f1=0.90, label_accuracy=0.98, label_pairs=200))
+        candidate = _scores(overall=_metrics(f1=0.90, label_accuracy=0.93, label_pairs=200))
+        result = gate(candidate, baseline)
+        self.assertFalse(result["passed"])
+        self.assertTrue(any("label_accuracy" in r for r in result["reasons"]), result["reasons"])
+
+    def test_label_accuracy_small_drop_within_tolerance_passes(self):
+        baseline = _scores(overall=_metrics(f1=0.90, label_accuracy=0.98, label_pairs=200))
+        candidate = _scores(overall=_metrics(f1=0.90, label_accuracy=0.97, label_pairs=200))
+        result = gate(candidate, baseline)
+        self.assertTrue(result["passed"])
+
+    def test_label_accuracy_unavailable_in_candidate_skips_check_and_warns(self):
+        # e.g. a run scored only against real stripped forms, which carry no
+        # truth labels at all -- label_pairs is 0 and label_accuracy is absent.
+        baseline = _scores(overall=_metrics(f1=0.90, label_accuracy=0.98, label_pairs=200))
+        candidate = _scores(overall=_metrics(f1=0.90))
+        result = gate(candidate, baseline)
+        self.assertTrue(result["passed"])
+        self.assertTrue(any("LABEL ACCURACY CHECK DID NOT RUN" in w for w in result["warnings"]),
+                        result["warnings"])
+
+    def test_label_accuracy_literal_unavailable_string_skips_check_and_warns(self):
+        baseline = _scores(overall=_metrics(f1=0.90, label_accuracy="UNAVAILABLE", label_pairs=0))
+        candidate = _scores(overall=_metrics(f1=0.90, label_accuracy=0.5, label_pairs=50))
+        result = gate(candidate, baseline)
+        self.assertTrue(result["passed"])
+        self.assertTrue(any("LABEL ACCURACY CHECK DID NOT RUN" in w for w in result["warnings"]),
+                        result["warnings"])
 
 
 if __name__ == "__main__":

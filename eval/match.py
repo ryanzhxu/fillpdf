@@ -10,9 +10,56 @@ Matching is one-to-one, resolved greedily by descending IoU: the
 highest-IoU candidate pair is taken first, then the next highest among
 what remains, and so on. A truth widget or a detection can appear in at
 most one match.
+
+Geometry and type alone say nothing about whether a matched detection got
+the field's NAME right. normalize_label() below exists so callers (see
+eval/score.py) can compare a matched pair's labels without being tripped
+up by formatting noise that carries no real naming difference.
 """
+import re
 
 TEXT_LIKE = {"text", "multiline", "choice"}
+
+# A trailing parenthetical made up ONLY of date-placeholder letters (d/m/y),
+# slashes, dashes and spaces -- e.g. "(DD/MM/YYYY)", "(dd-mm-yy)". Deliberately
+# narrow: it must NOT match "(Yes)", "(No)", "(required)", "(if applicable)",
+# etc., because those carry real distinguishing content between otherwise
+# similar labels (a checkbox question's Yes-arm vs its No-arm, for example).
+_TRAILING_DATE_HINT = re.compile(r"\(\s*[dmyDMY/\-\s]+\)\s*$")
+
+
+def normalize_label(label) -> str:
+    """Normalise a label for EQUALITY COMPARISON ONLY -- never for display.
+
+    Applied, repeatedly until stable (so any order/combination of the two
+    is handled, e.g. "Date (DD/MM/YYYY):"):
+      1. Strip a trailing colon (and the whitespace around it).
+      2. Strip a trailing date-format-hint parenthetical (see
+         _TRAILING_DATE_HINT above).
+    Then, once:
+      3. Collapse runs of whitespace to a single space and strip the ends.
+      4. Casefold (lowercase) for case-insensitive comparison.
+
+    Deliberately NOT normalised: internal punctuation, "(Yes)"/"(No)"-style
+    or other parenthetical content, word order, abbreviation vs spelled-out
+    text. Collapsing those would hide genuinely different headers -- the
+    very failure this comparison exists to catch.
+    """
+    s = label or ""
+    changed = True
+    while changed:
+        changed = False
+        stripped = s.rstrip()
+        if stripped.endswith(":"):
+            s = stripped[:-1]
+            changed = True
+            continue
+        m = _TRAILING_DATE_HINT.search(s)
+        if m:
+            s = s[:m.start()]
+            changed = True
+    s = " ".join(s.split())
+    return s.casefold()
 
 
 def _type_family(t: str) -> str:
