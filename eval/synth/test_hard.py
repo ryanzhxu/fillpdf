@@ -2,7 +2,7 @@
     .venv/bin/python -m pytest eval/synth/test_hard.py -v
 
 Test 5 is the whole point of this module: the current, unmodified detector
-must score f1 <= 0.65 on a 25-form hard corpus. If a future change to
+must score f1 <= 0.55 on a 25-form hard corpus. If a future change to
 hard.py raises that number back up, this test is the tripwire.
 """
 import json
@@ -16,11 +16,18 @@ from eval.synth.hard import generate_hard
 from eval.score import score_one
 
 SCHEMA = json.load(open("eval/contracts/truth.schema.json"))
-# tripwire; corpus currently measures precision 0.907, recall 0.500, f1 0.645
+# tripwire; corpus currently measures precision 0.898, recall 0.383, f1 0.537
 # on the real detector (see test_current_detector_scores_at_or_below_threshold).
 # Set just above that so ordinary float noise cannot trip it, but low enough
-# that the next merged detector improvement will.
-MAX_ALLOWED_F1 = 0.66
+# that the next merged detector improvement will. Raised from a prior 0.66
+# ceiling: the corpus had been exhausted again (f1 0.653, with a correct
+# change in flight expected to push it to ~0.679), so three new constructs
+# were added -- sec_group_caption (a caption governing a GROUP of separate
+# blank strips), sec_margin_caption (a rotated caption sitting outside a
+# box's own border, in an unbordered margin gutter) and a continuation
+# table whose columns reflow to different widths across the page break
+# (see docs/tuning/log.md for the account of this round).
+MAX_ALLOWED_F1 = 0.55
 FAIRNESS_MARGIN = 40  # points; matches the brief's "within 40pt" fairness bar
 # "no single difficulty feature may appear in more than about 70% of forms"
 # -- see test_feature_variety.

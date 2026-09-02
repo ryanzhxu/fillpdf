@@ -7,8 +7,11 @@ multi-line wrapped labels, labels to the left of the entry box instead of
 above it, ragged tables whose columns drift row to row, ungrid-aligned
 spacer/gutter columns, a "FOR OFFICE USE ONLY" block that looks fillable but
 is not, decorative heading underlines placed to bait the R5b write-on-line
-rule, checkboxes at sizes the detector's R6 window does not cover, and a
-nested sub-table inside a cell.
+rule, checkboxes at sizes the detector's R6 window does not cover, a
+nested sub-table inside a cell, a caption governing a GROUP of separate
+blank strips rather than one, a rotated caption sitting outside a box's
+own border in an unbordered margin gutter, and a continuation table whose
+columns reflow to different widths across the page break.
 
 Every truth widget still corresponds to something a human would obviously
 read as "write here": a bordered blank cell, a blank cell under a printed
@@ -93,6 +96,14 @@ QUESTION_POOL = [
     "Is this your primary residence?", "Are you self-employed?",
     "Do you own real property?", "Are you married?",
     "Has your address changed?", "Do you receive benefits?",
+]
+
+GROUP_CAPTIONS = [
+    "List each additional household member below (one per line):",
+    "Describe any other income received this month:",
+    "Enter each vehicle owned by you or a household member:",
+    "List all bank accounts held by any household member:",
+    "Enter each address where you lived during the past year:",
 ]
 
 COLUMN_HEADER_SETS = [
@@ -784,6 +795,130 @@ def sec_comb_field(c, rng, x0, x1, y_top, avail, style):
     return box_bot, [widget]
 
 
+def sec_group_caption(c, rng, x0, x1, y_top, avail, style):
+    """One instructional caption governs several separate blank tinted
+    strips below it -- "List each additional household member below (one
+    per line):" followed by three to five bare strips, none carrying its
+    own label. Each strip is a plain shaded fill with no stroke at all,
+    the same shape sec_shaded_field uses and for the same reason:
+    grid_cells() only ever treats a rect as part of a table when it is
+    THIN (height < 3 for a horizontal ruling line, width < 3 for a
+    vertical one), so a strip with real height and width never becomes a
+    cell and no cell-walking rule (R2, R3, R4, R10, R12, R14, R16) can
+    reach it.
+
+    Earlier drafts drew these as ordinary bordered boxes instead, on the
+    theory that a floating caption above a column of blank ruled cells
+    would defeat R2 (label must be in the SAME cell) and R10 (label must
+    be in the cell to the LEFT). It did not: grid_cells() pairs each
+    horizontal ruling line with the CLOSEST one below it with no cap on
+    the gap between them, so the ruling line ending whatever construct
+    drew immediately above paired straight down past the caption to the
+    first box's own top edge, reconstructing one phantom cell that
+    happened to contain the caption text -- and R3 then read it as a
+    completely ordinary column header, inheriting it into every bordered
+    box below at full accuracy (measured 81% recall in isolation). Shaded
+    strips have no ruling line at all for anything to pair down to, which
+    is what actually keeps the caption unclaimed."""
+    caption = rng.choice(GROUP_CAPTIONS)
+    size = 9
+    lines = _wrap_text(caption, style.body_font, size, x1 - x0)[:2]
+    cap_h = len(lines) * 11 + 6
+    row_h, gap = 20.0, 6.0
+    n = rng.randint(3, 5)
+    table_h = n * row_h + (n - 1) * gap
+    if cap_h + table_h > avail:
+        n = int((avail - cap_h + gap) // (row_h + gap))
+        if n < 3:
+            return None
+        table_h = n * row_h + (n - 1) * gap
+    c.setFont(style.body_font, size)
+    y = y_top - size
+    for line in lines:
+        c.drawString(x0, y, line)
+        y -= 11
+    strip_w = min(x1 - x0, 260)
+    if strip_w - 4 < 15.5:
+        return None
+    row_top = y - 6
+    widgets = []
+    for _ in range(n):
+        row_bot = row_top - row_h
+        c.setFillColorRGB(0.85, 0.85, 0.85)
+        c.rect(x0, row_bot, strip_w, row_h, stroke=0, fill=1)
+        c.setFillColorRGB(0, 0, 0)
+        widgets.append({"type": "text", "label": caption,
+                         "rect": [x0 + 2, row_bot + 2, x0 + strip_w - 2, row_top - 2]})
+        row_top = row_bot - gap
+    y_bottom = row_top + gap
+    return y_bottom, widgets
+
+
+def sec_margin_caption(c, rng, x0, x1, y_top, avail, style):
+    """A caption printed in the margin OUTSIDE a bordered writing box --
+    rotated 90 degrees to fit a narrow gutter, the way a printed sidebar
+    caption or a rotated column head is set on real forms to fit a tight
+    space. The box carries no text of its own; the label sits well clear of
+    its border, running bottom-to-top. R2 needs a label inside the SAME
+    cell; R10 needs a labelled CELL immediately to the left, sharing the
+    box's row bounds -- there is no rule drawn between the gutter and the
+    box, so grid_cells() never reconstructs a left cell there for R10 to
+    find, even though a person reads the sideways caption exactly as the
+    box's name."""
+    gutter_w = 16.0
+    row_h = rng.uniform(30, 46)
+    if row_h > avail or (x1 - x0) < gutter_w + 20:
+        return None
+    label = rng.choice(LABEL_POOL)
+    size = 8
+    cy_top, cy_bot = y_top, y_top - row_h
+    box_x0 = x0 + gutter_w
+    if x1 - box_x0 - 4 < 15.5 or row_h - 4 < 8:
+        return None
+    _hrect(c, box_x0, x1, cy_top)
+    _hrect(c, box_x0, x1, cy_bot)
+    _vrect(c, box_x0, cy_bot, cy_top)
+    _vrect(c, x1, cy_bot, cy_top)
+    fitted = label
+    while stringWidth(fitted, style.body_font, size) > row_h - 6 and len(fitted) > 3:
+        fitted = fitted[:-1]
+    c.saveState()
+    c.translate(x0 + size + 2, cy_bot + 3)
+    c.rotate(90)
+    c.setFont(style.body_font, size)
+    c.drawString(0, 0, fitted)
+    c.restoreState()
+    widget = {"type": "text", "label": label,
+              "rect": [box_x0 + 2, cy_bot + 2, x1 - 2, cy_top - 2]}
+    return cy_bot, [widget]
+
+
+def _shifted_edges(x0, x1, base_edges, rng):
+    """Column edges spanning the same (x0, x1) with the same column COUNT
+    as base_edges, but every internal boundary displaced by 30-55pt in a
+    random direction -- comfortably past the detector's 16pt column-
+    alignment tolerance for matching a continuation table's columns back to
+    the header page's. Mirrors a real thing that happens across a page
+    break: a table whose column widths are derived from its own content
+    (not a fixed template) often reflows with different proportions on a
+    later page even though it is unmistakably the same list to a reader."""
+    n_internal = len(base_edges) - 2
+    if n_internal <= 0:
+        return list(base_edges)
+    edges = [x0]
+    prev = x0
+    for i, e in enumerate(base_edges[1:-1]):
+        direction = 1 if rng.random() < 0.5 else -1
+        shifted = e + direction * rng.uniform(30, 55)
+        lo = prev + 40
+        hi = x1 - 40 * (n_internal - i)
+        shifted = min(max(shifted, lo), hi)
+        edges.append(shifted)
+        prev = shifted
+    edges.append(x1)
+    return edges
+
+
 # ---------------------------------------------------------------------------
 # Continuation tables: a table's header prints once on the page where it
 # starts, and rows that do not fit continue at the top of the next page
@@ -834,8 +969,14 @@ def _start_continuation_table(c, rng, x0, x1, y_top, avail, style):
     c.setFont(italic_font, 8)
     c.drawString(x0, y_bottom - 10, "(list continues on next page)")
 
-    carry = {"edges": edges, "row_h": row_h,
-             "nrows": rng.randint(3, 6), "headers": headers}
+    # Half the time, the continuation page reflows the same columns at
+    # different widths -- see _shifted_edges above. That is a genuine real-
+    # world layout behaviour, not a trick played on the header page itself:
+    # the rows drawn here on THIS page use the original `edges` unchanged.
+    shifted = rng.random() < 0.65
+    next_edges = _shifted_edges(x0, x1, edges, rng) if shifted else edges
+    carry = {"edges": next_edges, "row_h": row_h,
+             "nrows": rng.randint(3, 6), "headers": headers, "shifted": shifted}
     return y_bottom - 18, widgets, carry
 
 
@@ -972,14 +1113,21 @@ HARD_FUNCS = [
     sec_underline_trap, sec_nested_table, sec_merged_header_table,
     sec_dotted_line, sec_bilingual_grid,
     sec_label_below, sec_shaded_field, sec_circle_checkbox, sec_comb_field,
+    sec_group_caption, sec_margin_caption,
 ]
 # A modest boost for the sources that measure as the current blind spots:
-# the four new constructs above (label below its box, an unruled shaded
-# entry area, a circle checkbox, a comb field -- see each function's own
-# docstring for which detector assumption it falls outside of) plus the
-# three older constructs that are still misses on the current detector
-# (wrapped_label, nested_table, bilingual_grid all defeat R2's label-shape
-# and length guards, which have not changed).
+# the four constructs (label below its box, an unruled shaded entry area, a
+# circle checkbox, a comb field -- see each function's own docstring for
+# which detector assumption it falls outside of), three older constructs
+# still missed (wrapped_label, nested_table, bilingual_grid all defeat R2's
+# label-shape and length guards), and the two newest additions -- a caption
+# governing a GROUP of separate blank boxes (sec_group_caption) and a
+# rotated caption sitting outside a box's own border in an unbordered
+# margin gutter (sec_margin_caption). Both new ones were added because the
+# corpus's own tripwire fired: prior difficulty had been largely absorbed
+# by R3's column clustering, R11's dot leaders and the group-header split
+# (see below), so the gradient needed fresh constructs the detector's
+# cell-, column- and left-neighbour-based rules do not reach at all.
 #
 # Unlike the previous round, this weighting no longer needs to be timid
 # about presence: _active_pool already controls, per form, which features
@@ -989,24 +1137,26 @@ HARD_FUNCS = [
 # itself push presence over the variety cap. Measured per-feature in
 # isolation (an active pool of just that one function), sec_label_below,
 # sec_shaded_field, sec_circle_checkbox, sec_comb_field, sec_wrapped_label,
-# sec_nested_table and sec_bilingual_grid all sit at 7-15% recall -- the
-# detector essentially never reconstructs them -- while sec_dotted_line
-# (100%), sec_ragged_table (86%), sec_small_checkbox_row (68%) and
-# sec_merged_header_table (58%) are now largely or partly read by R11, the
+# sec_nested_table, sec_bilingual_grid, sec_group_caption and
+# sec_margin_caption all sit at 20% recall or under -- the detector
+# essentially never reconstructs them -- while sec_dotted_line (96%),
+# sec_ragged_table (85%), sec_small_checkbox_row (67%) and
+# sec_merged_header_table (70%) are now largely or partly read by R11, the
 # 16pt column clustering, and the group-header split respectively. The boost
-# below is concentrated on the still-effective seven and left off the
+# below is concentrated on the still-effective nine and left off the
 # now-mostly-handled ones, so they carry the extra density.
-EXTRA_WEIGHT = ([sec_label_below] * 6 + [sec_shaded_field] * 6
-                + [sec_circle_checkbox] * 6 + [sec_comb_field] * 6
-                + [sec_wrapped_label] * 4 + [sec_nested_table] * 4
-                + [sec_bilingual_grid] * 4)
+EXTRA_WEIGHT = ([sec_label_below] * 12 + [sec_shaded_field] * 12
+                + [sec_circle_checkbox] * 12 + [sec_comb_field] * 12
+                + [sec_wrapped_label] * 10 + [sec_nested_table] * 10
+                + [sec_bilingual_grid] * 10
+                + [sec_group_caption] * 22 + [sec_margin_caption] * 22)
 LEGIT_FUNCS = [sec_legit_grid, sec_legit_checkbox, sec_legit_line]
 
 # How many of the 40-ish placement attempts a column gets, and how many
 # distinct hard constructs are even eligible in one form, together decide
 # how "presence" (does this form contain the feature at all?) behaves. With
-# every one of ~16 hard functions offered on every attempt across up to 3
-# pages, nearly all of them get drawn at least once per form purely from
+# every one of the ~18 hard functions offered on every attempt across up to
+# 3 pages, nearly all of them get drawn at least once per form purely from
 # volume -- measured, this saturated every feature above 70% of forms, no
 # matter how the weights were balanced (weight only shapes how often an
 # ALREADY-eligible function fires, not whether it ever gets a look-in).
@@ -1017,7 +1167,7 @@ LEGIT_FUNCS = [sec_legit_grid, sec_legit_checkbox, sec_legit_line]
 # form's subset cannot appear in it at all, so a feature's share of the
 # 25-form corpus is controlled directly by ACTIVE_FRACTION rather than by
 # how many draws a column happens to make.
-ACTIVE_MIN, ACTIVE_MAX = 7, 10   # of 16 HARD_FUNCS made eligible per form
+ACTIVE_MIN, ACTIVE_MAX = 8, 11   # of 18 HARD_FUNCS made eligible per form
 
 
 def _active_pool(rng):
@@ -1079,6 +1229,8 @@ def _draw_page(c, rng, widgets_out, tags, page_w, page_h, pool,
     if carry_in is not None:
         y_top = _draw_carried_rows(c, margin, page_w - margin, y_top, style, widgets_out, carry_in)
         tags.add("continuation")
+        if carry_in.get("shifted"):
+            tags.add("continuation_shift")
 
     new_carry = None
     if (carry_in is None and allow_continuation_start
