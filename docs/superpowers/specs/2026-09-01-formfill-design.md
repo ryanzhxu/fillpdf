@@ -194,10 +194,17 @@ Rules, each derived from measured structure in `fixtures/safer.pdf`:
 | R3 | Empty cell in a grid column, name inherited from the column header above | text field | 95 candidates |
 | R4 | Cell containing only mask characters `( ) - $` | text field, mask preserved | 12 |
 | R5 | Run of `_` at least 25 points wide | text field on the line | 9 |
+| R5b | Thin horizontal rect that is **not** part of a cell grid | text field on the line | ~6 |
 | R6 | Small empty square cell drawn with rules, not a glyph | checkbox | 2 |
 | R7 | Reject: full-width cell whose only text is a label ending in `:` | nothing | removes 1 false positive |
 
-R1 and R2 are implemented and proven. R3 through R7 are the work.
+R1 through R5 are implemented in the demo and measured. R5b, R6 and R7 are the
+remaining work.
+
+R5b was found while testing the demo. Some write-on lines (4a on the SAFER form,
+"If no, when did you move to B.C.? ____") are drawn as thin vector rects, not as
+underscore characters, so R5 misses them entirely. They must be separated from
+table borders by checking that no matching rule closes a cell.
 
 The R3 figure counts candidate cells, not confirmed fields. Some are spacers and
 must be rejected, which is why the rule needs a header-inheritance test rather
@@ -224,8 +231,16 @@ Three screens.
 sending, so the obvious rejects never cost a request. Progress and a plain
 error message for each status code in section 4.2.
 
-**Fill.** The page renders through `pdf.js`. Detected boxes are drawn as an
-overlay of real HTML inputs positioned from `rect`. This screen carries the
+**Fill.** The page renders through `pdf.js`, which keeps the original document
+text selectable underneath the boxes. Detected boxes are drawn as an
+overlay of real HTML inputs positioned from `rect`.
+
+**Boxes must never wait on rendering.** Build every page container and every box
+from `fields.json` geometry alone, then paint the canvases in the background,
+each page independent of the others. The demo originally awaited each page's
+render inside the build loop, and one stalled page hid every box on every page.
+The text layer needs no animation frame, so selectable text appears even when
+painting lags. This screen carries the
 whole correction affordance:
 
 - Click empty space to add a box.
@@ -354,7 +369,10 @@ read is still fillable by hand, which is strictly better than the status quo.
   renamed to `.pdf`. Each must produce the correct status code, never a hang and
   never a crash.
 - **Service.** Contract tests against section 4.2, including every error code.
-- **Front end.** Unit tests for the box model. One Playwright run of the full
+- **Front end.** Unit tests for the box model. Note that `pdf.js` drives canvas
+  painting through `requestAnimationFrame`, which does not fire in a hidden tab,
+  so any headless or automated check must either force the tab visible or assert
+  on the box overlay and text layer rather than on canvas pixels. One Playwright run of the full
   path: upload `safer.pdf`, add a box, fill three fields, download, then reopen
   the output and assert the values are present.
 - **Round trip.** The strongest test: fill through the browser, re-read the

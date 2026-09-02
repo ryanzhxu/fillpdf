@@ -2,12 +2,13 @@
 <meta charset="utf-8">
 <title>FormFill demo</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <style>
   :root{--bg:#f6f6f4;--fg:#1c1c1a;--line:#d8d6d0;--accent:#2f6fd0;--warn:#c2410c;--ok:#15803d}
   *{box-sizing:border-box}
   body{margin:0;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--fg)}
-  header{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);
+  header{position:sticky;top:0;z-index:40;background:#fff;border-bottom:1px solid var(--line);
          padding:10px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   h1{font-size:15px;margin:0 12px 0 0;font-weight:650}
   button{font:inherit;padding:6px 11px;border:1px solid var(--line);background:#fff;border-radius:6px;cursor:pointer}
@@ -17,29 +18,40 @@
   .sp{flex:1}
   .stat{color:#666;font-variant-numeric:tabular-nums}
   .hint{background:#fffbeb;border-bottom:1px solid #fde68a;padding:8px 16px;color:#78350f;font-size:13px}
-  main{padding:20px;display:flex;flex-direction:column;align-items:center;gap:20px}
-  .page{position:relative;width:min(920px,100%);box-shadow:0 1px 6px rgba(0,0,0,.18);background:#fff}
-  .page img{display:block;width:100%;height:auto;user-select:none;-webkit-user-drag:none}
-  .layer{position:absolute;inset:0}
-  .fld{position:absolute;border:1.5px solid rgba(47,111,208,.55);background:rgba(47,111,208,.07);border-radius:2px}
-  .fld.user{border-color:rgba(21,128,61,.65);background:rgba(21,128,61,.08)}
-  .fld.sel{outline:2px solid var(--accent);outline-offset:1px;z-index:5}
+  main{padding:20px;display:flex;flex-direction:column;align-items:center;gap:22px}
+  .page{position:relative;box-shadow:0 1px 6px rgba(0,0,0,.18);background:#fff}
+  .page canvas{display:block}
+  .pno{position:absolute;left:-40px;top:0;color:#999;font-size:12px}
+
+  /* pdf.js text layer — this is what makes the original text selectable */
+  .textLayer{position:absolute;left:0;top:0;overflow:hidden;line-height:1;opacity:1;z-index:1}
+  .textLayer span,.textLayer br{position:absolute;white-space:pre;color:transparent;
+    transform-origin:0% 0%;cursor:text;pointer-events:auto}
+  .textLayer ::selection{background:rgba(47,111,208,.32)}
+
+  .layer{position:absolute;inset:0;z-index:2;pointer-events:none}
+  .fld{position:absolute;border:1.5px solid rgba(47,111,208,.5);background:rgba(47,111,208,.07);
+       border-radius:2px;pointer-events:auto}
+  .fld.user{border-color:rgba(21,128,61,.65);background:rgba(21,128,61,.09)}
+  .fld.sel{outline:2px solid var(--accent);outline-offset:1px;z-index:9}
   .fld input{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent;
              font:inherit;padding:0 3px;color:#111;outline:none}
-  .fld input[type=checkbox]{inset:auto;left:50%;top:50%;transform:translate(-50%,-50%);width:80%;height:80%;accent-color:var(--accent)}
-  .grip{position:absolute;right:-4px;bottom:-4px;width:9px;height:9px;background:var(--accent);
-        border:1px solid #fff;border-radius:2px;cursor:nwse-resize;display:none}
-  .fld.sel .grip{display:block}
-  .mv{position:absolute;left:-4px;top:-4px;width:9px;height:9px;background:var(--accent);
-      border:1px solid #fff;border-radius:50%;cursor:move;display:none}
-  .fld.sel .mv{display:block}
-  .pno{position:absolute;left:-42px;top:0;color:#999;font-size:12px}
-  #bar{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:30;background:#fff;
+  .fld input[type=checkbox]{inset:auto;left:50%;top:50%;transform:translate(-50%,-50%);
+             width:78%;height:78%;accent-color:var(--accent);cursor:pointer}
+  .grip,.mv{position:absolute;width:12px;height:12px;background:var(--accent);border:1.5px solid #fff;
+            box-shadow:0 0 0 1px rgba(0,0,0,.25);opacity:0;transition:opacity .1s;z-index:10}
+  .mv{left:-7px;top:-7px;border-radius:50%;cursor:move}
+  .grip{right:-7px;bottom:-7px;border-radius:2px;cursor:nwse-resize}
+  .fld:hover .grip,.fld:hover .mv,.fld.sel .grip,.fld.sel .mv{opacity:1}
+  .adding .layer{pointer-events:auto;cursor:crosshair}
+  .adding .page{outline:3px dashed var(--ok);outline-offset:-3px}
+  #bar{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:50;background:#fff;
        border:1px solid var(--line);border-radius:9px;padding:8px 10px;display:none;gap:8px;align-items:center;
        box-shadow:0 3px 14px rgba(0,0,0,.16)}
   #bar.on{display:flex}
-  #bar input{font:inherit;border:1px solid var(--line);border-radius:5px;padding:4px 6px;width:190px}
-  .adding{outline:3px dashed var(--ok);outline-offset:-3px}
+  #bar input{font:inherit;border:1px solid var(--line);border-radius:5px;padding:4px 6px;width:200px}
+  #bar .rl{color:#888;font-size:12px}
+  #load{padding:40px;color:#888}
 </style>
 
 <header>
@@ -52,14 +64,15 @@
   <button id="dlForm">Download fillable</button>
 </header>
 <div class="hint" id="hint">
-  Detection uses rules R1+R2 only, so it finds roughly 60% of fields on purpose —
-  the point is to feel what fixing the rest is like. Click a box to select it.
-  Drag the circle to move, the square to resize. <b>+ Add box</b> then click the page to add one.
+  Type in any box. <b>Hover a box</b> to reveal its handles — drag the circle to move, the square to resize.
+  <b>Alt-drag</b> anywhere on a box also moves it, and <b>arrow keys</b> nudge the selected one.
+  <b>+ Add box</b>, then click the page. The original PDF text stays selectable in the gaps.
 </div>
-<main id="main"></main>
+<main id="main"><div id="load">rendering…</div></main>
 
 <div id="bar">
   <input id="nm" placeholder="field name">
+  <span class="rl" id="rl"></span>
   <button id="tt">→ checkbox</button>
   <button id="del" class="d">Delete</button>
   <button id="close">Done</button>
@@ -67,133 +80,222 @@
 
 <script>
 const $ = s => document.querySelector(s);
-let DOC = null, FIELDS = [], PAGES = [], sel = null, adding = false, cursor = -1;
+let FIELDS = [], PAGES = [], sel = null, adding = false, cursor = -1;
 
-const uid = b => { let i=1, n=b; const has=x=>FIELDS.some(f=>f.id===x); while(has(n)) n=`${b}_${++i}`; return n; };
+const uid = b => { let i=1,n=b; while(FIELDS.some(f=>f.id===n)) n=`${b}_${++i}`; return n; };
+const pageEl = n => document.querySelector(`.page[data-page="${n}"]`);
+const pageOf = n => PAGES.find(p => p.page === n);
+// DOM order is grouped by page and does NOT match FIELDS order — always look up by index.
+const elOf   = i => document.querySelector(`.fld[data-i="${i}"]`);
 
 async function boot(){
+  const CDN = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/';
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   const d = await (await fetch('fields.json')).json();
   PAGES = d.pages; FIELDS = d.fields;
+
+  // 1. Build every page container and every box FIRST, from geometry alone.
+  //    Nothing here waits on rendering, so a slow or stalled page never hides the boxes.
+  const target = Math.min(900, window.innerWidth - 48);
+  $('#main').innerHTML = '';
   for (const p of PAGES){
-    const el = document.createElement('div');
-    el.className = 'page'; el.dataset.page = p.page;
-    el.innerHTML = `<span class="pno">${p.page}</span><img src="page_${p.page}.png" alt=""><div class="layer"></div>`;
-    el.querySelector('.layer').addEventListener('mousedown', e => onLayer(e, p));
-    $('#main').appendChild(el);
+    p.scale = target / p.width;
+    const wrap = document.createElement('div');
+    wrap.className = 'page'; wrap.dataset.page = p.page;
+    wrap.style.width  = target + 'px';
+    wrap.style.height = p.height * p.scale + 'px';
+    const pno = document.createElement('span'); pno.className='pno'; pno.textContent = p.page;
+    const canvas = document.createElement('canvas');
+    canvas.style.width = target+'px'; canvas.style.height = p.height*p.scale+'px';
+    const tl = document.createElement('div');
+    tl.className = 'textLayer';
+    tl.style.width = target+'px'; tl.style.height = p.height*p.scale+'px';
+    tl.style.setProperty('--scale-factor', p.scale);
+    const layer = document.createElement('div');
+    layer.className = 'layer';
+    layer.addEventListener('mousedown', e => onLayer(e, p));
+    wrap.append(pno, canvas, tl, layer);
+    $('#main').appendChild(wrap);
   }
   draw();
+
+  // 2. Then paint the pages in the background, each independent of the others.
+  const pdf = await pdfjsLib.getDocument({
+    url: 'source.pdf',
+    standardFontDataUrl: CDN + 'standard_fonts/',
+    cMapUrl: CDN + 'cmaps/', cMapPacked: true
+  }).promise;
+  const dpr = window.devicePixelRatio || 1;
+  for (const p of PAGES){
+    (async () => {
+      try {
+        const page = await pdf.getPage(p.page);
+        const vp = page.getViewport({scale: p.scale});
+        const wrap = pageEl(p.page);
+        const canvas = wrap.querySelector('canvas');
+        canvas.width = Math.floor(vp.width*dpr); canvas.height = Math.floor(vp.height*dpr);
+        const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+        // The text layer needs no rAF, so selectable text appears even if painting lags.
+        pdfjsLib.renderTextLayer({textContent: await page.getTextContent(),
+                                  container: wrap.querySelector('.textLayer'),
+                                  viewport: vp, textDivs: []});
+        await page.render({canvasContext: ctx, viewport: vp}).promise;
+      } catch (err){ console.warn('page ' + p.page + ' render failed:', err.message); }
+    })();
+  }
 }
 
-function pageEl(n){ return document.querySelector(`.page[data-page="${n}"]`); }
-function pageOf(n){ return PAGES.find(p => p.page === n); }
+function place(el, f){
+  const p = pageOf(f.page), [x0,y0,x1,y1] = f.rect;
+  el.style.left   = x0/p.width*100 + '%';
+  el.style.top    = (p.height-y1)/p.height*100 + '%';
+  el.style.width  = (x1-x0)/p.width*100 + '%';
+  el.style.height = (y1-y0)/p.height*100 + '%';
+}
 
 function draw(){
   document.querySelectorAll('.layer').forEach(l => l.innerHTML = '');
-  FIELDS.forEach((f, i) => {
-    const p = pageOf(f.page); if (!p) return;
-    const [x0,y0,x1,y1] = f.rect;
+  FIELDS.forEach((f,i) => {
+    if (!pageOf(f.page)) return;
     const b = document.createElement('div');
+    b.dataset.i = i;
     b.className = 'fld' + (f.origin === 'detected' ? '' : ' user') + (sel === i ? ' sel' : '');
-    b.style.cssText = `left:${x0/p.width*100}%;top:${(p.height-y1)/p.height*100}%;`
-                    + `width:${(x1-x0)/p.width*100}%;height:${(y1-y0)/p.height*100}%`;
-    b.title = f.label || f.id;
+    b.title = `${f.id}${f.rule ? '  ('+f.rule+')' : ''}`;
+    place(b, f);
     const inp = document.createElement('input');
-    if (f.type === 'checkbox'){ inp.type = 'checkbox'; inp.checked = !!f.value; inp.onchange = e => f.value = e.target.checked; }
-    else { inp.type = 'text'; inp.value = f.value || ''; inp.oninput = e => f.value = e.target.value;
-           inp.style.fontSize = Math.max(9, Math.min(15, (y1-y0)*0.72)) + 'px'; }
-    inp.onfocus = () => { sel = i; cursor = i; paintSel(); showBar(); };
+    const [,y0,,y1] = f.rect;
+    if (f.type === 'checkbox'){
+      inp.type='checkbox'; inp.checked=!!f.value; inp.onchange = e => f.value = e.target.checked;
+    } else {
+      inp.type='text'; inp.value = f.value || '';
+      inp.oninput = e => f.value = e.target.value;
+      inp.style.fontSize = Math.max(9, Math.min(15, (y1-y0)*0.7)) + 'px';
+    }
+    inp.onfocus = () => select(i);
     b.appendChild(inp);
-    const mv = document.createElement('div'); mv.className='mv'; mv.onmousedown = e => drag(e,i,'move');
-    const gr = document.createElement('div'); gr.className='grip'; gr.onmousedown = e => drag(e,i,'size');
+    const mv = document.createElement('div'); mv.className='mv';
+    const gr = document.createElement('div'); gr.className='grip';
+    mv.onmousedown = e => drag(e, i, 'move');
+    gr.onmousedown = e => drag(e, i, 'size');
+    b.onmousedown = e => { if (e.altKey) drag(e, i, 'move'); };
     b.append(mv, gr);
     pageEl(f.page).querySelector('.layer').appendChild(b);
   });
   stat();
 }
 
-function paintSel(){
-  document.querySelectorAll('.fld').forEach((el,i) => el.classList.toggle('sel', i === sel));
+function select(i){
+  sel = i; cursor = i;
+  document.querySelectorAll('.fld').forEach(el => el.classList.remove('sel'));
+  elOf(i)?.classList.add('sel');
+  showBar();
+}
+function deselect(){
+  sel = null;
+  document.querySelectorAll('.fld').forEach(el => el.classList.remove('sel'));
+  $('#bar').classList.remove('on');
 }
 function stat(){
-  const t = FIELDS.filter(f=>f.type==='text').length, c = FIELDS.length - t;
+  const t = FIELDS.filter(f=>f.type==='text').length;
   const u = FIELDS.filter(f=>f.origin!=='detected').length;
-  $('#stat').textContent = `${FIELDS.length} boxes · ${t} text · ${c} checkbox${u?` · ${u} yours`:''}`;
+  $('#stat').textContent = `${FIELDS.length} boxes · ${t} text · ${FIELDS.length-t} checkbox${u?` · ${u} yours`:''}`;
 }
 function showBar(){
-  const f = FIELDS[sel]; if (!f) return $('#bar').classList.remove('on');
-  $('#bar').classList.add('on'); $('#nm').value = f.id;
+  const f = FIELDS[sel];
+  if (!f) return $('#bar').classList.remove('on');
+  $('#bar').classList.add('on');
+  $('#nm').value = f.id;
+  $('#rl').textContent = f.rule ? f.rule : 'added';
   $('#tt').textContent = f.type === 'text' ? '→ checkbox' : '→ text';
 }
 
 function onLayer(e, p){
-  if (!adding) { if (e.target.classList.contains('layer')) { sel = null; paintSel(); $('#bar').classList.remove('on'); } return; }
+  if (!adding){ if (e.target.classList.contains('layer')) deselect(); return; }
   const r = e.currentTarget.getBoundingClientRect();
-  const x = (e.clientX - r.left) / r.width * p.width;
-  const y = p.height - (e.clientY - r.top) / r.height * p.height;
-  FIELDS.push({ id: uid('box'), page: p.page, type: 'text', label: '', origin: 'user_added',
-                rect: [x, y - 9, x + 150, y + 9], value: '' });
-  sel = FIELDS.length - 1; adding = false;
-  $('#main').classList.remove('adding'); $('#add').classList.remove('p');
-  draw(); showBar();
+  const x = (e.clientX - r.left)/r.width * p.width;
+  const y = p.height - (e.clientY - r.top)/r.height * p.height;
+  FIELDS.push({ id: uid('box'), page: p.page, type:'text', label:'', origin:'user_added',
+                rect:[x, y-9, x+150, y+9], value:'' });
+  setAdding(false);
+  draw(); select(FIELDS.length-1);
 }
 
 function drag(e, i, mode){
   e.preventDefault(); e.stopPropagation();
+  select(i);
   const f = FIELDS[i], p = pageOf(f.page);
   const r = pageEl(f.page).getBoundingClientRect();
-  const sx = e.clientX, sy = e.clientY, o = [...f.rect];
+  const el = elOf(i), sx = e.clientX, sy = e.clientY, o = [...f.rect];
   const move = ev => {
-    const dx = (ev.clientX - sx) / r.width * p.width;
-    const dy = -(ev.clientY - sy) / r.height * p.height;
-    f.rect = mode === 'move' ? [o[0]+dx, o[1]+dy, o[2]+dx, o[3]+dy]
-                             : [o[0], Math.min(o[1]+dy, o[3]-6), Math.max(o[2]+dx, o[0]+12), o[3]];
-    draw(); paintSel();
+    const dx = (ev.clientX-sx)/r.width * p.width;
+    const dy = -(ev.clientY-sy)/r.height * p.height;
+    f.rect = mode === 'move'
+      ? [o[0]+dx, o[1]+dy, o[2]+dx, o[3]+dy]
+      : [o[0], Math.min(o[1]+dy, o[3]-6), Math.max(o[2]+dx, o[0]+12), o[3]];
+    place(el, f);                       // restyle one element, never redraw all 234
   };
-  const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
-  document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+  const up = () => { document.removeEventListener('mousemove', move);
+                     document.removeEventListener('mouseup', up); };
+  document.addEventListener('mousemove', move);
+  document.addEventListener('mouseup', up);
 }
 
-$('#add').onclick = () => {
-  adding = !adding;
-  $('#main').classList.toggle('adding', adding); $('#add').classList.toggle('p', adding);
-};
+function setAdding(v){
+  adding = v;
+  document.body.classList.toggle('adding', v);
+  $('#add').classList.toggle('p', v);
+}
+
+$('#add').onclick  = () => setAdding(!adding);
 $('#next').onclick = () => {
   if (!FIELDS.length) return;
-  cursor = (cursor + 1) % FIELDS.length; sel = cursor;
-  const el = document.querySelectorAll('.fld')[cursor];
+  const i = (cursor+1) % FIELDS.length;
+  const el = elOf(i);
   el.scrollIntoView({behavior:'smooth', block:'center'});
-  el.querySelector('input').focus(); paintSel(); showBar();
+  el.querySelector('input').focus();
+  select(i);
 };
 $('#nm').oninput = e => { if (FIELDS[sel]) FIELDS[sel].id = e.target.value.replace(/[^A-Za-z0-9_]/g,'_').slice(0,64); };
 $('#tt').onclick = () => { const f = FIELDS[sel]; if(!f) return;
-  f.type = f.type === 'text' ? 'checkbox' : 'text'; f.value = f.type === 'checkbox' ? false : ''; draw(); showBar(); };
-$('#del').onclick = () => { if (sel==null) return; FIELDS.splice(sel,1); sel=null; cursor=-1; $('#bar').classList.remove('on'); draw(); };
-$('#close').onclick = () => { sel = null; paintSel(); $('#bar').classList.remove('on'); };
+  f.type = f.type==='text' ? 'checkbox' : 'text';
+  f.value = f.type==='checkbox' ? false : '';
+  const keep = sel; draw(); select(keep); };
+$('#del').onclick = () => { if (sel==null) return;
+  FIELDS.splice(sel,1); sel=null; cursor=-1; $('#bar').classList.remove('on'); draw(); };
+$('#close').onclick = deselect;
+
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape'){ adding=false; $('#main').classList.remove('adding'); $('#add').classList.remove('p'); }
-  if ((e.key === 'Backspace' || e.key === 'Delete') && sel!=null && document.activeElement.tagName !== 'INPUT') $('#del').click();
+  if (e.key === 'Escape') { setAdding(false); deselect(); }
+  const typing = document.activeElement.tagName === 'INPUT'
+              && document.activeElement.type === 'text';
+  if (sel == null) return;
+  if (e.key.startsWith('Arrow')){
+    if (typing && document.activeElement.closest('#bar')) return;
+    e.preventDefault();
+    const d = e.shiftKey ? 10 : 1, f = FIELDS[sel];
+    const [dx,dy] = {ArrowLeft:[-d,0],ArrowRight:[d,0],ArrowUp:[0,d],ArrowDown:[0,-d]}[e.key] || [0,0];
+    f.rect = [f.rect[0]+dx, f.rect[1]+dy, f.rect[2]+dx, f.rect[3]+dy];
+    place(elOf(sel), f);
+  }
+  if ((e.key==='Backspace'||e.key==='Delete') && !typing) $('#del').click();
 });
 
-// ---- the pdf-lib spike: create real AcroForm fields client-side, then fill -------
+// ---- the pdf-lib spike: create real AcroForm fields client-side, then fill -----
 async function build(flatten){
   const { PDFDocument } = PDFLib;
-  const bytes = await (await fetch('source.pdf')).arrayBuffer();
-  const doc = await PDFDocument.load(bytes);
+  const doc = await PDFDocument.load(await (await fetch('source.pdf')).arrayBuffer());
   const form = doc.getForm();
-  let made = 0, failed = [];
+  let made = 0; const failed = [];
   for (const f of FIELDS){
-    const page = doc.getPage(f.page - 1);
-    const [x0,y0,x1,y1] = f.rect;
-    const box = { x:x0, y:y0, width:Math.max(6,x1-x0), height:Math.max(6,y1-y0), borderWidth:0 };
+    const page = doc.getPage(f.page-1), [x0,y0,x1,y1] = f.rect;
+    const box = {x:x0, y:y0, width:Math.max(6,x1-x0), height:Math.max(6,y1-y0), borderWidth:0};
     try {
       if (f.type === 'checkbox'){
-        const cb = form.createCheckBox(f.id);
-        cb.addToPage(page, box);
-        if (f.value) cb.check();
+        const cb = form.createCheckBox(f.id); cb.addToPage(page, box); if (f.value) cb.check();
       } else {
-        const tf = form.createTextField(f.id);
-        tf.addToPage(page, box);
-        tf.setFontSize(Math.max(8, Math.min(12, (y1 - y0) * 0.62)));   // pdf-lib auto-sizes to fill; too big
+        const tf = form.createTextField(f.id); tf.addToPage(page, box);
+        tf.setFontSize(Math.max(8, Math.min(12, (y1-y0)*0.62)));  // pdf-lib auto-sizes too big
         if (f.value) tf.setText(String(f.value));
       }
       made++;
@@ -203,13 +305,13 @@ async function build(flatten){
   if (flatten) form.flatten();
   console.log(`[spike] created ${made}/${FIELDS.length} fields; ${failed.length} failed`);
   if (failed.length) console.warn('[spike] failures:', failed.slice(0,10));
-  const out = await doc.save();
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([out], {type:'application/pdf'}));
+  a.href = URL.createObjectURL(new Blob([await doc.save()], {type:'application/pdf'}));
   a.download = flatten ? 'filled.pdf' : 'fillable.pdf';
   a.click();
-  $('#hint').innerHTML = `<b>pdf-lib spike:</b> created ${made} of ${FIELDS.length} fields`
-    + (failed.length ? `, <span style="color:#c2410c">${failed.length} failed — see console</span>` : ', <span style="color:#15803d">0 failures</span>')
+  $('#hint').innerHTML = `<b>pdf-lib:</b> created ${made} of ${FIELDS.length} fields`
+    + (failed.length ? `, <span style="color:#c2410c">${failed.length} failed — see console</span>`
+                     : ', <span style="color:#15803d">0 failures</span>')
     + `. Downloaded <code>${a.download}</code>.`;
 }
 $('#dlFlat').onclick = () => build(true);
