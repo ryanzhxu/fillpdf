@@ -10,7 +10,7 @@ precision, and the label-free guards. The holdout is never tuned against.
 | 3 | R1 uses the glyph's real bbox | 0.5133 -> 0.5304 (+.0170) | 0.1810 (unchanged) | **MERGED** |
 | 3b | harness: per-rule metrics could exceed 1.0 | n/a | n/a | **MERGED** |
 | 4 | R3 refuses office-use columns | 0.5304 -> 0.5558 (P +.105) | unchanged | **MERGED** |
-| 5 | R10 reads the label from the cell to the left | 0.5558 -> 0.5662 (+.0103) | 0.1810 -> 0.1802 (-.0008) | **MERGED, flagged** |
+| 5 | R10 reads the label from the cell to the left | 0.5558 -> 0.5662 (+.0103) | 0.1810 -> 0.1802 (-.0008) | **MERGED** — flag cleared, see below |
 | 6 | R3 clusters ragged columns (tol 16pt) | 0.5662 -> 0.6277 (+.0616) | 0.1802 -> 0.1919 (+.0116) | **MERGED** |
 | 7 | R11 reads dot-leader write-on lines | 0.5387 -> 0.5546 (+.0159) | unchanged | **MERGED** |
 | 7b | exempt dot leaders from the ink guard | 0.5546 -> 0.5541 (-.0005) | -.0002 | **REJECTED** |
@@ -380,3 +380,24 @@ It defines "reachable" as "carries a signal some CURRENT rule reads". A future
 rule reading a new signal would find its evidence already filtered out. Dot
 leaders were added when R11 landed; whenever a rule learns a new signal, add it
 to MARK_CHARS in eval/label.py.
+
+
+## Iteration 5 re-examined on the clean corpus — flag CLEARED
+
+R10 was merged with a flag: on the old holdout it fired 5 times and was wrong
+all 5. Re-run with R10 on versus off against the corrected corpus:
+
+                    with R10    without
+    overall f1       0.6977      0.6947
+    holdout f1       0.6187      0.6104
+    holdout P        0.6898      0.6856
+    holdout R        0.5609      0.5500
+    R10 alone: 22 detected, 17 matched, label accuracy 1.0
+
+It improves the holdout on all three metrics. Those five "false positives" were
+boxes on fields that existed but had been filtered out as unreachable — the
+polluted corpus was scoring R10 against widgets it had itself excluded.
+
+Worth noting as a general lesson: a flagged merge was flagged on bad evidence.
+The other marginal verdicts from that era deserve the same scepticism, in both
+directions — a rejection can be as wrong as an approval.
