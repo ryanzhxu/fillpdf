@@ -245,6 +245,123 @@ def _text_in(words, cell, pad=1):
             and w["top"] >= top - pad and w["bottom"] <= bot + pad]
 
 
+# R3 group header: a wide, undivided row (a single grid_cells() cell) sitting
+# directly above a row that IS divided into sub-columns, e.g.
+#
+#     |        Sponsored Immigrants Only        |
+#     |   Name of Sponsor   |   End Date         |
+#
+# _cluster_columns groups purely by a cell's own x0, so the wide cell's x0
+# only ever matches the LEFTMOST sub-column's cluster -- every other
+# sub-column's own group never sees it at all. When the row directly below
+# is itself blank (the group header is the ONLY header text, Word simply
+# does not draw a divider through it), that leaves every non-leftmost
+# sub-column with no header to inherit and the leftmost stuck with the
+# whole row's text glued together ("Item Quantity Amount" instead of
+# "Item"). Measured on the tuning corpus (hard_*.pdf), this exact shape
+# repeats often: a one-line "Item / Quantity / Amount" (or similar) title
+# prints as one wide cell, directly above blank per-column entry rows.
+#
+# Fix: read the wide row's own words against the X-RANGES of the divided
+# row below it, splitting its text into one label per sub-column -- this
+# reconstructs "Item", "Quantity", "Amount" individually. Truth on this
+# corpus (hard_00013.json etc.) confirms the expected label is the bare
+# per-column text, e.g. "Item", "Street Number and Name" -- never the wide
+# row's text as a qualifying prefix -- so no group-name qualification is
+# added.
+#
+# Deliberately narrow, to avoid two traps seen in this same corpus:
+#   - a wide row that is a section TITLE or a Yes/No question, not a group
+#     header (hard_00015.pdf: "Do you receive benefits? [ ] Yes [ ] No"
+#     sits directly above an unrelated "Marital Status | Middle Initial |
+#     Name" row purely by page-layout coincidence). Any checkbox glyph in
+#     the wide row's text rules this out outright.
+#   - a dot-leader caption that happens to run the full row width (hard_
+#     00017.pdf: "Social Security Number: ....................." sits
+#     above an unrelated "Item | Quantity | Amount" row). Splitting it by
+#     column still lands SOME character in every column (the leader dots
+#     span the whole width) but none of those slices contain a letter or
+#     digit, so requiring each split label to have one rules it out.
+#   - a sub-column that already prints its OWN header text (the genuine
+#     two-level case, e.g. safer.pdf's "Name of Sponsor" / "End Date of
+#     Sponsorship Agreement") is left alone entirely -- that text is more
+#     specific than anything split out of the row above it, and R3 already
+#     picks it up on its own via each column's own header-setting cell.
+#   - the wide row being an R12-sized full answer area, or an outer table
+#     border: both run much taller than an ordinary header band, so a
+#     height cap excludes them.
+#   - a wide row spanning the table's FULL width, with no other columns
+#     beside it, is ambiguous: it could be this nested-group shape, or it
+#     could just as easily be an ordinary one-level table whose header
+#     merely lacks a ruled divider -- a case this corpus's hard_* forms
+#     use heavily on purpose to keep the detector honest (a pytest
+#     tripwire holds the hard corpus's f1 down for exactly this reason).
+#     safer.pdf's own group header is nested INSIDE a wider row that also
+#     carries other, differently-headed columns to its left ("Name",
+#     "Current status in Canada", ...), so its sub-columns are narrower
+#     than the columns of a table that fills the whole row by itself.
+#     Capping how wide a sub-column may be keeps this rule aimed at that
+#     nested shape.
+GROUP_HEADER_MAX_H = 40      # points; header-band height cap (R12 starts at 70)
+GROUP_HEADER_TOL = 3         # points; x-range match between the wide row and
+                             # the divided row's combined span
+GROUP_HEADER_MAX_SUBCOL_W = 150   # points; see "full width" trap above
+
+
+def _group_header_splits(cells, words):
+    """Split a wide header row's text across the sub-columns below it.
+
+    Returns (wide_labels, seeds):
+      wide_labels: {wide_cell: label} -- the LEFTMOST sub-column's share of
+        the split text plus that sub-column's OWN (x0, x1) -- not the wide
+        cell's full width -- keyed by the wide cell itself (it lives in the
+        leftmost sub-column's own x0-cluster, so this is consulted in place
+        of that cell's full, unsplit text).
+      seeds: [(sub_cell, label, wide_row_top), ...] for every OTHER
+        sub-column -- the caller seeds each one's own column-cluster with
+        this label before that cluster's cells are walked, the same way a
+        carried-in header is seeded (see _match_carried_columns).
+        wide_row_top is carried along so the seed's header_top matches the
+        wide row's own top exactly like the leftmost column's real one
+        does, so sibling columns corroborate each other for R3c carry-out.
+    """
+    rows = {}
+    for c in cells:
+        rows.setdefault(c[1], []).append(c)
+    wide_labels = {}
+    seeds = []
+    for wtop, row in rows.items():
+        if len(row) != 1:
+            continue
+        wide = row[0]
+        wx0, _, wx1, wbot = wide
+        if wbot - wtop > GROUP_HEADER_MAX_H or wx1 - wx0 < 60:
+            continue
+        wide_txt = _text_in(words, wide)
+        if not wide_txt or any(w["text"] in CHECK_GLYPHS for w in wide_txt):
+            continue
+        subrow = rows.get(wbot)
+        if not subrow or len(subrow) < 2:
+            continue
+        subs = sorted(subrow, key=lambda c: c[0])
+        if abs(subs[0][0] - wx0) > GROUP_HEADER_TOL or abs(subs[-1][2] - wx1) > GROUP_HEADER_TOL:
+            continue
+        if any((s[2] - s[0]) > GROUP_HEADER_MAX_SUBCOL_W for s in subs):
+            continue
+        if any(_text_in(words, s) for s in subs):
+            continue          # a sub-column already prints its own header
+        labels = []
+        for sx0, _, sx1, _ in subs:
+            in_col = [w for w in wide_txt
+                      if sx0 - GROUP_HEADER_TOL <= (w["x0"] + w["x1"]) / 2 <= sx1 + GROUP_HEADER_TOL]
+            labels.append(" ".join(w["text"] for w in sorted(in_col, key=lambda w: w["x0"])))
+        if not all(re.search(r"[A-Za-z0-9]", label) for label in labels):
+            continue
+        wide_labels[wide] = (labels[0], subs[0][0], subs[0][2])
+        seeds += [(sub_cell, label, wtop) for sub_cell, label in zip(subs[1:], labels[1:])]
+    return wide_labels, seeds
+
+
 # R1 label: a checkbox's option text sits right next to its glyph, usually to
 # the right ("[x] Yes"), sometimes to the left ("Yes [x]"). Measured on this
 # corpus, the gap from a glyph to its own label word, and the gap between two
@@ -659,11 +776,27 @@ def detect(page, pno, carry_in=None):
         group.sort(key=lambda c: c[1])
     groups.sort(key=lambda g: min(c[0] for c in g))
     carry_matches = _match_carried_columns(groups, carry_in, words)
+    wide_labels, group_header_seeds = _group_header_splits(cells, words)
+    # Match each group-header seed (see _group_header_splits above) to the
+    # one column-cluster containing its sub-cell, the same way a carried-in
+    # header is matched to a group by membership.
+    split_seed_by_group = {}
+    for sub_cell, label, wide_top in group_header_seeds:
+        for g in groups:
+            if sub_cell in g:
+                split_seed_by_group[id(g)] = {"label": label, "x0": sub_cell[0], "x1": sub_cell[2],
+                                               "top": wide_top}
+                break
     raw_carry = []          # (header_top or None, x0, x1, label) per group, before the
                              # multi-column corroboration filter below
     for group in groups:
         seeded = carry_matches.get(id(group))
-        header = seeded["label"] if seeded else None
+        # A group-header split only seeds when nothing was carried in from a
+        # previous page -- carry_in already passed this same corroboration
+        # check once, and takes precedence.
+        split_seed = split_seed_by_group.get(id(group)) if seeded is None else None
+        active_seed = seeded or split_seed
+        header = active_seed["label"] if active_seed else None
         # (x0, x1) of the specific cell that carries `header` -- the header's
         # OWN box, not the column-band's page-wide extent. _cluster_columns
         # groups purely by x0 proximity, so one page-wide band can span a
@@ -672,14 +805,22 @@ def detect(page, pno, carry_in=None):
         # the same left margin. Using the band's aggregate min/max would
         # inherit that unrelated cell's width -- the header's own box never
         # does.
-        header_extent = (seeded["x0"], seeded["x1"]) if seeded else None
-        header_top = None    # top of the cell that most recently SET header on
-                             # this page; None if header is still just the seed
+        header_extent = (active_seed["x0"], active_seed["x1"]) if active_seed else None
+        # top of the cell that most recently SET header on this page; None if
+        # header is still just a carried-in seed. A group-header split seed
+        # is NOT carried in -- its header_top is the wide row's own top, so
+        # it corroborates its sibling columns exactly like a real multi-
+        # column header row would (see the carry_out filter below).
+        header_top = split_seed["top"] if split_seed is not None else None
         carried = seeded is not None
         for cell in group:
             txt = _text_in(words, cell)
             if txt:
                 label = " ".join(w["text"] for w in sorted(txt, key=lambda w: w["x0"]))
+                forced = wide_labels.get(cell)
+                own_extent = (cell[0], cell[2])
+                if forced is not None:
+                    label, own_extent = forced[0], (forced[1], forced[2])
                 if 2 <= len(label) <= 60:
                     # An "office use" header marks its column off-limits: no
                     # blank cell below it should be claimed as a field until
@@ -688,7 +829,7 @@ def detect(page, pno, carry_in=None):
                         header, header_top, header_extent = None, None, None
                     else:
                         header, header_top = label, cell[1]
-                        header_extent = (cell[0], cell[2])
+                        header_extent = own_extent
                 carried = False           # a header printed on this page always wins
                 continue
             x0, top, x1, bot = cell
