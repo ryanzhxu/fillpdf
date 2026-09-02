@@ -846,3 +846,52 @@ has words inside each column; a run-on sentence has a word bridging them.
 10 of 185 is a low recovery rate, deliberately. The remaining 175 need signals
 this rule refuses to guess at. Zero holdout effect because no holdout form
 triggers it at all.
+
+
+## Harness round 3 — label quality is now measurable on real forms
+
+`label_accuracy` compares a label to a truth label, and only synthetic corpora
+have those. All 165 real forms are stripped AcroForms with geometry but no label
+text, so it reported UNAVAILABLE for the bulk of the evidence. A change could
+raise recall while attaching nonsense names and nothing would object — which
+nearly happened in iteration 25.
+
+`label_plausibility` is truth-free, in the spirit of box_over_ink. Three signals
+survived measurement:
+
+- **provenance** — do the label's words occur, in that order, on the page?
+- **contiguity** — is there a gap between matched words far wider than the page's
+  own normal word spacing? That means two headers merged across a gutter.
+- **fragment shape** — does a normally-spaced word sit immediately outside the
+  label's span, excluded from it? That means a slice taken mid-run.
+
+A fourth, "far from its matched text", was dropped: it fired constantly on one
+header legitimately governing a tall stack of boxes.
+
+Two false-positive modes were found and fixed against real output, not toy
+cases: checkbox glyphs and underscore blanks sit beside almost every real label
+by construction, and R11's dot leaders tokenise each dot as a word, which drove
+R11 to a false 100% until both got the same exclusion box_over_ink already uses
+for ink.
+
+### It found real bugs in today's output
+
+    1f697fad5785 p1  R2   'street address city, town or village country postal'
+    1f697fad5785 p10 R2   'the applicant must be paid within the'
+    1f95bd47c4b0 p1  R5b  'Name*: Last Name*:'   'Address*: City / Town*'
+    2312b040cb7e     R5b  'First name: Middle'   'Middle name: Phone'  (x3)
+    035b8cec3f20 p6  R5b  'is collected under section 26 (a) and (c) of the Freedom of '
+    fixtures/safer.pdf    'Landlord Phone # Date:'   <- on our own reference form
+    holdout 1fd892d78268  'Email' / 'Address:'  lifted mid-sentence from body text
+
+Overall 35.2% of labels carry at least one flag. Per rule: R2 22.5%, R3 30.4%,
+R5 54.5%, R5b 43.5%, and R4/R10/R11/R12 at or under 8%. R5 and R5b sit high by
+construction — they read short context words beside fill-in blanks — so the
+per-rule split matters more than the single number.
+
+Gated on the box_over_ink pattern: fail only on a rise over 0.01 WITH new
+offenders, warn on a rise without them, no-op when either run lacks the field.
+
+**Cost:** a full scoring run now takes about two minutes, up from well under
+one. Worth it, but it is the reason to keep the corpus from growing without
+bound.

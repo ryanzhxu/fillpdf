@@ -8,10 +8,783 @@
   "detector_fingerprint": "eadeec2067b2",
   "failures": [],
   "git_dirty": true,
-  "git_sha": "9bf352596fd8454a1fb4cb2bf51b2d795813a169",
+  "git_sha": "94b52fd9ce39fabdc5f6243e6d187adadb4d4df5",
   "guards": {
     "box_over_ink": 0.07021943573667712,
     "glyph_coverage": 1.0,
+    "label_duplication": {
+      "duplicated": 3540,
+      "fraction": 0.6180167597765364,
+      "max_repeat": 37,
+      "top": [
+        {
+          "count": 37,
+          "form": "f6b53f5f6901.pdf",
+          "label": "",
+          "page": 6
+        },
+        {
+          "count": 32,
+          "form": "2c5f89f13df6.pdf",
+          "label": "dates",
+          "page": 3
+        },
+        {
+          "count": 32,
+          "form": "2c5f89f13df6.pdf",
+          "label": "descriptionofincidents",
+          "page": 3
+        },
+        {
+          "count": 25,
+          "form": "ccee57500c21.pdf",
+          "label": "unknown",
+          "page": 4
+        },
+        {
+          "count": 25,
+          "form": "ccee57500c21.pdf",
+          "label": "extremelylow",
+          "page": 4
+        },
+        {
+          "count": 25,
+          "form": "ccee57500c21.pdf",
+          "label": "verylow",
+          "page": 4
+        },
+        {
+          "count": 25,
+          "form": "ccee57500c21.pdf",
+          "label": "lower",
+          "page": 4
+        },
+        {
+          "count": 25,
+          "form": "ccee57500c21.pdf",
+          "label": "moderate",
+          "page": 4
+        },
+        {
+          "count": 25,
+          "form": "ccee57500c21.pdf",
+          "label": "studio",
+          "page": 4
+        },
+        {
+          "count": 25,
+          "form": "ccee57500c21.pdf",
+          "label": "bedroom1",
+          "page": 4
+        },
+        {
+          "count": 25,
+          "form": "ccee57500c21.pdf",
+          "label": "bedroom2",
+          "page": 4
+        },
+        {
+          "count": 25,
+          "form": "ccee57500c21.pdf",
+          "label": "bedroom3",
+          "page": 4
+        },
+        {
+          "count": 25,
+          "form": "ccee57500c21.pdf",
+          "label": "bedrooms4ormore",
+          "page": 4
+        },
+        {
+          "count": 24,
+          "form": "af4e5b570a73.pdf",
+          "label": "line",
+          "page": 10
+        },
+        {
+          "count": 18,
+          "form": "72fc7951aaf5.pdf",
+          "label": "line",
+          "page": 5
+        }
+      ],
+      "total": 5728
+    },
+    "label_plausibility": 0.3510824022346369,
+    "label_plausibility_flagged": 2011,
+    "label_plausibility_offenders": [
+      {
+        "form": "035b8cec3f20.pdf",
+        "id": "p2_of",
+        "label": "of",
+        "page": 2,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R2"
+      },
+      {
+        "form": "035b8cec3f20.pdf",
+        "id": "p6_is_collected_under_section_26_a_and_c_of",
+        "label": "is collected under section 26 (a) and (c) of the Freedom of ",
+        "page": 6,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "067faa30db82.pdf",
+        "id": "p1_requested_change_amendment_duplicate_rea",
+        "label": "Requested change: Amendment Duplicate Reason:",
+        "page": 1,
+        "reasons": [
+          "internal_gap",
+          "truncated_left"
+        ],
+        "rule": "R5"
+      },
+      {
+        "form": "108621d8eae3.pdf",
+        "id": "p1_restraining_order_is_set_for_at",
+        "label": "Restraining Order is set for: at",
+        "page": 1,
+        "reasons": [
+          "internal_gap",
+          "truncated_left"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "1438b3832ba1.pdf",
+        "id": "p1_extended_to_20_at",
+        "label": "extended to 20 at",
+        "page": 1,
+        "reasons": [
+          "internal_gap",
+          "truncated_left"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "16ad6c8a75e1.pdf",
+        "id": "p3_line",
+        "label": "line",
+        "page": 3,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5"
+      },
+      {
+        "form": "16ad6c8a75e1.pdf",
+        "id": "p3_line_2",
+        "label": "line",
+        "page": 3,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5"
+      },
+      {
+        "form": "16ad6c8a75e1.pdf",
+        "id": "p3_line_3",
+        "label": "line",
+        "page": 3,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5"
+      },
+      {
+        "form": "1f697fad5785.pdf",
+        "id": "p1_established_date_business_purchased",
+        "label": "established: Date business purchased:",
+        "page": 1,
+        "reasons": [
+          "internal_gap",
+          "truncated_left"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "1f697fad5785.pdf",
+        "id": "p1_street_address_city_town_or_village_coun",
+        "label": "street address city, town or village country postal",
+        "page": 1,
+        "reasons": [
+          "internal_gap",
+          "truncated_right"
+        ],
+        "rule": "R2"
+      },
+      {
+        "form": "1f697fad5785.pdf",
+        "id": "p4_association_standards",
+        "label": "Association standards",
+        "page": 4,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "1f697fad5785.pdf",
+        "id": "p10_the_applicant_must_be_paid_within_the",
+        "label": "the applicant must be paid within the",
+        "page": 10,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R2"
+      },
+      {
+        "form": "1f95bd47c4b0.pdf",
+        "id": "p1_address_city_town",
+        "label": "Address*: City / Town*",
+        "page": 1,
+        "reasons": [
+          "internal_gap",
+          "truncated_left"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "1f95bd47c4b0.pdf",
+        "id": "p1_name_last_name",
+        "label": "Name*: Last Name*:",
+        "page": 1,
+        "reasons": [
+          "internal_gap",
+          "truncated_left"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "1fd892d78268.pdf",
+        "id": "p1_or",
+        "label": "or",
+        "page": 1,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R2"
+      },
+      {
+        "form": "1fd892d78268.pdf",
+        "id": "p1_to_another",
+        "label": "to another",
+        "page": 1,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R2"
+      },
+      {
+        "form": "1fd892d78268.pdf",
+        "id": "p2_appellant_filing_this",
+        "label": "appellant filing this",
+        "page": 2,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "1fd892d78268.pdf",
+        "id": "p2_appellant_filing_this_2",
+        "label": "appellant filing this",
+        "page": 2,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "1fd892d78268.pdf",
+        "id": "p2_filing_this",
+        "label": "filing this",
+        "page": 2,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "1fd892d78268.pdf",
+        "id": "p3_and_fill",
+        "label": "and Fill",
+        "page": 3,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "1fd892d78268.pdf",
+        "id": "p3_documents_by_email_be_sure_to_check_your",
+        "label": "DOCUMENTS BY EMAIL: Be sure to check your email every",
+        "page": 3,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "1fd892d78268.pdf",
+        "id": "p3_email",
+        "label": "Email",
+        "page": 3,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R2"
+      },
+      {
+        "form": "1fd892d78268.pdf",
+        "id": "p3_enter_the_date_a_on_this_date",
+        "label": "enter the date a. on this date",
+        "page": 3,
+        "reasons": [
+          "internal_gap",
+          "truncated_left"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "1fd892d78268.pdf",
+        "id": "p4_address",
+        "label": "Address:",
+        "page": 4,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "1fd892d78268.pdf",
+        "id": "p4_address_2",
+        "label": "address:",
+        "page": 4,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "1fd892d78268.pdf",
+        "id": "p4_address_3",
+        "label": "Address:",
+        "page": 4,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "1fd892d78268.pdf",
+        "id": "p4_document_name",
+        "label": "document Name:",
+        "page": 4,
+        "reasons": [
+          "internal_gap",
+          "truncated_left"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "1fd892d78268.pdf",
+        "id": "p4_email_address",
+        "label": "Email address:",
+        "page": 4,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "1fd892d78268.pdf",
+        "id": "p4_email_address_2",
+        "label": "Email address:",
+        "page": 4,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "1fd892d78268.pdf",
+        "id": "p4_email_address_3",
+        "label": "Email address:",
+        "page": 4,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "1fd892d78268.pdf",
+        "id": "p5_address",
+        "label": "Address:",
+        "page": 5,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "1fd892d78268.pdf",
+        "id": "p5_another_name",
+        "label": "another Name:",
+        "page": 5,
+        "reasons": [
+          "internal_gap",
+          "truncated_left"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "2312b040cb7e.pdf",
+        "id": "p1_first_name_middle",
+        "label": "First name: Middle",
+        "page": 1,
+        "reasons": [
+          "internal_gap",
+          "truncated_right"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "2312b040cb7e.pdf",
+        "id": "p3_middle_name_phone",
+        "label": "Middle name: Phone",
+        "page": 3,
+        "reasons": [
+          "internal_gap",
+          "truncated_right"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "2312b040cb7e.pdf",
+        "id": "p4_middle_name_phone",
+        "label": "Middle name: Phone",
+        "page": 4,
+        "reasons": [
+          "internal_gap",
+          "truncated_right"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "2312b040cb7e.pdf",
+        "id": "p4_middle_name_phone_2",
+        "label": "Middle name: Phone",
+        "page": 4,
+        "reasons": [
+          "internal_gap",
+          "truncated_right"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "2312b040cb7e.pdf",
+        "id": "p5_expected_income",
+        "label": "Expected Income",
+        "page": 5,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5b"
+      },
+      {
+        "form": "2312b040cb7e.pdf",
+        "id": "p5_field",
+        "label": "\u2610",
+        "page": 5,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5"
+      },
+      {
+        "form": "2312b040cb7e.pdf",
+        "id": "p7_field",
+        "label": "\u2022 \u2610",
+        "page": 7,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5"
+      },
+      {
+        "form": "2312b040cb7e.pdf",
+        "id": "p8_field",
+        "label": "\u2610",
+        "page": 8,
+        "reasons": [
+          "truncated_left",
+          "truncated_right"
+        ],
+        "rule": "R5"
+      }
+    ],
+    "label_plausibility_per_family": {
+      "real/Acrobat": {
+        "flagged": 35,
+        "fraction": 0.21875,
+        "total": 160
+      },
+      "real/Adobe": {
+        "flagged": 1135,
+        "fraction": 0.36695764629809247,
+        "total": 3093
+      },
+      "real/Corel": {
+        "flagged": 1,
+        "fraction": 0.16666666666666666,
+        "total": 6
+      },
+      "real/Designer": {
+        "flagged": 0,
+        "fraction": 0.0,
+        "total": 0
+      },
+      "real/GPL": {
+        "flagged": 46,
+        "fraction": 0.42990654205607476,
+        "total": 107
+      },
+      "real/Microsoft:": {
+        "flagged": 1,
+        "fraction": 1.0,
+        "total": 1
+      },
+      "real/Microsoft\u00ae": {
+        "flagged": 483,
+        "fraction": 0.38031496062992126,
+        "total": 1270
+      },
+      "real/QuarkXPress(R)": {
+        "flagged": 5,
+        "fraction": 0.4166666666666667,
+        "total": 12
+      },
+      "real/unknown": {
+        "flagged": 203,
+        "fraction": 0.6444444444444445,
+        "total": 315
+      },
+      "synthetic-hard/bilingual_grid-circle_checkbox-comb_field-dotted_line-heading-landscape-left_label-legit_checkbox-legit_grid-office_use_box-ragged_table-shaded_field-small_checkbox_row-spacer_column-twocol": {
+        "flagged": 3,
+        "fraction": 0.04918032786885246,
+        "total": 61
+      },
+      "synthetic-hard/bilingual_grid-circle_checkbox-continuation-continuation_start-legit_checkbox-legit_line-merged_header_table-ragged_table-shaded_field-small_checkbox_row-spacer_column": {
+        "flagged": 6,
+        "fraction": 0.23076923076923078,
+        "total": 26
+      },
+      "synthetic-hard/bilingual_grid-circle_checkbox-dotted_line-heading-left_label-legit_checkbox-legit_line-merged_header_table-shaded_field": {
+        "flagged": 4,
+        "fraction": 0.5714285714285714,
+        "total": 7
+      },
+      "synthetic-hard/bilingual_grid-circle_checkbox-dotted_line-legit_grid-shaded_field-small_checkbox_row-spacer_column-twocol-underline_trap": {
+        "flagged": 0,
+        "fraction": 0.0,
+        "total": 37
+      },
+      "synthetic-hard/bilingual_grid-circle_checkbox-label_below-left_label-nested_table-shaded_field-spacer_column-wrapped_label": {
+        "flagged": 1,
+        "fraction": 0.05555555555555555,
+        "total": 18
+      },
+      "synthetic-hard/bilingual_grid-comb_field-continuation-continuation_start-dotted_line-heading-label_below-landscape-legit_checkbox-legit_line-nested_table-shaded_field-spacer_column-twocol-underline_trap-wrapped_label": {
+        "flagged": 1,
+        "fraction": 0.025,
+        "total": 40
+      },
+      "synthetic-hard/bilingual_grid-comb_field-dotted_line-office_use_box-shaded_field": {
+        "flagged": 0,
+        "fraction": 0.0,
+        "total": 3
+      },
+      "synthetic-hard/bilingual_grid-continuation-continuation_start-dotted_line-heading-left_label-legit_checkbox-legit_grid-merged_header_table-nested_table-office_use_box-ragged_table-shaded_field-wrapped_label": {
+        "flagged": 7,
+        "fraction": 0.12727272727272726,
+        "total": 55
+      },
+      "synthetic-hard/bilingual_grid-continuation-continuation_start-heading-legit_grid-office_use_box-prose_box-ragged_table-underline_trap-wrapped_label": {
+        "flagged": 0,
+        "fraction": 0.0,
+        "total": 24
+      },
+      "synthetic-hard/bilingual_grid-label_below-nested_table-office_use_box-prose_box-shaded_field-spacer_column-underline_trap": {
+        "flagged": 0,
+        "fraction": 0.0,
+        "total": 11
+      },
+      "synthetic-hard/bilingual_grid-left_label-legit_checkbox-legit_line-ragged_table-shaded_field-underline_trap-wrapped_label": {
+        "flagged": 0,
+        "fraction": 0.0,
+        "total": 20
+      },
+      "synthetic-hard/circle_checkbox-comb_field-continuation-continuation_start-label_below-legit_checkbox-legit_grid-legit_line-merged_header_table-office_use_box-ragged_table-twocol-wrapped_label": {
+        "flagged": 2,
+        "fraction": 0.023529411764705882,
+        "total": 85
+      },
+      "synthetic-hard/circle_checkbox-comb_field-dotted_line-landscape-legit_line-merged_header_table-nested_table-shaded_field-spacer_column-underline_trap-wrapped_label": {
+        "flagged": 16,
+        "fraction": 0.5714285714285714,
+        "total": 28
+      },
+      "synthetic-hard/circle_checkbox-comb_field-dotted_line-left_label-legit_checkbox-legit_line-nested_table-ragged_table-small_checkbox_row-twocol-underline_trap-wrapped_label": {
+        "flagged": 3,
+        "fraction": 0.15,
+        "total": 20
+      },
+      "synthetic-hard/circle_checkbox-comb_field-heading-label_below-legit_grid-office_use_box-prose_box-shaded_field-small_checkbox_row-spacer_column-underline_trap-wrapped_label": {
+        "flagged": 0,
+        "fraction": 0.0,
+        "total": 19
+      },
+      "synthetic-hard/circle_checkbox-comb_field-heading-landscape-legit_checkbox-legit_grid-nested_table-prose_box-spacer_column": {
+        "flagged": 1,
+        "fraction": 0.034482758620689655,
+        "total": 29
+      },
+      "synthetic-hard/circle_checkbox-continuation-continuation_start-dotted_line-legit_checkbox-legit_grid-merged_header_table-shaded_field-spacer_column-twocol-underline_trap-wrapped_label": {
+        "flagged": 9,
+        "fraction": 0.1232876712328767,
+        "total": 73
+      },
+      "synthetic-hard/circle_checkbox-dotted_line-heading-landscape-left_label-legit_checkbox-legit_grid-legit_line-merged_header_table-nested_table-ragged_table-small_checkbox_row-wrapped_label": {
+        "flagged": 24,
+        "fraction": 0.3582089552238806,
+        "total": 67
+      },
+      "synthetic-hard/circle_checkbox-dotted_line-label_below-left_label-legit_checkbox-legit_grid-ragged_table-spacer_column-twocol-wrapped_label": {
+        "flagged": 4,
+        "fraction": 0.125,
+        "total": 32
+      },
+      "synthetic-hard/circle_checkbox-label_below-landscape-left_label-legit_grid-nested_table-office_use_box-prose_box-small_checkbox_row-spacer_column-underline_trap": {
+        "flagged": 2,
+        "fraction": 0.14285714285714285,
+        "total": 14
+      },
+      "synthetic-hard/circle_checkbox-label_below-left_label-shaded_field-underline_trap": {
+        "flagged": 0,
+        "fraction": 0.0,
+        "total": 0
+      },
+      "synthetic-hard/comb_field-continuation-continuation_start-dotted_line-heading-label_below-left_label-nested_table-shaded_field-small_checkbox_row-wrapped_label": {
+        "flagged": 1,
+        "fraction": 0.07692307692307693,
+        "total": 13
+      },
+      "synthetic-hard/dotted_line-left_label-legit_checkbox-legit_grid-legit_line-merged_header_table-ragged_table-small_checkbox_row-underline_trap-wrapped_label": {
+        "flagged": 4,
+        "fraction": 0.13793103448275862,
+        "total": 29
+      },
+      "synthetic-hard/label_below-landscape-legit_checkbox-legit_grid-legit_line-merged_header_table-nested_table-office_use_box-prose_box-small_checkbox_row-twocol-wrapped_label": {
+        "flagged": 14,
+        "fraction": 0.2978723404255319,
+        "total": 47
+      },
+      "synthetic-hard/label_below-left_label-legit_grid-legit_line-nested_table-shaded_field": {
+        "flagged": 0,
+        "fraction": 0.0,
+        "total": 6
+      }
+    },
+    "label_plausibility_per_rule": {
+      "R10": {
+        "flagged": 2,
+        "fraction": 0.04878048780487805,
+        "total": 41
+      },
+      "R11": {
+        "flagged": 3,
+        "fraction": 0.07894736842105263,
+        "total": 38
+      },
+      "R12": {
+        "flagged": 4,
+        "fraction": 0.06153846153846154,
+        "total": 65
+      },
+      "R14": {
+        "flagged": 0,
+        "fraction": 0.0,
+        "total": 3
+      },
+      "R16": {
+        "flagged": 2,
+        "fraction": 0.14285714285714285,
+        "total": 14
+      },
+      "R2": {
+        "flagged": 299,
+        "fraction": 0.22515060240963855,
+        "total": 1328
+      },
+      "R3": {
+        "flagged": 598,
+        "fraction": 0.30386178861788615,
+        "total": 1968
+      },
+      "R4": {
+        "flagged": 2,
+        "fraction": 0.03125,
+        "total": 64
+      },
+      "R5": {
+        "flagged": 701,
+        "fraction": 0.5446775446775447,
+        "total": 1287
+      },
+      "R5b": {
+        "flagged": 400,
+        "fraction": 0.43478260869565216,
+        "total": 920
+      }
+    },
+    "label_plausibility_signal_counts": {
+      "internal_gap": 380,
+      "not_found_on_page": 891,
+      "truncated_left": 615,
+      "truncated_right": 358
+    },
+    "label_plausibility_total": 5728,
     "offenders": [
       {
         "coverage": 1.0,
@@ -3356,6 +4129,6 @@
       "truth": 8407
     }
   },
-  "started_at": "2026-09-02T19:36:12.808476+00:00",
+  "started_at": "2026-09-02T19:40:51.004766+00:00",
   "version": 1
 }

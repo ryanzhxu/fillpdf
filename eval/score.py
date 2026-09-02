@@ -360,6 +360,14 @@ def score_corpus(pairs, out_path=None, *, holdout_pairs=None, adversarial_pairs=
     guard_glyphs = guard_glyphs_hit = 0    # glyph_coverage
     guard_offenders = []
     guard_stacked = []
+    lp_total = lp_flagged = 0              # label_plausibility, pooled over the corpus
+    lp_offenders = []
+    lp_per_rule = {}
+    lp_per_family = {}
+    lp_signal_counts = {}
+    lp_dup_total = lp_dup_duplicated = 0
+    lp_dup_max_repeat = 0
+    lp_dup_top = []
 
     for key in sorted(done):
         result = done[key]
@@ -405,6 +413,33 @@ def score_corpus(pairs, out_path=None, *, holdout_pairs=None, adversarial_pairs=
         guard_glyphs_hit += (g.get("glyph_coverage") or 0.0) * n_glyphs
         guard_stacked.append(((g.get("whitespace_fit") or {}).get("stacked_fraction") or 0.0))
 
+        # label_plausibility (see eval/guards.py): a truth-free label-quality
+        # rate, pooled the same way as box_over_ink -- weighted by each
+        # form's own labeled-field count, plus per-rule and per-family
+        # breakdowns the box_over_ink/glyph_coverage guards do not carry.
+        lp_total_f = g.get("label_plausibility_total", 0) or 0
+        lp_flagged_f = g.get("label_plausibility_flagged", 0) or 0
+        lp_total += lp_total_f
+        lp_flagged += lp_flagged_f
+        for off in (g.get("label_plausibility_offenders") or []):
+            lp_offenders.append({**off, "form": source_pdf})
+        for rule, rs in (g.get("label_plausibility_per_rule") or {}).items():
+            acc = lp_per_rule.setdefault(rule, {"total": 0, "flagged": 0})
+            acc["total"] += rs.get("total", 0)
+            acc["flagged"] += rs.get("flagged", 0)
+        fam_acc = lp_per_family.setdefault(family, {"total": 0, "flagged": 0})
+        fam_acc["total"] += lp_total_f
+        fam_acc["flagged"] += lp_flagged_f
+        for sig, n in (g.get("label_plausibility_signal_counts") or {}).items():
+            lp_signal_counts[sig] = lp_signal_counts.get(sig, 0) + n
+
+        dup = g.get("label_duplication") or {}
+        lp_dup_total += dup.get("total", 0) or 0
+        lp_dup_duplicated += dup.get("duplicated", 0) or 0
+        lp_dup_max_repeat = max(lp_dup_max_repeat, dup.get("max_repeat", 0) or 0)
+        for t in (dup.get("top") or []):
+            lp_dup_top.append({**t, "form": source_pdf})
+
     output = {
         "version": 1,
         "git_sha": git_sha,
@@ -427,6 +462,30 @@ def score_corpus(pairs, out_path=None, *, holdout_pairs=None, adversarial_pairs=
             "stacked_fraction": (sum(guard_stacked) / len(guard_stacked)) if guard_stacked else 0.0,
             "offenders": sorted(guard_offenders,
                                 key=lambda o: -(o.get("coverage") or 0))[:40],
+            "label_plausibility": (lp_flagged / lp_total) if lp_total else 0.0,
+            "label_plausibility_flagged": lp_flagged,
+            "label_plausibility_total": lp_total,
+            "label_plausibility_offenders": sorted(
+                lp_offenders,
+                key=lambda o: (-len(o.get("reasons") or []), o.get("form", ""), o.get("page", 0)),
+            )[:40],
+            "label_plausibility_per_rule": {
+                r: {"total": v["total"], "flagged": v["flagged"],
+                    "fraction": (v["flagged"] / v["total"]) if v["total"] else 0.0}
+                for r, v in sorted(lp_per_rule.items())
+            },
+            "label_plausibility_per_family": {
+                fam: {"total": v["total"], "flagged": v["flagged"],
+                      "fraction": (v["flagged"] / v["total"]) if v["total"] else 0.0}
+                for fam, v in sorted(lp_per_family.items())
+            },
+            "label_plausibility_signal_counts": dict(sorted(lp_signal_counts.items())),
+            "label_duplication": {
+                "total": lp_dup_total, "duplicated": lp_dup_duplicated,
+                "fraction": (lp_dup_duplicated / lp_dup_total) if lp_dup_total else 0.0,
+                "max_repeat": lp_dup_max_repeat,
+                "top": sorted(lp_dup_top, key=lambda d: -d.get("count", 0))[:15],
+            },
         },
     }
 

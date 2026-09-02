@@ -28,7 +28,10 @@ A change is accepted only when ALL of these hold:
      wrong field name -- see eval/match.py's normalize_label.
 
 Guards are handled separately, and deliberately not folded into a single
-absolute threshold on box_over_ink -- see _check_guards.
+absolute threshold on box_over_ink -- see _check_guards. label_plausibility
+(eval/guards.py), a truth-free label-quality guard covering the 165 real
+forms that label_accuracy above cannot reach, follows the same
+rise-plus-new-offenders pattern -- see _check_label_plausibility.
 """
 import argparse
 import json
@@ -40,6 +43,7 @@ FAMILY_DROP_LIMIT = 0.02
 BOX_OVER_INK_RISE_LIMIT = 0.01
 GLYPH_COVERAGE_FLOOR = 0.98
 LABEL_ACCURACY_DROP_LIMIT = 0.02
+LABEL_PLAUSIBILITY_RISE_LIMIT = 0.01
 CRASH_REASONS = {"crash", "timeout", "memory"}
 
 
@@ -199,6 +203,51 @@ def _check_guards(candidate, baseline, reasons, warnings):
             )
 
 
+def _label_plausibility_offender_keys(guards):
+    return {(o.get("form"), o.get("id"))
+            for o in (guards or {}).get("label_plausibility_offenders", [])}
+
+
+def _check_label_plausibility(candidate, baseline, reasons, warnings):
+    """label_plausibility (eval/guards.py) is a truth-free fragment-rate
+    guard for labels -- the counterpart to box_over_ink for boxes. It is
+    never hard-failed on its absolute value: a form with unusually dense
+    multi-column tables, or a rule whose design legitimately produces short
+    context labels beside blanks (R5), can sit at a high fragment rate with
+    nothing wrong. We fail only when it RISES relative to baseline AND that
+    rise brings NEW offending (form, id) pairs; a rise with no new
+    offenders is a warning, not a failure -- exactly the box_over_ink
+    precedent in _check_guards below.
+    """
+    cand_guards = candidate.get("guards")
+    base_guards = baseline.get("guards")
+    if cand_guards is None or base_guards is None:
+        return
+
+    cand_lp = cand_guards.get("label_plausibility")
+    base_lp = base_guards.get("label_plausibility")
+    if cand_lp is None or base_lp is None:
+        return
+
+    rise = cand_lp - base_lp
+    if rise > LABEL_PLAUSIBILITY_RISE_LIMIT:
+        new_keys = sorted(
+            _label_plausibility_offender_keys(cand_guards) - _label_plausibility_offender_keys(base_guards)
+        )
+        if new_keys:
+            new_ids = ", ".join(f"{form}:{fid}" for form, fid in new_keys)
+            reasons.append(
+                f"label_plausibility rose {rise:+.4f} ({base_lp:.4f} -> {cand_lp:.4f}) "
+                f"with new offenders: {new_ids}"
+            )
+        else:
+            warnings.append(
+                f"label_plausibility rose {rise:+.4f} ({base_lp:.4f} -> {cand_lp:.4f}) "
+                "but no new offenders appeared -- watch this, do not block on "
+                "it alone (check the offender list before failing a run)"
+            )
+
+
 def gate(candidate_scores, baseline_scores) -> dict:
     reasons = []
     warnings = []
@@ -210,6 +259,7 @@ def gate(candidate_scores, baseline_scores) -> dict:
     _check_precision(candidate_scores, baseline_scores, reasons)
     _check_label_accuracy(candidate_scores, baseline_scores, reasons, warnings)
     _check_guards(candidate_scores, baseline_scores, reasons, warnings)
+    _check_label_plausibility(candidate_scores, baseline_scores, reasons, warnings)
 
     return {"passed": len(reasons) == 0, "reasons": reasons, "warnings": warnings}
 

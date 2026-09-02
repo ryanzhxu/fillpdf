@@ -167,6 +167,70 @@ class TestGate(unittest.TestCase):
         self.assertTrue(any("LABEL ACCURACY CHECK DID NOT RUN" in w for w in result["warnings"]),
                         result["warnings"])
 
+    def test_label_plausibility_up_with_new_offenders_fails(self):
+        base_guards = {"label_plausibility": 0.10,
+                        "label_plausibility_offenders": [{"form": "a.pdf", "id": "f1", "reasons": ["internal_gap"]}]}
+        cand_guards = {"label_plausibility": 0.14, "label_plausibility_offenders": [
+            {"form": "a.pdf", "id": "f1", "reasons": ["internal_gap"]},
+            {"form": "a.pdf", "id": "f2", "reasons": ["not_found_on_page"]},
+        ]}
+        baseline = _scores(guards=base_guards)
+        candidate = _scores(guards=cand_guards)
+        result = gate(candidate, baseline)
+        self.assertFalse(result["passed"])
+        self.assertTrue(any("f2" in r for r in result["reasons"]), result["reasons"])
+
+    def test_label_plausibility_up_no_new_offenders_warns_not_fails(self):
+        base_guards = {"label_plausibility": 0.10,
+                        "label_plausibility_offenders": [{"form": "a.pdf", "id": "f1", "reasons": ["internal_gap"]}]}
+        cand_guards = {"label_plausibility": 0.14,
+                        "label_plausibility_offenders": [{"form": "a.pdf", "id": "f1",
+                                                           "reasons": ["internal_gap", "truncated_left"]}]}
+        baseline = _scores(guards=base_guards)
+        candidate = _scores(guards=cand_guards)
+        result = gate(candidate, baseline)
+        self.assertTrue(result["passed"])
+        self.assertTrue(any("label_plausibility" in w for w in result["warnings"]), result["warnings"])
+
+    def test_label_plausibility_same_form_new_id_counts_as_new_offender(self):
+        """The same id string on a DIFFERENT form must not be mistaken for
+        an existing offender -- offender identity is (form, id)."""
+        base_guards = {"label_plausibility": 0.10,
+                        "label_plausibility_offenders": [{"form": "a.pdf", "id": "f1", "reasons": ["internal_gap"]}]}
+        cand_guards = {"label_plausibility": 0.14,
+                        "label_plausibility_offenders": [{"form": "b.pdf", "id": "f1", "reasons": ["internal_gap"]}]}
+        baseline = _scores(guards=base_guards)
+        candidate = _scores(guards=cand_guards)
+        result = gate(candidate, baseline)
+        self.assertFalse(result["passed"])
+        self.assertTrue(any("b.pdf:f1" in r for r in result["reasons"]), result["reasons"])
+
+    def test_label_plausibility_down_passes_clean(self):
+        base_guards = {"label_plausibility": 0.20, "label_plausibility_offenders": []}
+        cand_guards = {"label_plausibility": 0.15, "label_plausibility_offenders": []}
+        baseline = _scores(guards=base_guards)
+        candidate = _scores(guards=cand_guards)
+        result = gate(candidate, baseline)
+        self.assertTrue(result["passed"])
+        self.assertFalse(any("label_plausibility" in w for w in result["warnings"]), result["warnings"])
+
+    def test_label_plausibility_small_rise_within_tolerance_passes(self):
+        base_guards = {"label_plausibility": 0.10, "label_plausibility_offenders": []}
+        cand_guards = {"label_plausibility": 0.105, "label_plausibility_offenders": []}
+        baseline = _scores(guards=base_guards)
+        candidate = _scores(guards=cand_guards)
+        result = gate(candidate, baseline)
+        self.assertTrue(result["passed"])
+        self.assertFalse(any("label_plausibility" in w for w in result["warnings"]), result["warnings"])
+
+    def test_label_plausibility_missing_in_either_run_skips_silently(self):
+        """No guards object at all (an old scores.json, or a run that
+        crashed before guards ran) must not be treated as a rise."""
+        baseline = _scores(guards=None)
+        candidate = _scores(guards={"label_plausibility": 0.5, "label_plausibility_offenders": []})
+        result = gate(candidate, baseline)
+        self.assertTrue(result["passed"])
+
 
 if __name__ == "__main__":
     unittest.main()
