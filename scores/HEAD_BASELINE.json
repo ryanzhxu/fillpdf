@@ -6,9 +6,9 @@
     "tuning": 35
   },
   "failures": [],
-  "git_sha": "d4a20cd87eb29c00d6af9612cd3b8076bb66bd22",
+  "git_sha": "afbaea31bf872753717a49ab18c2d907a36c2b6f",
   "guards": {
-    "box_over_ink": 0.1236501079913607,
+    "box_over_ink": 0.1234501347708895,
     "glyph_coverage": 1.0,
     "offenders": [
       {
@@ -269,15 +269,15 @@
   },
   "overall": {
     "attribution_ok": true,
-    "detected": 1505,
-    "f1": 0.6388090885348655,
-    "label_accuracy": 0.8838526912181303,
-    "label_pairs": 706,
-    "matched": 1223,
+    "detected": 1508,
+    "f1": 0.6398747390396659,
+    "label_accuracy": 0.8843441466854725,
+    "label_pairs": 709,
+    "matched": 1226,
     "near_miss": 36,
-    "placement": 0.865782979432792,
-    "precision": 0.812624584717608,
-    "recall": 0.5262478485370051,
+    "placement": 0.8658094453222152,
+    "precision": 0.8129973474801061,
+    "recall": 0.5275387263339071,
     "truth": 2324
   },
   "per_family": {
@@ -426,15 +426,15 @@
     },
     "synthetic-hard/bilingual_grid-comb_field-continuation-continuation_start-dotted_line-heading-label_below-landscape-legit_checkbox-legit_line-nested_table-shaded_field-spacer_column-twocol-underline_trap-wrapped_label": {
       "attribution_ok": true,
-      "detected": 41,
-      "f1": 0.5714285714285715,
+      "detected": 43,
+      "f1": 0.5925925925925926,
       "label_accuracy": 1.0,
-      "label_pairs": 36,
-      "matched": 38,
+      "label_pairs": 38,
+      "matched": 40,
       "near_miss": 1,
-      "placement": 0.8929534922210908,
-      "precision": 0.926829268292683,
-      "recall": 0.41304347826086957,
+      "placement": 0.8955956945212762,
+      "precision": 0.9302325581395349,
+      "recall": 0.43478260869565216,
       "truth": 92
     },
     "synthetic-hard/bilingual_grid-comb_field-dotted_line-office_use_box-shaded_field": {
@@ -504,15 +504,15 @@
     },
     "synthetic-hard/circle_checkbox-comb_field-continuation-continuation_start-label_below-legit_checkbox-legit_grid-legit_line-merged_header_table-office_use_box-ragged_table-twocol-wrapped_label": {
       "attribution_ok": true,
-      "detected": 90,
-      "f1": 0.7678571428571429,
+      "detected": 91,
+      "f1": 0.7733333333333333,
       "label_accuracy": 1.0,
-      "label_pairs": 80,
-      "matched": 86,
+      "label_pairs": 81,
+      "matched": 87,
       "near_miss": 0,
-      "placement": 0.9229543484001891,
-      "precision": 0.9555555555555556,
-      "recall": 0.6417910447761194,
+      "placement": 0.9208307471804352,
+      "precision": 0.9560439560439561,
+      "recall": 0.6492537313432836,
       "truth": 134
     },
     "synthetic-hard/circle_checkbox-comb_field-dotted_line-landscape-legit_line-merged_header_table-nested_table-shaded_field-spacer_column-underline_trap-wrapped_label": {
@@ -961,28 +961,28 @@
     },
     "hard_00005.pdf": {
       "attribution_ok": true,
-      "detected": 41,
-      "f1": 0.5714285714285715,
+      "detected": 43,
+      "f1": 0.5925925925925926,
       "label_accuracy": 1.0,
-      "label_pairs": 36,
-      "matched": 38,
+      "label_pairs": 38,
+      "matched": 40,
       "near_miss": 1,
-      "placement": 0.8929534922210908,
-      "precision": 0.926829268292683,
-      "recall": 0.41304347826086957,
+      "placement": 0.8955956945212762,
+      "precision": 0.9302325581395349,
+      "recall": 0.43478260869565216,
       "truth": 92
     },
     "hard_00006.pdf": {
       "attribution_ok": true,
-      "detected": 90,
-      "f1": 0.7678571428571429,
+      "detected": 91,
+      "f1": 0.7733333333333333,
       "label_accuracy": 1.0,
-      "label_pairs": 80,
-      "matched": 86,
+      "label_pairs": 81,
+      "matched": 87,
       "near_miss": 0,
-      "placement": 0.9229543484001891,
-      "precision": 0.9555555555555556,
-      "recall": 0.6417910447761194,
+      "placement": 0.9208307471804352,
+      "precision": 0.9560439560439561,
+      "recall": 0.6492537313432836,
       "truth": 134
     },
     "hard_00007.pdf": {
@@ -1273,6 +1273,19 @@
       "recall": 0.0,
       "truth": 0
     },
+    "R14": {
+      "attribution_ok": false,
+      "detected": 3,
+      "f1": 0.0,
+      "label_accuracy": 1.0,
+      "label_pairs": 3,
+      "matched": 3,
+      "near_miss": 0,
+      "placement": 0.8765987062437333,
+      "precision": 1.0,
+      "recall": 0.0,
+      "truth": 0
+    },
     "R2": {
       "attribution_ok": false,
       "detected": 391,
@@ -1365,6 +1378,6 @@
       "truth": 2690
     }
   },
-  "started_at": "2026-09-02T13:56:29.374009+00:00",
+  "started_at": "2026-09-02T14:27:54.161042+00:00",
   "version": 1
 }

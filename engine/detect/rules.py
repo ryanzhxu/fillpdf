@@ -790,6 +790,130 @@ def _multiline_label(cell, words):
     return label, entry_top
 
 
+# R14: a comb field -- one small box per character, divided by tick marks
+# spaced closer than grid_cells()'s own 20pt minimum cell width (see
+# sec_comb_field in eval/synth/hard.py). A postal code, SIN, phone number or
+# date often uses this convention: one outer box with N evenly-spaced
+# internal dividers, none of them 20pt apart, so grid_cells() finds zero
+# cells in the whole row and no cell-based rule ever sees it.
+#
+# Measured on the real corpus (16 forms, eval/corpus/real_all2): only one
+# form draws anything resembling this shape (43b1efcebeb7.pdf, a Canadian
+# family-info form, 7 instances across 2 pages for a Year/Month/Day date
+# entry) -- and in every one of those 7 places the PDF's own original
+# AcroForm (this corpus's truth, origin "stripped") has NO widget at all; its
+# 6 real widgets sit elsewhere on the page entirely. The real ticks there are
+# also drawn as ~3pt baseline serifs, not full-height dividers, unlike the
+# synthetic construct below -- a further reason not to loosen the height
+# floor chasing that one instance. So on the real corpus this rule can only
+# cost precision, never gain recall: a caveat recorded here rather than
+# hidden, same position R11 (dot leaders) landed in.
+#
+# Two other candidate shapes turned up in the same survey and are
+# deliberately excluded by the bounds below:
+#   - a genuine 2-cell YYYY|MM sub-table (a5ffdc173722.pdf, a LiveCycle
+#     Designer form) -- gaps of 25-36pt, past COMB_MAX_GAP, and only 2 of
+#     them, well under COMB_MIN_GAPS.
+#   - a rotated-text data table with narrow columns (b642646180f3.pdf) and a
+#     shaded schedule table (86b3dc306803.pdf) -- both have dividers spanning
+#     many rows (heights of 80-115pt), past COMB_MAX_H.
+#
+# The construct DOES appear as designed on the synthetic tuning/holdout
+# corpora (sec_comb_field, eval/synth/hard.py) -- full-height dividers, an
+# outer bounding box, and a caption directly above -- which is where this
+# rule's recall gain is real (measured recall on the construct there was
+# 0.098 before it). Truth for that synthetic construct is ONE widget
+# spanning the whole comb, not one per character cell, so R14 emits one
+# field per comb to match.
+COMB_TICK_MAX_W = 3        # points; a tick is a thin rect, like grid_cells' v
+COMB_TICK_MIN_H = 10       # points; excludes the real corpus's baseline serifs
+COMB_TICK_MAX_H = 40       # points; excludes a real table's multi-row dividers
+COMB_TICK_TOL_Y = 1.5      # points; ticks in one comb share an exact top/bottom
+COMB_MIN_GAP = 6           # points; a per-character cell has some real width
+COMB_MAX_GAP = 20          # points; must stay under grid_cells' own cell floor
+COMB_GAP_TOL = 3           # points; cells in one comb are uniform width
+COMB_MIN_GAPS = 6          # matches sec_comb_field's COMB_MIN_N floor of 6 boxes
+COMB_BORDER_TOL_X = 3      # points; bounding h-rule x-span match
+COMB_BORDER_TOL_Y = 2      # points; bounding h-rule y match
+COMB_LABEL_ABOVE_GAP = 14  # points; caption-above gap, mirrors R12's own band
+COMB_LABEL_LEFT_REACH = 200  # points; how far left a same-line label may start
+
+
+def _comb_runs(page):
+    """Group vertical tick rects into candidate comb fields.
+
+    A tick joins a run only while its gap to the last tick is both within
+    COMB_MIN_GAP..COMB_MAX_GAP and close to the run's own already-established
+    gap (uniform cell width) -- a table's ragged column dividers do not pass
+    this, and COMB_MIN_GAPS is re-checked on the finished run so a lone pair
+    of ticks that happens to match is not enough on its own.
+    """
+    v = [r for r in page.rects if r["width"] < COMB_TICK_MAX_W
+         and COMB_TICK_MIN_H <= r["height"] <= COMB_TICK_MAX_H]
+    v.sort(key=lambda r: r["x0"])
+    runs, cur = [], []
+    for r in v:
+        if cur:
+            last = cur[-1]
+            gap = r["x0"] - last["x0"]
+            same_row = (abs(r["top"] - last["top"]) <= COMB_TICK_TOL_Y
+                        and abs(r["bottom"] - last["bottom"]) <= COMB_TICK_TOL_Y)
+            gap_ok = COMB_MIN_GAP <= gap <= COMB_MAX_GAP
+            established_ok = (len(cur) < 2
+                               or abs(gap - (cur[-1]["x0"] - cur[-2]["x0"])) <= COMB_GAP_TOL)
+            if same_row and gap_ok and established_ok:
+                cur.append(r)
+                continue
+            if len(cur) - 1 >= COMB_MIN_GAPS:
+                runs.append(cur)
+            cur = [r]
+        else:
+            cur = [r]
+    if cur and len(cur) - 1 >= COMB_MIN_GAPS:
+        runs.append(cur)
+    return runs
+
+
+def _comb_bounded(run, page):
+    """True when a real horizontal rule bounds the run on both top and
+    bottom, spanning its full width -- a bare row of ticks with no box
+    around it is a ruler or a scale, not a comb field."""
+    x0, x1 = run[0]["x0"], run[-1]["x0"]
+    h = [r for r in page.rects if r["height"] < 3 and r["width"] >= 5]
+    def has_h(y):
+        return any(abs(r["top"] - y) <= COMB_BORDER_TOL_Y
+                   and r["x0"] <= x0 + COMB_BORDER_TOL_X
+                   and r["x1"] >= x1 - COMB_BORDER_TOL_X
+                   for r in h)
+    return has_h(run[0]["top"]) and has_h(run[0]["bottom"])
+
+
+def _comb_label(run, words, max_len=60):
+    """A comb's label, read from the left ("Postal Code: |_|_|_|") or from a
+    caption directly above (sec_comb_field's convention), or None."""
+    x0, x1 = run[0]["x0"], run[-1]["x0"]
+    top, bot = run[0]["top"], run[0]["bottom"]
+    cy = (top + bot) / 2
+    left = [w for w in words if w["x1"] <= x0 + 1
+            and abs(((w["top"] + w["bottom"]) / 2) - cy) < COMB_TICK_TOL_Y + 3
+            and x0 - w["x1"] < COMB_LABEL_LEFT_REACH]
+    if left:
+        label = " ".join(w["text"] for w in sorted(left, key=lambda w: w["x0"])[-6:])
+        label = label.rstrip(":").strip()
+        if 2 <= len(label) <= max_len and not OFFICE_USE.search(label):
+            return label
+    above = [w for w in words if 0 < top - w["bottom"] < COMB_LABEL_ABOVE_GAP
+             and w["x0"] < x1 and w["x1"] > x0 - 20]
+    if above:
+        line_bot = max(w["bottom"] for w in above)
+        line = [w for w in above if abs(w["bottom"] - line_bot) < 2]
+        label = " ".join(w["text"] for w in sorted(line, key=lambda w: w["x0"]))
+        label = label.rstrip(":").strip()
+        if 2 <= len(label) <= max_len and not OFFICE_USE.search(label):
+            return label
+    return None
+
+
 def detect(page, pno, carry_in=None):
     """Detect fields on one page.
 
@@ -986,6 +1110,19 @@ def detect(page, pno, carry_in=None):
         out.append({"page": pno, "type": "multiline", "label": label, "rule": "R12",
                     "confidence": 0.55,
                     "rect": [x0 + 2, H - bot + 2, ext_x1 - 2, H - entry_top - 2]})
+
+    # ---- R14  comb field: one box per character, ticks under grid_cells' floor
+    for run in _comb_runs(page):
+        if not _comb_bounded(run, page):
+            continue
+        label = _comb_label(run, words)
+        if label is None:
+            continue
+        x0, x1 = run[0]["x0"], run[-1]["x0"]
+        top, bot = run[0]["top"], run[0]["bottom"]
+        out.append({"page": pno, "type": "text", "label": label, "rule": "R14",
+                    "confidence": 0.55,
+                    "rect": [x0 + 2, H - bot + 2, x1 - 2, H - top - 2]})
 
     # ---- R10  blank cell whose LEFT neighbour in the same row is a label ----
     # "Last Name |          |" -- the label sits in the cell to the left of the

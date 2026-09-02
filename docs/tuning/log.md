@@ -511,3 +511,31 @@ and these two survived because the corpus has no truth widget there — a false
 positive on a heading costs precision only if some truth widget is nearby to
 make the denominator move. Rendering the page and looking at it caught what the
 metric could not. Both kinds of checking are needed.
+
+
+## STANDING CONCERN — rules with synthetic-only evidence
+
+Two merged rules have no measured real-world benefit whatsoever:
+
+    R11  dot leaders    67 detections, all synthetic, 0 on any real form
+    R14  comb fields     3 detections, all synthetic, 0 on any real form
+
+Both are genuine real-world conventions, and both are tightly guarded and fire
+zero times on the 16 real forms, so neither is doing harm. But both were
+*invented by our own generator and then solved by our own rule* — a closed loop.
+
+The comb survey made this sharp. The one real comb in the corpus, appearing 7
+times in a Canadian family-info form, has **no truth widget at any location**:
+the form's author drew it as decoration. So the corpus offers no evidence that a
+comb is a field at all. The convention is real; our sample simply has no fillable
+instance of it.
+
+**Watch the ratio.** One or two such rules is a reasonable bet on a convention we
+know exists. A detector where a growing share of rules only ever fire on
+synthetic input has drifted toward the generator's idea of a form rather than the
+world's. Re-validate R11 and R14 the moment the real corpus grows, and treat a
+third synthetic-only rule as a reason to stop and go fetch more real forms
+instead.
+
+`engine/detect/rules.py` is now 1,317 lines. Complexity is a cost that no gate
+measures.
