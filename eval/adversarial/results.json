@@ -1,0 +1,86 @@
+{
+  "char_flood.pdf": {
+    "detail": "RSS crossed 512MB (RSS watchdog); killed before it could send a result",
+    "elapsed_s": 2.13,
+    "status": "memory"
+  },
+  "cyclic_references.pdf": {
+    "detail": "detect() returned",
+    "elapsed_s": 0.08,
+    "fields": 0,
+    "pages": 1,
+    "status": "ok"
+  },
+  "decompression_bomb.pdf": {
+    "detail": "RSS crossed 512MB (RSS watchdog); killed before it could send a result",
+    "elapsed_s": 0.22,
+    "status": "memory"
+  },
+  "deep_nesting.pdf": {
+    "detail": "pdfplumber.utils.exceptions.PdfminerException: maximum recursion depth exceeded",
+    "elapsed_s": 0.1,
+    "status": "rejected"
+  },
+  "empty_file.pdf": {
+    "detail": "pdfplumber.utils.exceptions.PdfminerException: No /Root object! - Is this really a PDF?",
+    "elapsed_s": 0.08,
+    "status": "rejected"
+  },
+  "encrypted.pdf": {
+    "detail": "pdfplumber.utils.exceptions.PdfminerException: ",
+    "elapsed_s": 0.08,
+    "status": "rejected"
+  },
+  "huge_page.pdf": {
+    "detail": "detect() returned",
+    "elapsed_s": 0.08,
+    "fields": 0,
+    "pages": 1,
+    "status": "ok"
+  },
+  "inverted_mediabox.pdf": {
+    "detail": "detect() returned",
+    "elapsed_s": 0.08,
+    "fields": 0,
+    "pages": 1,
+    "status": "ok"
+  },
+  "javascript_openaction.pdf": {
+    "detail": "detect() returned",
+    "elapsed_s": 0.08,
+    "fields": 0,
+    "pages": 1,
+    "status": "ok"
+  },
+  "not_a_pdf.pdf": {
+    "detail": "pdfplumber.utils.exceptions.PdfminerException: No /Root object! - Is this really a PDF?",
+    "elapsed_s": 0.08,
+    "status": "rejected"
+  },
+  "page_flood.pdf": {
+    "detail": "detect() returned",
+    "elapsed_s": 0.43,
+    "fields": 0,
+    "pages": 5000,
+    "status": "ok"
+  },
+  "rect_flood.pdf": {
+    "detail": "detect() returned",
+    "elapsed_s": 3.23,
+    "fields": 0,
+    "pages": 1,
+    "status": "ok"
+  },
+  "truncated.pdf": {
+    "detail": "pdfplumber.utils.exceptions.PdfminerException: Unexpected EOF",
+    "elapsed_s": 0.08,
+    "status": "rejected"
+  },
+  "zero_size_page.pdf": {
+    "detail": "detect() returned",
+    "elapsed_s": 0.08,
+    "fields": 0,
+    "pages": 1,
+    "status": "ok"
+  }
+}

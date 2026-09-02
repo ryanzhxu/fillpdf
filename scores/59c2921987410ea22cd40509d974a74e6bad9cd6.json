@@ -1,0 +1,248 @@
+{
+  "corpus": {
+    "adversarial": 0,
+    "excluded": 0,
+    "holdout": 0,
+    "tuning": 12
+  },
+  "failures": [],
+  "git_sha": "59c2921987410ea22cd40509d974a74e6bad9cd6",
+  "holdout": {
+    "detected": 0,
+    "f1": 0.0,
+    "matched": 0,
+    "near_miss": 0,
+    "placement": 0.0,
+    "precision": 0.0,
+    "recall": 0.0,
+    "truth": 0
+  },
+  "overall": {
+    "detected": 1776,
+    "f1": 0.9486745628877609,
+    "matched": 1682,
+    "near_miss": 3,
+    "placement": 0.9351850011480283,
+    "precision": 0.9470720720720721,
+    "recall": 0.9502824858757062,
+    "truth": 1770
+  },
+  "per_family": {
+    "synthetic/checkbox_row-column_header_table-heading-labelled_grid-mask_cell-prose-rect_line-twocol-underscore_line": {
+      "detected": 1647,
+      "f1": 0.9459295261239368,
+      "matched": 1557,
+      "near_miss": 3,
+      "placement": 0.9336822800815376,
+      "precision": 0.9453551912568307,
+      "recall": 0.9465045592705167,
+      "truth": 1645
+    },
+    "synthetic/checkbox_row-column_header_table-heading-labelled_grid-prose-rect_line": {
+      "detected": 51,
+      "f1": 0.98,
+      "matched": 49,
+      "near_miss": 0,
+      "placement": 0.9612449573968247,
+      "precision": 0.9607843137254902,
+      "recall": 1.0,
+      "truth": 49
+    },
+    "synthetic/checkbox_row-column_header_table-labelled_grid-prose-rect_line-underscore_line": {
+      "detected": 78,
+      "f1": 0.9870129870129869,
+      "matched": 76,
+      "near_miss": 0,
+      "placement": 0.9491691964682238,
+      "precision": 0.9743589743589743,
+      "recall": 1.0,
+      "truth": 76
+    }
+  },
+  "per_form": {
+    "synth_00000.pdf": {
+      "detected": 210,
+      "f1": 0.9320843091334895,
+      "matched": 199,
+      "near_miss": 0,
+      "placement": 0.927663811381253,
+      "precision": 0.9476190476190476,
+      "recall": 0.9170506912442397,
+      "truth": 217
+    },
+    "synth_00001.pdf": {
+      "detected": 115,
+      "f1": 0.9198312236286921,
+      "matched": 109,
+      "near_miss": 0,
+      "placement": 0.9261344581101772,
+      "precision": 0.9478260869565217,
+      "recall": 0.8934426229508197,
+      "truth": 122
+    },
+    "synth_00002.pdf": {
+      "detected": 51,
+      "f1": 0.98,
+      "matched": 49,
+      "near_miss": 0,
+      "placement": 0.9612449573968247,
+      "precision": 0.9607843137254902,
+      "recall": 1.0,
+      "truth": 49
+    },
+    "synth_00003.pdf": {
+      "detected": 104,
+      "f1": 0.9056603773584906,
+      "matched": 96,
+      "near_miss": 2,
+      "placement": 0.9359359165039675,
+      "precision": 0.9230769230769231,
+      "recall": 0.8888888888888888,
+      "truth": 108
+    },
+    "synth_00004.pdf": {
+      "detected": 78,
+      "f1": 0.9870129870129869,
+      "matched": 76,
+      "near_miss": 0,
+      "placement": 0.9491691964682238,
+      "precision": 0.9743589743589743,
+      "recall": 1.0,
+      "truth": 76
+    },
+    "synth_00005.pdf": {
+      "detected": 234,
+      "f1": 0.9478260869565217,
+      "matched": 218,
+      "near_miss": 0,
+      "placement": 0.9364521755562608,
+      "precision": 0.9316239316239316,
+      "recall": 0.9646017699115044,
+      "truth": 226
+    },
+    "synth_00006.pdf": {
+      "detected": 206,
+      "f1": 0.9633251833740832,
+      "matched": 197,
+      "near_miss": 0,
+      "placement": 0.9362866831914158,
+      "precision": 0.9563106796116505,
+      "recall": 0.9704433497536946,
+      "truth": 203
+    },
+    "synth_00007.pdf": {
+      "detected": 100,
+      "f1": 0.9452736318407959,
+      "matched": 95,
+      "near_miss": 0,
+      "placement": 0.9280254688972497,
+      "precision": 0.95,
+      "recall": 0.9405940594059405,
+      "truth": 101
+    },
+    "synth_00008.pdf": {
+      "detected": 97,
+      "f1": 0.968421052631579,
+      "matched": 92,
+      "near_miss": 0,
+      "placement": 0.9326018538780474,
+      "precision": 0.9484536082474226,
+      "recall": 0.989247311827957,
+      "truth": 93
+    },
+    "synth_00009.pdf": {
+      "detected": 178,
+      "f1": 0.9352112676056338,
+      "matched": 166,
+      "near_miss": 0,
+      "placement": 0.9372502209371766,
+      "precision": 0.9325842696629213,
+      "recall": 0.9378531073446328,
+      "truth": 177
+    },
+    "synth_00010.pdf": {
+      "detected": 206,
+      "f1": 0.9653465346534653,
+      "matched": 195,
+      "near_miss": 1,
+      "placement": 0.9413541775779871,
+      "precision": 0.9466019417475728,
+      "recall": 0.9848484848484849,
+      "truth": 198
+    },
+    "synth_00011.pdf": {
+      "detected": 197,
+      "f1": 0.9571788413098236,
+      "matched": 190,
+      "near_miss": 0,
+      "placement": 0.9296592917811731,
+      "precision": 0.9644670050761421,
+      "recall": 0.95,
+      "truth": 200
+    }
+  },
+  "per_rule": {
+    "R1": {
+      "detected": 132,
+      "f1": 1.0,
+      "matched": 132,
+      "near_miss": 0,
+      "placement": 0.9477569711170954,
+      "precision": 1.0,
+      "recall": 1.0,
+      "truth": 132
+    },
+    "R2": {
+      "detected": 530,
+      "f1": 0.9330783938814531,
+      "matched": 488,
+      "near_miss": 3,
+      "placement": 0.9754116791734679,
+      "precision": 0.9207547169811321,
+      "recall": 0.9457364341085271,
+      "truth": 516
+    },
+    "R3": {
+      "detected": 893,
+      "f1": 0.9399332591768631,
+      "matched": 845,
+      "near_miss": 0,
+      "placement": 0.947398074993451,
+      "precision": 0.9462486002239642,
+      "recall": 0.9337016574585635,
+      "truth": 905
+    },
+    "R4": {
+      "detected": 81,
+      "f1": 1.0,
+      "matched": 81,
+      "near_miss": 0,
+      "placement": 0.9631811641746668,
+      "precision": 1.0,
+      "recall": 1.0,
+      "truth": 81
+    },
+    "R5": {
+      "detected": 61,
+      "f1": 1.0,
+      "matched": 61,
+      "near_miss": 0,
+      "placement": 0.5999999999999999,
+      "precision": 1.0,
+      "recall": 1.0,
+      "truth": 61
+    },
+    "R5b": {
+      "detected": 79,
+      "f1": 0.974025974025974,
+      "matched": 75,
+      "near_miss": 0,
+      "placement": 0.7560973951901396,
+      "precision": 0.9493670886075949,
+      "recall": 1.0,
+      "truth": 75
+    }
+  },
+  "started_at": "2026-09-02T06:43:07.075665+00:00",
+  "version": 1
+}

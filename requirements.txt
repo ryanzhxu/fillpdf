@@ -1,2 +1,12 @@
+# runtime
 pdfplumber>=0.11
+pypdf>=6.0
 pypdfium2>=5.0
+pillow>=11.0
+
+# eval harness
+reportlab>=4.0
+jsonschema>=4.0
+
+# tests
+pytest>=8.0
