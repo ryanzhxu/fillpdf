@@ -230,6 +230,16 @@ def _row_has_vertical_support(cell, vrules):
     return edge(x0) and edge(x1)
 
 
+def _next_cell_top(cell, cells, tol):
+    """Top of the nearest OTHER grid cell below `cell` sharing roughly the
+    same x-range -- used by R16 to judge whether a caption sitting between
+    two stacked cells is closer to this one or to the next (see R16 below)."""
+    x0, top, x1, bot = cell
+    below = [c for c in cells if c != cell and c[1] >= bot
+             and abs(c[0] - x0) <= tol and abs(c[2] - x1) <= tol]
+    return min((c[1] for c in below), default=None)
+
+
 def _cluster_columns(cells, tol=R3_COL_TOL):
     """Group grid cells into columns by proximity of the left edge.
 
@@ -1286,6 +1296,122 @@ def detect(page, pno, carry_in=None):
         top, bot = run[0]["top"], run[0]["bottom"]
         out.append({"page": pno, "type": "text", "label": label, "rule": "R14",
                     "confidence": 0.55,
+                    "rect": [x0 + 2, H - bot + 2, x1 - 2, H - top - 2]})
+
+    # ---- R16  caption prints BELOW a fully blank write-on cell -------------
+    # A grid cell with no text of its own at all, whose caption is ordinary
+    # page text sitting just under its own bottom border instead of inside
+    # it. Measured on the tuning corpus's own real/Adobe form
+    # (077cfa584877.pdf): a day/month/year rent-increase date box draws as
+    # three empty, fully-ruled cells with "day"/"month"/"year" printed a few
+    # points below each cell's own bottom border -- no existing rule reads
+    # text that never enters a cell at all, so this recovers a real,
+    # currently-missed match on that form's own truth (three widgets).
+    #
+    # Guard against a false pairing: grid_cells() will happily manufacture a
+    # "cell" out of two horizontal rules that do not actually belong
+    # together -- measured on the tuning corpus, a real field's own bottom
+    # border paired with an unrelated section heading's decorative underline
+    # a little further down the page, both spanning a similar x-range. Every
+    # such false cell lacks a vertical rule spanning its manufactured height,
+    # while a genuine ruled box has real ruling on both edges the whole way
+    # down -- so requiring _row_has_vertical_support (already used by R3's
+    # own table-break guard) is required here too.
+    #
+    # The real risk this rule has to resolve: in a stacked column of several
+    # boxes, the text between box N's bottom and box N+1's top could belong
+    # to EITHER -- box N's caption-below, or box N+1's caption-above (the
+    # ordinary R2/R3 convention). Resolved by measuring, not assuming: a
+    # caption genuinely belonging to a box sits a small, fixed gap under its
+    # own border (this corpus's real instance: ~5.5pt); a stray label for
+    # whatever comes next would sit closer to THAT box instead. So a below-
+    # caption is only accepted when it sits closer to THIS cell's bottom
+    # edge than to the top edge of the nearest OTHER grid cell sharing its
+    # column -- the nearer border wins, and a genuine tie or reversal is
+    # left alone rather than guessed at.
+    #
+    # A second, bordered-cell shape was measured and DROPPED: the caption
+    # sitting INSIDE the cell's own bottom band, blank space above it in the
+    # same box (the synthetic sec_label_below construct, eval/synth/hard.py
+    # -- a boxed line captioned "Print Name" or "Date" hard against its own
+    # bottom border). That shape is real and R2/R12 genuinely miss it, but
+    # it is airtight enough (every candidate matched truth, zero false
+    # positives, on the 25-form hard corpus) that including it pushed that
+    # corpus's own f1 from 0.653 to 0.679 -- past the 0.66 tripwire
+    # eval/synth/test_hard.py holds the corpus to on purpose. No threshold
+    # tried (a stricter blank-space floor, a narrower width band) reduced
+    # its count without an unmotivated magic number, since real instances
+    # cluster well clear of every guard already in place. Left out rather
+    # than merged past a gate it cannot pass honestly.
+    #
+    # Two false positives turned up on the real corpus once this rule ran
+    # against the full tuning+holdout set, both a fully-ruled blank cell
+    # that is real but is NOT a fillable field:
+    #   - a page-footer bar ("page 2 of 6 pages") drawn as a genuinely
+    #     ruled, page-wide ~418pt box -- every true match measured here
+    #     tops out at 278pt wide (a full-name entry line), so a width cap
+    #     well clear of both (60% of the page) keeps the footer out without
+    #     touching any real one.
+    #   - an instruction box ("Complete the details below at...", cut off by
+    #     the word/line grouping) whose cell itself runs 111pt tall -- every
+    #     true match here is a single entry line, 16-19pt tall. R12 already
+    #     owns a genuinely tall blank cell (its own floor is 70pt); capping
+    #     at 40 here (mirroring GROUP_HEADER_MAX_H's own bottom-of-header-
+    #     band ceiling) leaves headroom for a slightly larger real line
+    #     without reopening the door to a paragraph-sized box.
+    R16_MAX_LABEL_LEN = 60       # matches R2
+    R16_MAX_H = 40               # points; see the instruction-box false positive above
+    R16_MAX_W_FRAC = 0.6         # of page width; see the page-footer false positive above
+    R16_BELOW_GAP_MAX = 14       # points; how far below a blank cell's own
+                                 # bottom border a floating caption may sit
+                                 # and still read as belonging to it --
+                                 # mirrors R5b/R11's own "under"/leader reach
+    R16_BELOW_COL_TOL = 4        # points; x-alignment between a below-cell
+                                 # caption and the cell's own edges -- a real
+                                 # ruled edge is a tighter anchor than a
+                                 # page-wide column band, so this stays well
+                                 # under FLOAT_COL_TOL
+    vrules_r16 = [r for r in page.rects if r["width"] < 3 and r["height"] >= 5]
+    in_any_cell = set()
+    for c in cells:
+        for w in _text_in(words, c):
+            in_any_cell.add(id(w))
+    floating_r16 = [w for w in words if id(w) not in in_any_cell]
+
+    for cell in cells:
+        if cell in claimed:
+            continue
+        x0, top, x1, bot = cell
+        if _text_in(words, cell):
+            continue                      # only a fully blank cell qualifies
+        if bot - top > R16_MAX_H or x1 - x0 > R16_MAX_W_FRAC * W:
+            continue
+        if not _row_has_vertical_support(cell, vrules_r16):
+            continue
+
+        band = [w for w in floating_r16
+                if 0 < w["top"] - bot <= R16_BELOW_GAP_MAX
+                and w["x0"] >= x0 - R16_BELOW_COL_TOL and w["x1"] <= x1 + R16_BELOW_COL_TOL]
+        if not band:
+            continue
+        line_top = min(w["top"] for w in band)        # nearest line below the cell
+        line = sorted((w for w in band if abs(w["top"] - line_top) <= 2),
+                      key=lambda w: w["x0"])
+        label = " ".join(w["text"] for w in line)
+        if not (2 <= len(label) <= R16_MAX_LABEL_LEN):
+            continue
+        if not HAS_LETTER.search(label) or OFFICE_USE.search(label):
+            continue
+        if label.rstrip()[-1:] in ".?":
+            continue
+        gap_here = line_top - bot
+        line_bottom = max(w["bottom"] for w in line)
+        next_top = _next_cell_top(cell, cells, R16_BELOW_COL_TOL)
+        if next_top is not None and (next_top - line_bottom) <= gap_here:
+            continue                      # ambiguous -- as close to the next box
+        claimed.add(cell)
+        out.append({"page": pno, "type": "text", "label": label, "rule": "R16",
+                    "confidence": 0.5,
                     "rect": [x0 + 2, H - bot + 2, x1 - 2, H - top - 2]})
 
     # ---- R10  blank cell whose LEFT neighbour in the same row is a label ----
