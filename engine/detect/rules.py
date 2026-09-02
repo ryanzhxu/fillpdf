@@ -746,7 +746,28 @@ R12_MAX_H = 350             # points; a bound against a full-page frame
 R12_MIN_WIDTH_FRAC = 0.55   # of page width; excludes narrow leftover slices
 R12_WRAP_GAP = 20           # points; gap allowed between wrapped header lines
 R12_MAX_HEADER_LINES = 3
-R12_MAX_LABEL_LEN = 130
+# The line count above already bounds *how many* wrapped lines a header may
+# take, but not how much text those lines hold: a wide cell can pack a long
+# paragraph into two or three visually-wrapped lines, so a character cap
+# still does independent work the line count does not.
+#
+# 130 was never measured -- it happened to sit just under one real label
+# ("The following rule will be added to the park rules: What is the new
+# park rule(s)? Copy it exactly as it will appear in the park rules." --
+# 134 chars) and rejected it along with 8 other genuine instructions sharing
+# its shape, all confirmed against truth (best-cell IoU 0.68-0.79) on the
+# tuning corpus: 134, 150, 151, 156, 160, 167, 171, 173, 183 chars. Every
+# rejected non-field candidate found in the same corpus -- a signature line,
+# a Yes/No/Unknown checkbox row, informational prose ending in a link -- is
+# already caught by R12_MIN_BLANK_GAP below regardless of its length, except
+# one 217-char informational paragraph (a link-and-login blurb) that still
+# clears the blank-gap floor.
+#
+# So the real label population measured on tuning tops out at 183 and the
+# nearest confirmed non-field prose starts at 217 -- a 34-char gap with
+# nothing in it. 200 sits at the midpoint, covering every real label found
+# while still rejecting that one prose case.
+R12_MAX_LABEL_LEN = 200
 R12_MIN_BLANK_GAP = 40      # points; blank room required below the header
 
 
