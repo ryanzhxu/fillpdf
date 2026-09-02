@@ -131,6 +131,152 @@ def _text_in(words, cell, pad=1):
             and w["top"] >= top - pad and w["bottom"] <= bot + pad]
 
 
+# R1 label: a checkbox's option text sits right next to its glyph, usually to
+# the right ("[x] Yes"), sometimes to the left ("Yes [x]"). Measured on this
+# corpus, the gap from a glyph to its own label word, and the gap between two
+# words already inside one label, never exceeds ~9pt -- it is ordinary word
+# spacing. A gap past that is where unrelated trailing text starts (e.g. an
+# inline "...[ ] No  If yes, please describe..." -- "No" must not swallow the
+# instruction that follows it), so it is where the scan stops.
+#
+# When the line also carries a question before the first checkbox on it
+# ("Are you a U.S. citizen? [ ] Yes [ ] No"), that question is the part that
+# actually says what the box means -- "Yes" alone, ticked on some unlabeled
+# box, tells nobody anything. The label becomes "question (option)". Line
+# grouping is intentionally tight (not just "roughly the same height"): a
+# same-size header sitting a few points off the true baseline (e.g. a
+# "FOR OFFICE USE ONLY" box floating beside the real question) must not be
+# swept in as if it were more of the question.
+CHECK_LABEL_GAP_MAX = 11        # points; see comment above
+CHECK_LABEL_LINE_TOL = 2        # points; vertical tolerance for "same line"
+CHECK_LABEL_WRAP_GAP = 14       # points; how far below a line its wrapped
+                                 # continuation (no glyph of its own) may start
+CHECK_LABEL_WRAP_MAX = 3        # cap on wrapped continuation lines folded in
+
+# The gap between a question and the row of checkboxes answering it is a
+# deliberate visual break, wider than ordinary word spacing -- measured
+# 5.6-45.8pt on the real corpus, a fixed 18pt on the synthetic one. Only the
+# single connection from the question's last word to the first glyph gets
+# this wider allowance; every earlier word-to-word step within the question
+# still uses CHECK_LABEL_GAP_MAX, so a second, unrelated block of text
+# further back on the same line is not swept in with it.
+CHECK_LABEL_QUESTION_GAP_MAX = 60
+
+
+def _checkbox_label(c, words, page_width, max_len=90):
+    """Read a checkbox's label off the page, or "" if none is found.
+
+    The option text is bounded by the next checkbox glyph on the same line,
+    so two boxes on one line ("[x] Yes   [x] No") get "Yes" and "No", never
+    both "Yes No" -- and by a gap bigger than normal word spacing, so
+    trailing text past the true label is left out. It is read from the RIGHT
+    of the glyph (the usual layout) if present, else from the LEFT. A short
+    continuation line directly below, carrying no glyph of its own, is
+    folded in as wrapped option text.
+
+    If the line also carries a question before its first checkbox, the
+    result is "question (option)"; otherwise it is the option text alone.
+    """
+    cy1 = c["bottom"]
+    cmid = (c["top"] + cy1) / 2
+    cx0, cx1 = c["x0"], c["x1"]
+
+    line = sorted((w for w in words if abs(((w["top"] + w["bottom"]) / 2) - cmid)
+                   < CHECK_LABEL_LINE_TOL), key=lambda w: w["x0"])
+    glyphs = [w for w in line if w["text"] in CHECK_GLYPHS]
+    text_line = [w for w in line if w["text"] not in CHECK_GLYPHS]
+
+    def scan(cands, x_lo, x_hi, cur_bottom):
+        picked, prev_edge = [], x_lo
+        for w in sorted((w for w in cands if w["x0"] >= x_lo - 1 and w["x1"] <= x_hi + 1),
+                         key=lambda w: w["x0"]):
+            if w["x0"] - prev_edge > CHECK_LABEL_GAP_MAX:
+                break
+            picked.append(w)
+            prev_edge = w["x1"]
+        bottom = cur_bottom
+        for _ in range(CHECK_LABEL_WRAP_MAX):
+            band = [w for w in words if bottom - 1 <= w["top"] <= bottom + CHECK_LABEL_WRAP_GAP]
+            if not band:
+                break
+            nxt_top = min(w["top"] for w in band)
+            nxt_line = sorted((w for w in band if abs(w["top"] - nxt_top) < 2),
+                               key=lambda w: w["x0"])
+            window = [w for w in nxt_line if w["x0"] >= x_lo - 1 and w["x1"] <= x_hi + 1]
+            # A fresh option row has its own glyph -- check the whole candidate
+            # line for one, not just this option's window: that glyph usually
+            # starts a new row's left margin, which can sit just outside the
+            # window (to the left of x_lo) rather than inside it.
+            if not window or any(w["text"] in CHECK_GLYPHS for w in nxt_line):
+                break                    # a fresh option row, not a continuation
+            # A genuine wrap starts fresh: nothing before it on this line, or a
+            # real gap (a column break) before it. A tight gap means the window
+            # is just where an unrelated, wider line (e.g. a different, later
+            # question that has not reached its own checkbox yet) happens to
+            # cross our x-range -- that is the middle of someone else's
+            # sentence, not a continuation of ours.
+            before = [w for w in nxt_line if w["x1"] <= window[0]["x0"] + 1]
+            if before and window[0]["x0"] - max(w["x1"] for w in before) <= CHECK_LABEL_GAP_MAX:
+                break
+            wrapped, prev_edge = [], x_lo
+            for w in window:
+                if w["x0"] - prev_edge > CHECK_LABEL_GAP_MAX:
+                    break
+                wrapped.append(w)
+                prev_edge = w["x1"]
+            if not wrapped:
+                break
+            picked += wrapped
+            bottom = max(w["bottom"] for w in nxt_line)
+        return picked
+
+    right_bound = min((g["x0"] for g in glyphs if g["x0"] > cx1), default=page_width)
+    right = scan(text_line, cx1, right_bound, cy1)
+    if right:
+        option = " ".join(w["text"] for w in right)
+    else:
+        left_bound = max((g["x1"] for g in glyphs if g["x1"] < cx0), default=0)
+        picked, prev_edge = [], cx0
+        for w in sorted((w for w in text_line if w["x1"] <= cx0 + 1 and w["x1"] >= left_bound - 1),
+                         key=lambda w: -w["x0"]):
+            if prev_edge - w["x1"] > CHECK_LABEL_GAP_MAX:
+                break
+            picked.append(w)
+            prev_edge = w["x0"]
+        picked.reverse()
+        option = " ".join(w["text"] for w in picked)
+
+    if not option:
+        return ""
+
+    # The question, if any, is whatever precedes the FIRST checkbox on the
+    # line -- shared by every option on that line ("Do you: (Rent)",
+    # "Do you: (Own)", ...). Skip it when the word right against that first
+    # glyph is itself an option word: that means this line uses the LEFT
+    # layout ("Yes [x]  No [ ]") and there is no real question to recover.
+    first_glyph_x0 = min((g["x0"] for g in glyphs), default=cx0)
+    picked, prev_edge = [], first_glyph_x0
+    gap_max = CHECK_LABEL_QUESTION_GAP_MAX
+    for w in sorted((w for w in text_line if w["x1"] <= first_glyph_x0 + 1),
+                     key=lambda w: -w["x0"]):
+        if prev_edge - w["x1"] > gap_max:
+            break
+        picked.append(w)
+        prev_edge = w["x0"]
+        gap_max = CHECK_LABEL_GAP_MAX      # later hops: ordinary word spacing only
+    picked.reverse()
+    if picked and picked[-1]["text"].strip().lower() not in ("yes", "no"):
+        question = " ".join(w["text"] for w in picked)
+        tail = f" ({option})"
+        if len(question) + len(tail) <= max_len:
+            return question + tail
+        # Truncate the question, not the option: "(Yes)"/"(No)" cut off looks
+        # like nothing was found at all, which is worse than a shorter question.
+        keep = max_len - len(tail)
+        return (question[:keep].rstrip() + tail) if keep > 0 else option[:max_len]
+    return option[:max_len]
+
+
 def _ink_boxes(page):
     """Printed character boxes, in PDF points, origin bottom-left.
 
@@ -204,7 +350,8 @@ def detect(page, pno):
             # Use the glyph's real bounding box. A fixed 10x10 rect only worked
             # because every checkbox glyph on safer.pdf happens to be 10pt; it
             # misplaces on any other size.
-            out.append({"page": pno, "type": "checkbox", "label": "", "rule": "R1",
+            label = _checkbox_label(c, words, W)
+            out.append({"page": pno, "type": "checkbox", "label": label, "rule": "R1",
                         "confidence": 0.99,
                         "rect": [c["x0"], H - c["bottom"], c["x1"], H - c["top"]]})
 
@@ -426,8 +573,10 @@ def detect(page, pno):
                         "rect": [x0 + 2, H - bot + 2, x0 + 14, H - bot + 14]})
 
     # A signature must be signed, not typed. Drop those boxes rather than invite
-    # someone to type a name into them.
-    out = [f for f in out if not SIGNATURE.search(f["label"])]
+    # someone to type a name into them. Checkboxes are exempt: before this
+    # change their label was always "", so this filter could never touch one,
+    # and R1 now giving them real text should not open that up as a side effect.
+    out = [f for f in out if f["type"] == "checkbox" or not SIGNATURE.search(f["label"])]
 
     # R9: drop text candidates sitting on top of printed text. Checkboxes are
     # exempt -- they are small and deliberately placed on a glyph.

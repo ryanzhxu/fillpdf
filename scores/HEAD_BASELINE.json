@@ -6,7 +6,7 @@
     "tuning": 39
   },
   "failures": [],
-  "git_sha": "e14c62accc890eea43c5fc42409dcbde8303b23d",
+  "git_sha": "f1ac7fd238d2c81e6b73a0809c5a49c7225b0e2b",
   "guards": {
     "box_over_ink": 0.11802853437094682,
     "glyph_coverage": 1.0,
@@ -1290,7 +1290,7 @@
       "attribution_ok": false,
       "detected": 83,
       "f1": 1.0,
-      "label_accuracy": 0.0,
+      "label_accuracy": 1.0,
       "label_pairs": 83,
       "matched": 83,
       "near_miss": 0,
@@ -1417,6 +1417,6 @@
       "truth": 4888
     }
   },
-  "started_at": "2026-09-02T09:16:39.047128+00:00",
+  "started_at": "2026-09-02T09:27:26.748945+00:00",
   "version": 1
 }

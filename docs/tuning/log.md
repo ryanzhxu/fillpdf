@@ -14,6 +14,8 @@ precision, and the label-free guards. The holdout is never tuned against.
 | 6 | R3 clusters ragged columns (tol 16pt) | 0.5662 -> 0.6277 (+.0616) | 0.1802 -> 0.1919 (+.0116) | **MERGED** |
 | 7 | R11 reads dot-leader write-on lines | 0.5387 -> 0.5546 (+.0159) | unchanged | **MERGED** |
 | 7b | exempt dot leaders from the ink guard | 0.5546 -> 0.5541 (-.0005) | -.0002 | **REJECTED** |
+| 8 | merge doubled ruling lines in grid_cells | 0.5546 -> 0.5586 (P +.019) | +.0003 | **MERGED** |
+| 9 | R1 gives checkboxes real labels | f1 unchanged, R1 label acc 0.0 -> 1.0 | unchanged | **MERGED** |
 
 ## Iteration 1 — MERGED
 
@@ -274,3 +276,50 @@ reject, so exempting dots stopped R9 killing boxes it was correctly killing —
 including on the real fee-schedule page R11 had proposed and R9 had caught.
 
 A plausible symmetry argument lost to the measurement. Reverted.
+
+
+## Iteration 8 — MERGED, and it was my bug
+
+I guessed R3 was over-generating down long columns and named the 16pt clustering
+as the likely culprit. Both wrong, and the investigation said so.
+
+`grid_cells()` was the problem. Many PDFs draw one visual table border as TWO
+stacked rects — a ~1.4pt stroke and a ~0.1pt hairline over the same x-range —
+and both pass the `height < 3` ruling-line filter. Every cell below was built
+twice, near-identical but not equal, so the `set()` dedup never collapsed them.
+In greedy matching one twin matched truth and its sibling was a pure false
+positive: 36 of one form's 46.
+
+    detected 2032 -> 1988    matched 1709 -> 1709    precision 0.8410 -> 0.8597
+
+Every removed box a false positive; zero real fields lost, tuning and holdout.
+
+The first attempt merged on vertical gap alone and swallowed a header row's
+full-width border together with the per-column underlines beneath it, costing 21
+real matches. Caught by re-running the diagnostic *before* trusting the score.
+Adding an x-span condition fixed it. Verify the mechanism, not just the metric.
+
+## Iteration 9 — MERGED, a product bug not a metric
+
+Checkboxes had no label at all: R1 emitted `""` and they were named `p3_chk`,
+`p3_chk_2`. In the app that means a person sees a tickable box with no idea what
+it means, and profile mapping — which works by name — can never reach it. On
+safer.pdf, 81 of 242 fields.
+
+    R1 label_accuracy 0.0 -> 1.0 (83/83)
+    f1, precision, recall all bit-identical -- a pure labelling change
+    safer.pdf: 81 of 81 checkboxes now labelled, 0 blank
+
+Reads correctly by hand, including wrapped options and the
+`"question (option)"` form for shared-question rows:
+
+    '4a. Have you lived in B.C. for the past twelve months? (Yes)'
+    'Living with a spouse or common-law partner'
+    'First Nations' / 'Métis' / 'Inuit' / 'Other'
+
+**One label is confidently wrong and was left alone deliberately.** Checkbox 36
+reads `'...do you? (Rent Trailer Rent)'` — the page has "[ ] Own [ ] Rent
+Trailer Rent $____", and "Trailer Rent" belongs to the next field but follows at
+ordinary word spacing, indistinguishable by gap from a real multi-word option
+like "Life Lease". Special-casing it risked regressing the multi-word cases that
+work. Flagged rather than patched.
