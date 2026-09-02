@@ -16,19 +16,30 @@ you see is what is measured.
 
 ## Where it stands
 
-    tuning   f1 0.6556   precision 0.7905   recall 0.5601
-    holdout  f1 0.6420   precision 0.7035   recall 0.5903
-    label_plausibility 0.3511        106 tests passing
+Measured on commit `eccc794`, clean tree, and reproducible with
+`python -m eval.score --corpus eval/corpus/tuning --holdout eval/holdout`:
+
+    tuning   f1 0.6392   precision 0.7770   recall 0.5428
+    holdout  f1 0.6418   precision 0.7032   recall 0.5903
+    label_plausibility 0.3115        hard corpus f1 0.454
+    107 tests passing
 
 Corpus: 165 real government forms (419 fetched), 6,951 fillable fields, 9
 producer families. 110 forms tuning, 55 holdout. Plus 25 synthetic hard forms.
 
-Tuning and holdout agree within 0.014, which is the main evidence the detector is
-not fitted to its tuning set.
+Tuning and holdout agree to within 0.003, which is the main evidence the
+detector is not fitted to its tuning set.
+
+**Correction.** An earlier version of this file reported tuning f1 0.6556 /
+P 0.7905 / R 0.5601. That did not match the recorded baseline in `scores/` for
+the same period and was not reproducible; the figures above come from a clean
+re-score and agree with `scores/HEAD_BASELINE.json`. Trust `scores/`, which
+records `detector_fingerprint` and `git_dirty` for exactly this reason, over
+any number typed into prose.
 
 **Do not compare these numbers to anything in the git history before commit
-`19fe9fb`.** The corpus was corrected twice; older figures were measured against
-fields no rule could ever find.
+`19fe9fb`.** The corpus was corrected twice; older figures were measured
+against fields no rule could ever find.
 
 ## Layout
 
@@ -111,15 +122,27 @@ Two design decisions in it were learned the hard way and should not be undone:
 
 ## Queued, with numbers already measured
 
-- **Caption inside a cell's bottom band.** Airtight when tried: every candidate
-  matched truth, zero false positives. Left out only because it pushed the
-  hard-corpus tripwire past its ceiling. That tripwire means the CORPUS needs
-  difficulty, not that the change is wrong. Take the change, strengthen the
-  generator.
-- **Mislabelling found by `label_plausibility`** in current output, e.g.
-  `'Name*: Last Name*:'` (two headers merged), `'the applicant must be paid
-  within the'` (a sentence fragment), and `'Landlord Phone # Date:'` on
-  safer.pdf itself.
+**Done since the last handover** (do not re-do these): the caption-in-bottom-band
+rule landed as R17 (`8250261`); the `label_plausibility` mislabelling — including
+`'Landlord Phone # Date:'` on safer.pdf — was fixed by the gutter cut in
+`feaca36`; R10 now reads past a blank gutter cell (`89bcac9`).
+
+- **The hard corpus is thin and it is the most urgent item.** Five constructs are
+  spent: `dotted_line`, `ragged_table`, `merged_header_table`, `sec_label_below`,
+  `sec_gutter_left_label`. Of the boosted difficulty only `sec_whitespace_field`
+  is still unsolved. Headroom is f1 0.454 against a 0.48 ceiling, and the last
+  round bought that headroom by RE-WEIGHTING a solved construct, not by adding
+  difficulty. That move cannot be repeated. **Add constructs.** `MAX_ALLOWED_F1`
+  has been raised twice historically to absorb solved constructs; both times the
+  log called it bookkeeping. Do not raise it a third time.
+- **`sec_label_below` is marked spent but is still boosted at 12** in
+  `EXTRA_WEIGHT`, so the de-boosting convention is not applied uniformly. Settle
+  it.
+- **`sec_whitespace_field` is unsolved and worth solving**: an inline label
+  followed only by blank space, no rule, box, or dot. Every write-on rule (R5,
+  R5b, R11) and every cell-walking rule needs something *drawn*. Isolated recall
+  9%. Ordinary on typewriter-era intake sheets. Solving it needs a genuinely new
+  signal, which is why it is the last hard construct standing.
 - **SAFER's "Option 1 / Option 2" consent boxes are undetected.** They are single
   25pt stroked rects; `grid_cells()` only treats a rect as a ruling line below
   3pt. R6 was written for these and never once found them.
@@ -129,6 +152,9 @@ Two design decisions in it were learned the hard way and should not be undone:
   a sibling-count test (worse than 1:1).
 - **422 fields near partial ruling that never assembles into a cell.** Needs
   better cell reconstruction, not a new rule.
+- **`label_plausibility` is 0.3115 and still flags 68 `internal_gap` cases**
+  (down from 364). The remainder are a different shape from the gutter merge and
+  have not been diagnosed.
 
 ## Process rules that earned their place
 
