@@ -22,6 +22,8 @@ from pypdf import PdfReader, PdfWriter
 from pypdf.generic import ArrayObject, NameObject
 
 FT_TO_TYPE = {"/Tx": "text", "/Btn": "checkbox", "/Ch": "choice"}
+CHECK_GLYPHS = {"\uf063", "\uf06f"}   # Webdings, Wingdings checkbox glyphs
+MARK_CHARS = CHECK_GLYPHS | {"_", ".", "\u00b7", "\u2024"}   # underscores and dot leaders
 MIN_SIDE = 4.0          # a widget smaller than this is not something a person fills
 MIN_WIDGETS = 5         # a form with fewer is not worth a corpus slot
 
@@ -75,30 +77,51 @@ def strip(reader, dest):
         writer.write(fh)
 
 
-def admits(pdf_path, widgets, min_fraction=0.6):
-    """Reject forms whose widgets sit over nothing.
+def keep_reachable(pdf_path, widgets, pad=6):
+    """Drop widgets that sit over nothing a rule could read.
 
-    Some fillable PDFs draw no rule, label or box beneath the widget. Strip it
-    and the page is blank there. No detector could find that field and no human
-    could fill the printed form, so scoring against it punishes the detector for
-    a defect in the source. Returns (ok, fraction).
+    Filtering at the WIDGET level rather than the form level. Some fillable
+    PDFs place a widget where the page has no rule, no checkbox glyph and no
+    underscore -- strip it and the page is blank there. No detector could find
+    that field and no human could fill the printed form, so scoring against it
+    punishes the detector for a defect in the source.
+
+    Rejecting the whole FORM for containing some such widgets threw away 15 of
+    21 usable forms. Rejecting only the unreachable widgets keeps the rest.
+
+    Supporting structure means something a rule actually reads: a thin vector
+    rule, a checkbox glyph, an underscore, or a dot leader. Counting any nearby
+    CHARACTER was the original test and was useless -- a form with 50,000
+    characters and zero vector rules passed at 100%, then scored 0.000 forever.
+
+    KNOWN LIMITATION: this defines "reachable" as "carries a signal some current
+    rule reads". A future rule that reads a NEW signal would find its evidence
+    already filtered out of the corpus. Whenever a rule learns a new signal, add
+    it here -- dot leaders were added when R11 landed.
     """
-    if not widgets:
-        return False, 0.0
-    near = 0
+    kept = []
     with pdfplumber.open(str(pdf_path)) as pdf:
+        by_page = {}
+        for i, page in enumerate(pdf.pages, 1):
+            rules = [r for r in page.rects
+                     if (r["height"] < 3 and r["width"] >= 5)
+                     or (r["width"] < 3 and r["height"] >= 5)]
+            marks = [c for c in page.chars if c["text"] in MARK_CHARS]
+            by_page[i] = (page.height, rules, marks)
         for w in widgets:
-            page = pdf.pages[w["page"] - 1]
-            h = page.height
+            if w["page"] not in by_page:
+                continue
+            h, rules, marks = by_page[w["page"]]
             x0, y0, x1, y1 = w["rect"]
             top, bot = h - y1, h - y0
+
             def hit(o):
-                return not (o["x1"] < x0 - 6 or o["x0"] > x1 + 6
-                            or o["bottom"] < top - 6 or o["top"] > bot + 6)
-            if any(hit(r) for r in page.rects) or any(hit(c) for c in page.chars):
-                near += 1
-    frac = near / len(widgets)
-    return frac >= min_fraction, frac
+                return not (o["x1"] < x0 - pad or o["x0"] > x1 + pad
+                            or o["bottom"] < top - pad or o["top"] > bot + pad)
+
+            if any(hit(o) for o in rules) or any(hit(o) for o in marks):
+                kept.append(w)
+    return kept
 
 
 def label(src_pdf, out_dir, family="real"):
@@ -112,8 +135,8 @@ def label(src_pdf, out_dir, family="real"):
     stem = hashlib.sha256(Path(src_pdf).read_bytes()).hexdigest()[:12]
     pdf_out = out_dir / f"{stem}.pdf"
     strip(reader, pdf_out)
-    ok, frac = admits(pdf_out, widgets)
-    if not ok:
+    widgets = keep_reachable(pdf_out, widgets)
+    if len(widgets) < MIN_WIDGETS:
         pdf_out.unlink(missing_ok=True)
         return None
     pages = [{"page": i, "width": float(p.mediabox.width), "height": float(p.mediabox.height)}

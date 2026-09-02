@@ -2,13 +2,13 @@
   "corpus": {
     "adversarial": 0,
     "excluded": 0,
-    "holdout": 7,
-    "tuning": 39
+    "holdout": 6,
+    "tuning": 35
   },
   "failures": [],
-  "git_sha": "f1ac7fd238d2c81e6b73a0809c5a49c7225b0e2b",
+  "git_sha": "79f92c5f58dbe89752fd82d5cee98d0cc3ce86f5",
   "guards": {
-    "box_over_ink": 0.11802853437094682,
+    "box_over_ink": 0.11974248927038626,
     "glyph_coverage": 1.0,
     "offenders": [
       {
@@ -252,33 +252,33 @@
         "page": 9
       }
     ],
-    "stacked_fraction": 0.011027393243932032
+    "stacked_fraction": 0.012372197298070086
   },
   "holdout": {
     "attribution_ok": true,
-    "detected": 325,
-    "f1": 0.1922077922077922,
+    "detected": 374,
+    "f1": 0.6187050359712231,
     "label_accuracy": "UNAVAILABLE",
     "label_pairs": 0,
-    "matched": 111,
-    "near_miss": 44,
-    "placement": 0.705066725027029,
-    "precision": 0.3415384615384615,
-    "recall": 0.13373493975903614,
-    "truth": 830
+    "matched": 258,
+    "near_miss": 22,
+    "placement": 0.8266482448267581,
+    "precision": 0.6898395721925134,
+    "recall": 0.5608695652173913,
+    "truth": 460
   },
   "overall": {
     "attribution_ok": true,
-    "detected": 1988,
-    "f1": 0.5585880045759111,
+    "detected": 1956,
+    "f1": 0.6977055023390509,
     "label_accuracy": 0.8083491461100569,
     "label_pairs": 1054,
-    "matched": 1709,
-    "near_miss": 26,
-    "placement": 0.8797998826966269,
-    "precision": 0.8596579476861167,
-    "recall": 0.4137012829823287,
-    "truth": 4131
+    "matched": 1566,
+    "near_miss": 48,
+    "placement": 0.8763157935995539,
+    "precision": 0.8006134969325154,
+    "recall": 0.618239242005527,
+    "truth": 2533
   },
   "per_family": {
     "real/Acrobat": {
@@ -292,20 +292,20 @@
       "placement": 0.0,
       "precision": 0.0,
       "recall": 0.0,
-      "truth": 200
+      "truth": 6
     },
     "real/Adobe": {
       "attribution_ok": true,
-      "detected": 802,
-      "f1": 0.5407572383073497,
+      "detected": 819,
+      "f1": 0.7428571428571428,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
-      "matched": 607,
+      "matched": 611,
       "near_miss": 24,
-      "placement": 0.8216700115240072,
-      "precision": 0.756857855361596,
-      "recall": 0.42065142065142064,
-      "truth": 1443
+      "placement": 0.8224207380208541,
+      "precision": 0.746031746031746,
+      "recall": 0.7397094430992736,
+      "truth": 826
     },
     "real/Designer": {
       "attribution_ok": true,
@@ -318,33 +318,33 @@
       "placement": 0.0,
       "precision": 0.0,
       "recall": 0.0,
-      "truth": 338
+      "truth": 50
     },
     "real/Microsoft:": {
       "attribution_ok": true,
       "detected": 1,
-      "f1": 0.007194244604316546,
+      "f1": 0.042553191489361694,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
       "matched": 1,
       "near_miss": 0,
       "placement": 0.809514673093485,
       "precision": 1.0,
-      "recall": 0.0036101083032490976,
-      "truth": 277
+      "recall": 0.021739130434782608,
+      "truth": 46
     },
     "real/Microsoft\u00ae": {
       "attribution_ok": true,
       "detected": 281,
-      "f1": 0.2586206896551724,
+      "f1": 0.26223776223776224,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
       "matched": 75,
       "near_miss": 46,
       "placement": 0.6955594807451484,
       "precision": 0.2669039145907473,
-      "recall": 0.2508361204013378,
-      "truth": 299
+      "recall": 0.25773195876288657,
+      "truth": 291
     },
     "real/unknown": {
       "attribution_ok": true,
@@ -357,7 +357,7 @@
       "placement": 0.0,
       "precision": 0.0,
       "recall": 0.0,
-      "truth": 645
+      "truth": 15
     },
     "synthetic-hard/bilingual_grid-continuation-continuation_start-dotted_line-heading-left_label-legit_checkbox-legit_grid-legit_line-merged_header_table-nested_table-office_use_box-prose_box-small_checkbox_row-spacer_column-underline_trap-wrapped_label": {
       "attribution_ok": true,
@@ -689,54 +689,41 @@
     "14921b7f41fc.pdf": {
       "attribution_ok": true,
       "detected": 64,
-      "f1": 0.18791946308724833,
+      "f1": 0.2456140350877193,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
       "matched": 14,
       "near_miss": 11,
       "placement": 0.8808206217740336,
       "precision": 0.21875,
-      "recall": 0.16470588235294117,
-      "truth": 85
+      "recall": 0.28,
+      "truth": 50
     },
     "2303930e0569.pdf": {
       "attribution_ok": true,
       "detected": 29,
-      "f1": 0.27814569536423844,
+      "f1": 0.5121951219512195,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
       "matched": 21,
       "near_miss": 0,
       "placement": 0.7990100333014037,
       "precision": 0.7241379310344828,
-      "recall": 0.1721311475409836,
-      "truth": 122
+      "recall": 0.39622641509433965,
+      "truth": 53
     },
-    "2edb9989afd5.pdf": {
+    "2b9c4b64dd7c.pdf": {
       "attribution_ok": true,
-      "detected": 0,
-      "f1": 0.0,
+      "detected": 11,
+      "f1": 0.28571428571428564,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
-      "matched": 0,
+      "matched": 3,
       "near_miss": 0,
-      "placement": 0.0,
-      "precision": 0.0,
-      "recall": 0.0,
-      "truth": 82
-    },
-    "37f6acade5d1.pdf": {
-      "attribution_ok": true,
-      "detected": 0,
-      "f1": 0.0,
-      "label_accuracy": "UNAVAILABLE",
-      "label_pairs": 0,
-      "matched": 0,
-      "near_miss": 0,
-      "placement": 0.0,
-      "precision": 0.0,
-      "recall": 0.0,
-      "truth": 105
+      "placement": 0.932692133493985,
+      "precision": 0.2727272727272727,
+      "recall": 0.3,
+      "truth": 10
     },
     "43b1efcebeb7.pdf": {
       "attribution_ok": true,
@@ -749,85 +736,72 @@
       "placement": 0.0,
       "precision": 0.0,
       "recall": 0.0,
-      "truth": 200
+      "truth": 6
     },
     "47b092cd0a1c.pdf": {
       "attribution_ok": true,
       "detected": 8,
-      "f1": 0.2285714285714286,
+      "f1": 0.7272727272727273,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
       "matched": 8,
       "near_miss": 0,
       "placement": 0.8802199179753184,
       "precision": 1.0,
-      "recall": 0.12903225806451613,
-      "truth": 62
+      "recall": 0.5714285714285714,
+      "truth": 14
+    },
+    "5e9df96ba7a1.pdf": {
+      "attribution_ok": true,
+      "detected": 6,
+      "f1": 0.1818181818181818,
+      "label_accuracy": "UNAVAILABLE",
+      "label_pairs": 0,
+      "matched": 1,
+      "near_miss": 0,
+      "placement": 0.9472975351875057,
+      "precision": 0.16666666666666666,
+      "recall": 0.2,
+      "truth": 5
     },
     "6f3b4dd6e072.pdf": {
       "attribution_ok": true,
       "detected": 83,
-      "f1": 0.5052631578947369,
+      "f1": 0.64,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
       "matched": 48,
       "near_miss": 3,
       "placement": 0.6178094447848869,
       "precision": 0.5783132530120482,
-      "recall": 0.4485981308411215,
-      "truth": 107
-    },
-    "77d82b98bba9.pdf": {
-      "attribution_ok": true,
-      "detected": 0,
-      "f1": 0.0,
-      "label_accuracy": "UNAVAILABLE",
-      "label_pairs": 0,
-      "matched": 0,
-      "near_miss": 0,
-      "placement": 0.0,
-      "precision": 0.0,
-      "recall": 0.0,
-      "truth": 39
+      "recall": 0.7164179104477612,
+      "truth": 67
     },
     "834466262122.pdf": {
       "attribution_ok": true,
       "detected": 119,
-      "f1": 0.3088803088803089,
+      "f1": 0.31496062992125984,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
       "matched": 40,
       "near_miss": 16,
       "placement": 0.6995927137215826,
       "precision": 0.33613445378151263,
-      "recall": 0.2857142857142857,
-      "truth": 140
-    },
-    "855ea1a376c1.pdf": {
-      "attribution_ok": true,
-      "detected": 0,
-      "f1": 0.0,
-      "label_accuracy": "UNAVAILABLE",
-      "label_pairs": 0,
-      "matched": 0,
-      "near_miss": 0,
-      "placement": 0.0,
-      "precision": 0.0,
-      "recall": 0.0,
-      "truth": 65
+      "recall": 0.2962962962962963,
+      "truth": 135
     },
     "86b3dc306803.pdf": {
       "attribution_ok": true,
       "detected": 355,
-      "f1": 0.8263305322128852,
+      "f1": 0.8638360175695461,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
       "matched": 295,
       "near_miss": 2,
       "placement": 0.8203388076797133,
       "precision": 0.8309859154929577,
-      "recall": 0.8217270194986073,
-      "truth": 359
+      "recall": 0.899390243902439,
+      "truth": 328
     },
     "a5ffdc173722.pdf": {
       "attribution_ok": true,
@@ -840,33 +814,20 @@
       "placement": 0.0,
       "precision": 0.0,
       "recall": 0.0,
-      "truth": 233
+      "truth": 50
     },
     "acbed8a48a12.pdf": {
       "attribution_ok": true,
       "detected": 15,
-      "f1": 0.5531914893617021,
+      "f1": 0.8125,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
       "matched": 13,
       "near_miss": 0,
       "placement": 0.8679459417979132,
       "precision": 0.8666666666666667,
-      "recall": 0.40625,
-      "truth": 32
-    },
-    "b37698a21b44.pdf": {
-      "attribution_ok": true,
-      "detected": 0,
-      "f1": 0.0,
-      "label_accuracy": "UNAVAILABLE",
-      "label_pairs": 0,
-      "matched": 0,
-      "near_miss": 0,
-      "placement": 0.0,
-      "precision": 0.0,
-      "recall": 0.0,
-      "truth": 24
+      "recall": 0.7647058823529411,
+      "truth": 17
     },
     "b642646180f3.pdf": {
       "attribution_ok": true,
@@ -879,85 +840,59 @@
       "placement": 0.0,
       "precision": 0.0,
       "recall": 0.0,
-      "truth": 645
+      "truth": 15
     },
     "c83888e63ca7.pdf": {
       "attribution_ok": true,
       "detected": 1,
-      "f1": 0.007194244604316546,
+      "f1": 0.042553191489361694,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
       "matched": 1,
       "near_miss": 0,
       "placement": 0.809514673093485,
       "precision": 1.0,
-      "recall": 0.0036101083032490976,
-      "truth": 277
+      "recall": 0.021739130434782608,
+      "truth": 46
     },
     "c9a8b63fd70b.pdf": {
       "attribution_ok": true,
       "detected": 22,
-      "f1": 0.3714285714285714,
+      "f1": 0.41269841269841273,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
       "matched": 13,
       "near_miss": 0,
       "placement": 0.7064422269878415,
       "precision": 0.5909090909090909,
-      "recall": 0.2708333333333333,
-      "truth": 48
-    },
-    "cd6dbfe4d554.pdf": {
-      "attribution_ok": true,
-      "detected": 0,
-      "f1": 0.0,
-      "label_accuracy": "UNAVAILABLE",
-      "label_pairs": 0,
-      "matched": 0,
-      "near_miss": 0,
-      "placement": 0.0,
-      "precision": 0.0,
-      "recall": 0.0,
-      "truth": 85
+      "recall": 0.3170731707317073,
+      "truth": 41
     },
     "ced73d75e395.pdf": {
       "attribution_ok": true,
       "detected": 162,
-      "f1": 0.21806853582554514,
+      "f1": 0.220125786163522,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
       "matched": 35,
       "near_miss": 30,
       "placement": 0.6909500716292235,
       "precision": 0.21604938271604937,
-      "recall": 0.22012578616352202,
-      "truth": 159
+      "recall": 0.22435897435897437,
+      "truth": 156
     },
     "f6b53f5f6901.pdf": {
       "attribution_ok": true,
       "detected": 226,
-      "f1": 0.8262711864406779,
+      "f1": 0.8351177730192719,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
       "matched": 195,
       "near_miss": 8,
       "placement": 0.8742532842958927,
       "precision": 0.8628318584070797,
-      "recall": 0.7926829268292683,
-      "truth": 246
-    },
-    "fbfa25acd04f.pdf": {
-      "attribution_ok": true,
-      "detected": 0,
-      "f1": 0.0,
-      "label_accuracy": "UNAVAILABLE",
-      "label_pairs": 0,
-      "matched": 0,
-      "near_miss": 0,
-      "placement": 0.0,
-      "precision": 0.0,
-      "recall": 0.0,
-      "truth": 87
+      "recall": 0.8091286307053942,
+      "truth": 241
     },
     "hard_00000.pdf": {
       "attribution_ok": true,
@@ -1301,14 +1236,14 @@
     },
     "R10": {
       "attribution_ok": false,
-      "detected": 21,
+      "detected": 22,
       "f1": 0.0,
       "label_accuracy": 1.0,
       "label_pairs": 12,
       "matched": 17,
       "near_miss": 0,
       "placement": 0.909122642685138,
-      "precision": 0.8095238095238095,
+      "precision": 0.7727272727272727,
       "recall": 0.0,
       "truth": 0
     },
@@ -1327,27 +1262,27 @@
     },
     "R2": {
       "attribution_ok": false,
-      "detected": 430,
-      "f1": 0.8078602620087336,
+      "detected": 433,
+      "f1": 0.8026030368763558,
       "label_accuracy": 1.0,
       "label_pairs": 28,
       "matched": 185,
       "near_miss": 0,
-      "placement": 0.7164393177722106,
-      "precision": 0.43023255813953487,
+      "placement": 0.7164393177722107,
+      "precision": 0.42725173210161665,
       "recall": 1.0,
       "truth": 28
     },
     "R3": {
       "attribution_ok": false,
-      "detected": 1498,
+      "detected": 1506,
       "f1": 0.0,
       "label_accuracy": 0.7869379014989293,
       "label_pairs": 934,
-      "matched": 1370,
+      "matched": 1374,
       "near_miss": 0,
-      "placement": 0.9236137447119928,
-      "precision": 0.9145527369826435,
+      "placement": 0.9236508036325324,
+      "precision": 0.9123505976095617,
       "recall": 0.0,
       "truth": 0
     },
@@ -1379,14 +1314,14 @@
     },
     "R5b": {
       "attribution_ok": false,
-      "detected": 108,
+      "detected": 113,
       "f1": 0.0,
       "label_accuracy": "UNAVAILABLE",
       "label_pairs": 0,
       "matched": 4,
       "near_miss": 0,
       "placement": 0.9222240927796447,
-      "precision": 0.037037037037037035,
+      "precision": 0.035398230088495575,
       "recall": 0.0,
       "truth": 0
     },
@@ -1414,9 +1349,9 @@
       "placement": 0.0,
       "precision": 0.0,
       "recall": 0.0,
-      "truth": 4888
+      "truth": 2920
     }
   },
-  "started_at": "2026-09-02T09:27:26.748945+00:00",
+  "started_at": "2026-09-02T09:48:18.283384+00:00",
   "version": 1
 }

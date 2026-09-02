@@ -323,3 +323,60 @@ Trailer Rent $____", and "Trailer Rent" belongs to the next field but follows at
 ordinary word spacing, indistinguishable by gap from a real multi-word option
 like "Life Lease". Special-casing it risked regressing the multi-word cases that
 work. Flagged rather than patched.
+
+
+## CORPUS CORRECTION — every number before this point was measured wrong
+
+Investigating why real-form recall was stuck at 0.13 after nine iterations, the
+per-family breakdown showed four families scoring **exactly zero**:
+
+    real/Acrobat    f1 0.000   truth 200   matched 0
+    real/Designer   f1 0.000   truth 338   matched 0
+    real/Microsoft: f1 0.007   truth 277   matched 1
+    real/unknown    f1 0.000   truth 645   matched 0
+
+Those forms have **no table structure at all** — h_rect 0, v_rect 0 — while
+carrying 26,000 to 50,000 characters. No rule can see them: R2, R3 and R5b all
+read vector rules.
+
+They were admitted because my own admission test counted **any nearby
+character** as supporting structure. I identified that exact weakness when
+writing the harness spec, then implemented it anyway.
+
+Of 3,202 truth widgets, only about a third were ever reachable. The rest were
+impossible test cases dragging every metric down.
+
+### The fix, and why it is at the widget level
+
+First attempt rejected whole FORMS lacking structure, which threw away 15 of 21
+usable forms. Filtering at the WIDGET level keeps the reachable fields of a
+partly-structured form and drops only the unreachable ones.
+
+"Reachable" now means a thin vector rule, a checkbox glyph, an underscore, or a
+dot leader within 6pt — signals a rule actually reads.
+
+### The corrected picture
+
+                      polluted      reachable only
+    tuning f1          0.5586          0.6977
+    holdout f1         0.1922          0.6187
+    holdout recall     0.1337          0.5609
+
+**The detector did not improve. The measurement was wrong.** Numbers before and
+after this point are not comparable.
+
+### What this means for the nine iterations already merged
+
+Their gate verdicts were computed against a partly meaningless denominator, so
+they were noisier than they looked. The changes whose evidence was structural
+rather than statistical still stand on their own: iteration 4 (matched exactly
+unchanged), 8 (44 detections removed, matched unchanged) and 9 (bit-identical
+f1) are safe by construction. The marginal ones — iteration 5 in particular,
+already flagged — deserve re-examination against the clean corpus.
+
+### Known limitation of the new test
+
+It defines "reachable" as "carries a signal some CURRENT rule reads". A future
+rule reading a new signal would find its evidence already filtered out. Dot
+leaders were added when R11 landed; whenever a rule learns a new signal, add it
+to MARK_CHARS in eval/label.py.
