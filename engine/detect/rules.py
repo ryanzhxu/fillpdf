@@ -116,9 +116,12 @@ def detect(page, pno):
     # ---- R1  checkbox glyphs ------------------------------------------------
     for c in page.chars:
         if c["text"] in CHECK_GLYPHS:
+            # Use the glyph's real bounding box. A fixed 10x10 rect only worked
+            # because every checkbox glyph on safer.pdf happens to be 10pt; it
+            # misplaces on any other size.
             out.append({"page": pno, "type": "checkbox", "label": "", "rule": "R1",
                         "confidence": 0.99,
-                        "rect": [c["x0"], H - c["bottom"], c["x0"] + 10, H - c["bottom"] + 10]})
+                        "rect": [c["x0"], H - c["bottom"], c["x1"], H - c["top"]]})
 
     cells = grid_cells(page)
     claimed = set()
