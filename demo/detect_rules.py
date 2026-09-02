@@ -3,6 +3,7 @@ import re
 
 CHECK_GLYPHS = {"\uf063", "\uf06f"}          # Webdings box, Wingdings box
 MASK_ONLY = set("()- $.")
+SIGNATURE = re.compile(r"signatur", re.I)      # signature lines get no input box
 
 
 def slug(s, n=40):
@@ -138,6 +139,29 @@ def detect(page, pno):
                     "confidence": 0.65,
                     "rect": [x0 + 1, H - base + 1, x1 - 1, H - top + 11]})
 
+    # ---- R5b  write-on line drawn as a thin rect, not underscore characters --
+    # A cell border has vertical rules standing at its endpoints. A write-on line
+    # has none. That single test separates them cleanly on this corpus.
+    vrules = [r for r in page.rects if r["width"] < 3 and r["height"] >= 5]
+    for r in page.rects:
+        if r["height"] >= 3 or not (40 <= r["width"] <= W * 0.77):
+            continue
+        if any(abs(x["x0"] - r["x0"]) < 3 or abs(x["x0"] - r["x1"]) < 3
+               for x in vrules
+               if x["top"] <= r["top"] + 3 and x["bottom"] >= r["top"] - 3):
+            continue
+        left = [w for w in words if abs(w["bottom"] - r["top"]) < 9
+                and w["x1"] <= r["x0"] + 3 and w["x1"] > r["x0"] - 260]
+        under = [w for w in words if 0 < w["top"] - r["top"] < 14
+                 and w["x1"] > r["x0"] - 2 and w["x0"] < r["x1"] + 2]
+        src = sorted(left, key=lambda w: w["x0"])[-7:] or sorted(under, key=lambda w: w["x0"])
+        label = " ".join(w["text"] for w in src).strip()
+        if not label:                      # unlabelled rules are decorative
+            continue
+        out.append({"page": pno, "type": "text", "label": label[:60], "rule": "R5b",
+                    "confidence": 0.6,
+                    "rect": [r["x0"] + 1, H - r["top"] + 1, r["x1"] - 1, H - r["top"] + 15]})
+
     # ---- R6  small empty square cell drawn with rules, not a glyph ----------
     for cell in cells:
         if cell in claimed:
@@ -149,4 +173,7 @@ def detect(page, pno):
             out.append({"page": pno, "type": "checkbox", "label": "", "rule": "R6",
                         "confidence": 0.5,
                         "rect": [x0 + 2, H - bot + 2, x0 + 14, H - bot + 14]})
-    return out
+
+    # A signature must be signed, not typed. Drop those boxes rather than invite
+    # someone to type a name into them.
+    return [f for f in out if not SIGNATURE.search(f["label"])]

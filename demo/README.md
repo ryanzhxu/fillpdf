@@ -27,26 +27,41 @@ selectable. There is no server-side image pipeline.
 ## Coverage on fixtures/safer.pdf
 
 ```
-234 fields (153 text, 81 checkbox) across 8 pages
-R1=81  R2=42  R3=90  R4=12  R5=9
+246 fields (165 text, 81 checkbox) across 8 pages
+R1=81  R2=39  R3=89  R4=12  R5=9  R5b=16
 ```
 
-Up from 123 with R1+R2 alone. R3 (column-header inheritance for empty grid
-cells) is the single largest win, as the spec predicted.
+Up from 123 with R1+R2 alone. R3 (column-header inheritance) and R5b (rect-drawn
+write-on lines) are the two big wins.
 
-The true field count is roughly 200, so **234 means some over-detection**.
-Deleting a spurious box is cheaper than hunting a missing one, but R3 needs a
-tighter spacer-cell test in track T1.
+The true field count is roughly 200, so **coverage is no longer the problem —
+precision is**. R3 emits some spacer cells, most visibly on page 3 where boxes
+land on the 4c heading. Tightening R3 is now T1's main job.
 
-## Known gaps, seen while testing
+## Known gaps, still open
 
-- **R5b is missing.** Some write-on lines are drawn as thin vector rects rather
-  than underscore characters, so R5 misses them. Visible on 4a of the SAFER form:
-  "If no, when did you move to B.C.? ____" gets no box. Added to the spec.
+- **R3 over-detects.** Spacer cells become boxes. Worst on page 3, where boxes
+  overlay the "4c. If you or your spouse were not born in Canada" heading.
 - **R6 finds nothing.** The two large Option 1 / Option 2 consent boxes on page 2
   are cell-drawn and fall outside the current size window.
-- **A few R3 false positives** float near the page 2 section headings, where an
-  upper table's columns bleed into the rows below.
+- **Three R5b false positives** on headings that carry a decorative underline
+  ("PLEASE:", "Avoid Processing Delays:", "Scan and Upload:").
+
+## Fixes from the second play-through
+
+1. **Panel would not dismiss.** The overlay layer carries `pointer-events: none`
+   so the page text stays selectable, which means a background click never
+   reached its handler. Now a document-level listener checks the event target.
+2. **Checkboxes were misaligned.** Detection was already exact — a 10pt Webdings
+   glyph measures 10.0 x 10.0 and overlays the printed box precisely. The cause
+   was CSS: user agents apply `margin: 3px 3.5px` to a checkbox input, shifting
+   an absolutely-placed one up and left. Set `margin: 0`.
+3. **Missing lines in 4a, 9a, 9b, 9d, 9f.** These write-on lines are drawn as
+   thin vector rects, not underscore characters. Added R5b, which separates them
+   from table borders by a single clean test: a cell border has a vertical rule
+   standing at one of its endpoints, a write-on line has none. All 16 found.
+4. **Signature lines got input boxes.** A signature is signed, not typed. R8 now
+   drops any field whose label matches `/signatur/i`.
 
 ## Fixes made after the first play-through
 

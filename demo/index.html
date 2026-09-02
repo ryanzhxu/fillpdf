@@ -36,8 +36,10 @@
   .fld.sel{outline:2px solid var(--accent);outline-offset:1px;z-index:9}
   .fld input{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent;
              font:inherit;padding:0 3px;color:#111;outline:none}
-  .fld input[type=checkbox]{inset:auto;left:50%;top:50%;transform:translate(-50%,-50%);
-             width:78%;height:78%;accent-color:var(--accent);cursor:pointer}
+  /* A UA default of margin:3px 3.5px shifts an absolutely-placed checkbox up
+     and left of its box. Zero it and let the input fill the detected rect. */
+  .fld input[type=checkbox]{inset:0;margin:0;width:100%;height:100%;
+             accent-color:var(--accent);cursor:pointer}
   .grip,.mv{position:absolute;width:12px;height:12px;background:var(--accent);border:1.5px solid #fff;
             box-shadow:0 0 0 1px rgba(0,0,0,.25);opacity:0;transition:opacity .1s;z-index:10}
   .mv{left:-7px;top:-7px;border-radius:50%;cursor:move}
@@ -66,7 +68,7 @@
 <div class="hint" id="hint">
   Type in any box. <b>Hover a box</b> to reveal its handles — drag the circle to move, the square to resize.
   <b>Alt-drag</b> anywhere on a box also moves it, and <b>arrow keys</b> nudge the selected one.
-  <b>+ Add box</b>, then click the page. The original PDF text stays selectable in the gaps.
+  <b>+ Add box</b>, then click the page. Signature lines deliberately get no box. The original PDF text stays selectable in the gaps.
 </div>
 <main id="main"><div id="load">rendering…</div></main>
 
@@ -264,6 +266,12 @@ $('#tt').onclick = () => { const f = FIELDS[sel]; if(!f) return;
 $('#del').onclick = () => { if (sel==null) return;
   FIELDS.splice(sel,1); sel=null; cursor=-1; $('#bar').classList.remove('on'); draw(); };
 $('#close').onclick = deselect;
+
+document.addEventListener('mousedown', e => {
+  if (adding) return;                                  // adding handles its own click
+  if (e.target.closest('.fld') || e.target.closest('#bar') || e.target.closest('header')) return;
+  deselect();
+}, true);
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { setAdding(false); deselect(); }

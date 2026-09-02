@@ -194,21 +194,34 @@ Rules, each derived from measured structure in `fixtures/safer.pdf`:
 | R3 | Empty cell in a grid column, name inherited from the column header above | text field | 95 candidates |
 | R4 | Cell containing only mask characters `( ) - $` | text field, mask preserved | 12 |
 | R5 | Run of `_` at least 25 points wide | text field on the line | 9 |
-| R5b | Thin horizontal rect that is **not** part of a cell grid | text field on the line | ~6 |
+| R5b | Thin horizontal rect with **no vertical rule at either endpoint** | text field on the line | 16 |
+| R8 | Reject: label matches `/signatur/i` | nothing — a signature is signed, not typed | removes 5 |
 | R6 | Small empty square cell drawn with rules, not a glyph | checkbox | 2 |
 | R7 | Reject: full-width cell whose only text is a label ending in `:` | nothing | removes 1 false positive |
 
-R1 through R5 are implemented in the demo and measured. R5b, R6 and R7 are the
-remaining work.
+R1 through R5b and R8 are implemented in the demo and measured. R6 and a tighter
+R3 are the remaining work.
 
-R5b was found while testing the demo. Some write-on lines (4a on the SAFER form,
-"If no, when did you move to B.C.? ____") are drawn as thin vector rects, not as
-underscore characters, so R5 misses them entirely. They must be separated from
-table borders by checking that no matching rule closes a cell.
+R5b was found while testing the demo. Some write-on lines are drawn as thin
+vector rects, not underscore characters, so R5 misses them entirely. On the SAFER
+form this cost sections 4a, 9a, 9b, 9d and 9f every box.
+
+The discriminator is clean and worth stating precisely: **a cell border has a
+vertical rule standing at one of its endpoints. A write-on line has none.** That
+single test separated all 16 real write-on lines from 279 table borders on this
+form. Two further filters are needed: the line must carry a label (text to its
+left on the same baseline, or directly beneath it), and it must be narrower than
+77 percent of the page, or decorative rules under headings are picked up too.
 
 The R3 figure counts candidate cells, not confirmed fields. Some are spacers and
 must be rejected, which is why the rule needs a header-inheritance test rather
 than emitting every empty cell. The rule counts do not sum to the ~200 total.
+
+The checkbox glyph's character box is exactly the printed box: a 10pt Webdings
+glyph measures 10.0 x 10.0 and overlays the ink precisely. No inset correction is
+needed. If checkboxes look misaligned in a browser, the cause is CSS, not
+detection: user agents apply `margin: 3px 3.5px` to a checkbox input, which
+shifts an absolutely-placed one up and to the left. Set `margin: 0`.
 
 Word draws table borders as thin filled rectangles rather than lines. The cell
 grid is recovered from rects narrower than 3 points (vertical rules) and shorter
@@ -216,8 +229,10 @@ than 3 points (horizontal rules). `pdfplumber.lines` is empty on this file and
 must not be relied on.
 
 **Coverage target:** at least 90 percent of true fields on `fixtures/safer.pdf`
-with at most 3 false positives. Current baseline is 62 percent with 1 false
-positive.
+with at most 3 false positives. The demo now emits 246 fields against a true
+count of roughly 200, so coverage is no longer the problem — **precision is**.
+R3 emits spacer cells, which on page 3 land on top of the 4c heading text. T1's
+job is now to tighten R3, not to find more fields.
 
 **Complexity guard.** The prototype cell-recovery loop is quadratic in the number
 of horizontal rules per page. A crafted PDF with 50,000 rules would hang it.
@@ -247,6 +262,10 @@ whole correction affordance:
 - Drag a box to move it, drag an edge to resize.
 - Delete a box.
 - Toggle a box between text and checkbox.
+- Clicking anywhere outside a box dismisses the editing panel. Note that the
+  overlay layer carries `pointer-events: none` so the page text stays
+  selectable, which means background clicks never reach it. Listen on the
+  document and test the event target instead.
 
 Every edit updates the in-memory `fields.json` and re-renders instantly. There
 is no server round trip and no distinction in code between a detected box and a
