@@ -137,8 +137,14 @@ def _worker_main(argv):
         fields_doc = detect_fn(pdf_path)
         detections = fields_doc["fields"]
         _, form, rule_buckets = _score_detections(detections, truth_widgets)
+        try:
+            from eval.guards import guards as _guards
+            guard_data = _guards(pdf_path, detections)
+        except Exception as e:      # a guard must never fail a form's score
+            guard_data = {"error": f"{type(e).__name__}: {e}"[:200]}
         out = {
             "ok": True,
+            "guards": guard_data,
             "source_pdf": truth_doc.get("source_pdf", Path(pdf_path).name),
             "family": truth_doc.get("family", "unknown"),
             "metrics": _finalize_bucket(form),
@@ -281,6 +287,10 @@ def score_corpus(pairs, out_path=None, *, holdout_pairs=None, adversarial_pairs=
     overall, holdout = _empty_bucket(), _empty_bucket()
     per_rule, per_family, per_form = {}, {}, {}
     failures = []
+    guard_boxes = guard_inked = 0          # box_over_ink, pooled over the corpus
+    guard_glyphs = guard_glyphs_hit = 0    # glyph_coverage
+    guard_offenders = []
+    guard_stacked = []
 
     for key in sorted(done):
         result = done[key]
@@ -310,6 +320,22 @@ def score_corpus(pairs, out_path=None, *, holdout_pairs=None, adversarial_pairs=
         source_pdf = result.get("source_pdf", result.get("_pdf_path", key))
         per_form[source_pdf] = result["metrics"]
 
+        # guards() returns box_over_ink and glyph_coverage as plain fractions
+        # per form. Weight each by that form's box / glyph count so the pooled
+        # corpus figure is not a mean of means.
+        g = result.get("guards") or {}
+        n_boxes = raw.get("detected", 0)
+        guard_boxes += n_boxes
+        guard_inked += (g.get("box_over_ink") or 0.0) * n_boxes
+        for off in (g.get("box_over_ink_offenders") or []):
+            guard_offenders.append({**off, "form": source_pdf})
+        n_glyphs = g.get("glyph_count")
+        if n_glyphs is None:
+            n_glyphs = 1 if g.get("glyph_coverage") is not None else 0
+        guard_glyphs += n_glyphs
+        guard_glyphs_hit += (g.get("glyph_coverage") or 0.0) * n_glyphs
+        guard_stacked.append(((g.get("whitespace_fit") or {}).get("stacked_fraction") or 0.0))
+
     output = {
         "version": 1,
         "git_sha": git_sha,
@@ -324,6 +350,13 @@ def score_corpus(pairs, out_path=None, *, holdout_pairs=None, adversarial_pairs=
         "per_family": {k: _finalize_bucket(per_family[k]) for k in sorted(per_family)},
         "per_form": {k: per_form[k] for k in sorted(per_form)},
         "failures": sorted(failures, key=lambda f: f["form"]),
+        "guards": {
+            "box_over_ink": (guard_inked / guard_boxes) if guard_boxes else 0.0,
+            "glyph_coverage": (guard_glyphs_hit / guard_glyphs) if guard_glyphs else 1.0,
+            "stacked_fraction": (sum(guard_stacked) / len(guard_stacked)) if guard_stacked else 0.0,
+            "offenders": sorted(guard_offenders,
+                                key=lambda o: -(o.get("coverage") or 0))[:40],
+        },
     }
 
     if out_dir:
