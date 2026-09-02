@@ -992,3 +992,58 @@ detector out of scope — so it was a test *of the defect*, and fixing the defec
 had to break it. Rewritten to feed the guard a handmade merged label (testing
 the guard, which is what the file is for), plus a new regression test that the
 detector returns `'Landlord Phone #'` and `'Date:'` as two fields. 107 tests.
+
+## Iteration 28b — hard corpus difficulty restored — MERGED
+
+`19bb68b`
+
+Not a detector change. The hard corpus is a tripwire: the detector is supposed
+to score *badly* on it, so that a sudden good score means either a real
+generalization or a stale corpus. It had gone stale four times over —
+`dotted_line`, `ragged_table`, `merged_header_table`, and `sec_label_below`
+(spent last iteration by R17) were all solved. `MAX_ALLOWED_F1` had been raised
+twice to compensate, recorded honestly both times as bookkeeping. This is the
+fix for that bookkeeping.
+
+    hard corpus f1 0.569 -> 0.453   (P 0.881, R 0.305)
+    MAX_ALLOWED_F1 0.58 -> 0.48
+    test_feature_variety passes, highest tag 60% of 25 forms
+    107 tests
+
+Two new constructs, both meeting the standard that a person must be able to
+fill them in and that they occur on real forms:
+
+**`sec_gutter_left_label`** — `[label][blank ruled gutter][entry]`. R10 reads a
+blank cell's label from the closest cell to its left, with no distance bound and
+no requirement that the cell hold text, so a blank gutter makes it give up
+without looking one cell further. Gutter 21-24pt: above `grid_cells()`'s 20pt
+cell floor so it becomes a real cell, below R10's 25pt candidate floor so R10
+never claims it as a field. Isolated recall 8%. Ordinary on typeset
+grid-template forms where a fixed blank column aligns every entry box.
+
+**`sec_whitespace_field`** — an inline label followed only by blank space. No
+underscore, dot, rule, or box. Every write-on rule (R5, R5b, R11) and every
+cell-walking rule needs something *drawn*. Isolated recall 9%. Ordinary on
+typewriter-era intake sheets.
+
+**Removed before merge — the important part of this iteration.**
+`sec_single_column_list` was designed to defeat R3's floating-header rule, which
+needs a second adjacent column to corroborate a header; a single-column list has
+no such neighbor. It passed the plausibility standard on all three questions and
+then failed empirically at **86% recall — the opposite of intended**.
+
+Cause: `grid_cells()` pairs each horizontal rule with the closest one below it,
+no distance cap, regardless of which construct drew each. Sitting below another
+ruled construct sharing its x-range, the two constructs' rules paired *across*
+the gap and manufactured a phantom cell containing the caption — precisely R2's
+"one line of header text, blank space below" shape. No parameter fixes it: the
+pairing depends on whatever construct lands above. The same hazard
+`sec_group_caption`'s own docstring already documents.
+
+Worth stating plainly: a plausible-sounding adversarial construct measured the
+opposite of its intent, and only measurement caught it. This is the second time
+in this project that reasoning about what the detector "should" find has been
+wrong in the falsifiable direction.
+
+`sec_gutter_left_label` names a real detector bug rather than an artificial one,
+so it feeds directly into the next iteration.
