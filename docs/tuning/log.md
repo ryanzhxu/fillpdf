@@ -1216,3 +1216,58 @@ exploit the same code path as `sec_bracket_checkbox` — no rect, no glyph —
 rather than a structurally distinct blind spot. Rejected on reasoning before
 implementation, so there is no measurement for it, and it is recorded here as a
 reasoning-only rejection rather than an empirical one.
+
+## Iteration 31 — R5 claims short captioned underscore runs — MERGED
+
+`085718d`. Baseline moved to `085718d`.
+
+R5 required an underscore run of at least 25pt, a guard against decorative
+mid-sentence underscores. A genuine single-character field is narrower, so
+middle initial, suffix, apartment letter, and province code fields were
+silently skipped. `sec_short_underscore_field` (added in 30b) named this.
+
+Floor dropped to 12pt, with a run between 12 and 25pt claimed only given a
+contiguous caption: the preceding word on the same baseline within 4pt, at
+least two alphabetic characters, not a bare function word. That rejects a
+notarization clause's own blank (`"this ___ day of ___,"`) and a caption
+separated by a wide gap. The 25pt+ branch is byte-identical.
+
+    tuning  f1 0.639162 -> 0.644667  P 0.777027 -> 0.779207  R 0.542847 -> 0.549746
+    holdout f1 0.641833 -> 0.642374  P 0.703186 -> 0.703445  R 0.590326 -> 0.591059
+    detected +38 / matched +38 (tuning),  +2 / +2 (holdout)
+    ZERO new false positives on either corpus
+    near_miss unchanged 273 / 139     R5 per-rule precision 0.8053 -> 0.8112
+    GATE PASSED
+
+**Precision rises on both corpora**, so this buys recall without the usual
+trade — the best-shaped result in the log. Every new detection is a true
+positive: detected and matched grew by identical amounts on both sets. Wins
+traced by hand to real ground truth — a land-survey Qtr/Sec/Twp/Rge/Mer comb
+repeated down a page (`c83888e63ca7.pdf`), a `"REQUESTED @ $2 EACH:"` field
+(`cc15fd260573.pdf`), and two holdout fields.
+
+### A condition removed before merging, and why it matters
+
+The candidate carried a third condition: the run must share its baseline with
+another underscore run. Its own comment said the requirement is *"what a solo
+synthetic instance can never satisfy"*. It had been chosen because it excludes
+`hard.py`'s construct **by construction**, added after the scoring run purely to
+stop the hard corpus breaching its ceiling — and it cost a real detection (the
+solo `"REQUESTED @ $2 EACH:"` field) to do it.
+
+That is the tripwire dilemma inverted, and it is worse than raising the ceiling.
+Raising `MAX_ALLOWED_F1` weakens the measurement; this weakens **the product**,
+deliberately, so that a synthetic test passes. The corpus exists to find real
+weaknesses. When it succeeds and the weakness gets fixed, the answer is to
+record the construct as spent — never to teach the detector to fail it.
+
+Removing the condition produced the numbers above. `sec_short_underscore_field`
+is spent 30 minutes after being added, and is de-boosted to base weight like
+every solved construct before it: hard corpus f1 0.487 -> 0.443, under the 0.48
+ceiling, **which was not raised**.
+
+Note the asymmetry that makes this the right call and iteration 29's de-boost
+also right: the detector got genuinely better both times, and the corpus is
+bookkeeping. Difficulty was really added in 30b, so this de-boost draws on
+real difficulty rather than substituting for it. `sec_bracket_checkbox` remains
+boosted and unsolved.
