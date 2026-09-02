@@ -229,7 +229,10 @@ than 3 points (horizontal rules). `pdfplumber.lines` is empty on this file and
 must not be relied on.
 
 **Coverage target:** at least 90 percent of true fields on `fixtures/safer.pdf`
-with at most 3 false positives. The demo now emits 246 fields against a true
+with at most 3 false positives. **This target is not yet measurable.** The true
+field count is an estimate made by eye, so the target can be neither passed nor
+failed. It becomes real only once the evaluation harness exists — see
+`2026-09-01-detection-eval-harness-design.md`, which is a prerequisite for T1. The demo now emits 246 fields against a true
 count of roughly 200, so coverage is no longer the problem — **precision is**.
 R3 emits spacer cells, which on page 3 land on top of the 4c heading text. T1's
 job is now to tighten R3, not to find more fields.
@@ -357,12 +360,13 @@ events, for example "a box was added 12 points right of a label ending in `#`".
 Read them periodically and improve the rules in section 5. Cheap and effective.
 The developer learns, not the app. Build the logging in v1, act on it later.
 
-**Level 2 — a trained layout model.** Explicitly **not** in scope. It needs
-thousands of labeled forms, training infrastructure, and above all a held-out
-evaluation set. Without an evaluation set, continuous self-training cannot
-distinguish an improvement from a regression, so quality would decay silently.
-Revisit only if the corpus grows large, and only after building the evaluation
-set first.
+**Level 2 — a trained layout model.** Still not in scope, but the blocker named
+here has a route around it. Stripping the AcroForm from a fillable PDF yields a
+flat form plus a perfect answer key, so thousands of labeled examples can be had
+without human labeling. That is what the evaluation harness spec builds. Once it
+exists, a layout model becomes a question of whether it beats the rules on the
+holdout, rather than an act of faith. Rules first regardless: they are debuggable
+and a model is not.
 
 ## 11. Error handling
 
@@ -403,6 +407,13 @@ The contracts in section 4 exist so that tracks can proceed without talking to
 each other. Each track owns a disjoint set of files. No track edits another
 track's files. Every track is given its acceptance test up front.
 
+**T7 — evaluation harness. Blocking for T1. Its own spec.**
+Specified in `2026-09-01-detection-eval-harness-design.md`. Builds the corpus,
+auto-labels it by stripping fillable PDFs, hand-labels a flat holdout, and scores
+precision and recall per rule and per form family. Until it prints a trustworthy
+number, no claim about detection quality in this document can be verified, and
+T1 has nothing to optimize against. T1 may begin only after T7 lands.
+
 **T0 — contracts and fixtures. Blocking. Not delegated.**
 Write `contracts/fields.schema.json`, `contracts/openapi.yaml`, the shared
 fixture set, and a stub server that returns a recorded `fields.json`. Every
@@ -410,7 +421,7 @@ other track builds against these. Nothing starts until T0 lands.
 
 | Track | Owns | Depends on | Acceptance |
 |---|---|---|---|
-| **T1 Detector** | `engine/detect/**` | T0 | Rules R3–R7 implemented; at least 90% coverage and at most 3 false positives on `safer.pdf` |
+| **T1 Detector** | `engine/detect/**` | T0, **T7** | Tighter R3 and a working R6; scored by T7 against corpus and holdout; must pass the T7 acceptance gate |
 | **T2 Service** | `service/**` | T0 | Every status code in 4.2 reachable; adversarial corpus passes; detector imported behind an interface, mocked in tests |
 | **T3 Viewer/Editor** | `web/src/viewer/**` | T0 | Renders `safer.pdf`, draws boxes from a fixture `fields.json`, supports add/move/resize/delete and Next-field; no network calls |
 | **T4 Fill/Export** | `web/src/engine/**` | T0 | **Opens with the `pdf-lib` spike.** Then: values in, filled PDF out, both flattened and fillable; round-trip test passes |
