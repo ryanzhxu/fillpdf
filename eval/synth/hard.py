@@ -1286,15 +1286,21 @@ HARD_FUNCS = [
 # caption floating above it (meant to target R3's floating-header
 # corroboration requirement), was designed, measured, and DROPPED: see
 # docs/tuning/log.md's account of this round for why it does not survive
-# contact with grid_cells()'s own unbounded rule-pairing. Both surviving
-# constructs are boosted at the same density as the strongest of the
-# existing nine.
+# contact with grid_cells()'s own unbounded rule-pairing.
+#
+# sec_gutter_left_label is now ALSO spent: a later fix taught R10 to read
+# past a blank left-neighbour cell to the real label beyond it (isolated
+# recall 5.8% -> 90.8%), the same way dotted_line/ragged_table/
+# merged_header_table/sec_label_below were solved before it. Its boost is
+# removed here for the same reason theirs was removed above -- kept in
+# HARD_FUNCS at base weight for page variety, no longer boosted. Only
+# sec_whitespace_field, still unsolved, keeps the boost.
 EXTRA_WEIGHT = ([sec_label_below] * 12 + [sec_shaded_field] * 12
                 + [sec_circle_checkbox] * 12 + [sec_comb_field] * 12
                 + [sec_wrapped_label] * 10 + [sec_nested_table] * 10
                 + [sec_bilingual_grid] * 10
                 + [sec_group_caption] * 22 + [sec_margin_caption] * 22
-                + [sec_gutter_left_label] * 22 + [sec_whitespace_field] * 22)
+                + [sec_whitespace_field] * 22)
 LEGIT_FUNCS = [sec_legit_grid, sec_legit_checkbox, sec_legit_line]
 
 # How many of the 40-ish placement attempts a column gets, and how many
