@@ -1,12 +1,12 @@
 {
   "char_flood.pdf": {
     "detail": "RSS crossed 512MB (RSS watchdog); killed before it could send a result",
-    "elapsed_s": 2.12,
+    "elapsed_s": 2.35,
     "status": "memory"
   },
   "cyclic_references.pdf": {
     "detail": "detect() returned",
-    "elapsed_s": 0.08,
+    "elapsed_s": 0.09,
     "fields": 0,
     "pages": 1,
     "status": "ok"
@@ -18,7 +18,7 @@
   },
   "deep_nesting.pdf": {
     "detail": "pdfplumber.utils.exceptions.PdfminerException: maximum recursion depth exceeded",
-    "elapsed_s": 0.1,
+    "elapsed_s": 0.11,
     "status": "rejected"
   },
   "empty_file.pdf": {
@@ -28,7 +28,7 @@
   },
   "encrypted.pdf": {
     "detail": "pdfplumber.utils.exceptions.PdfminerException: ",
-    "elapsed_s": 0.08,
+    "elapsed_s": 0.09,
     "status": "rejected"
   },
   "huge_page.pdf": {
@@ -40,7 +40,7 @@
   },
   "inverted_mediabox.pdf": {
     "detail": "detect() returned",
-    "elapsed_s": 0.08,
+    "elapsed_s": 0.09,
     "fields": 0,
     "pages": 1,
     "status": "ok"
@@ -59,14 +59,14 @@
   },
   "page_flood.pdf": {
     "detail": "detect() returned",
-    "elapsed_s": 0.43,
+    "elapsed_s": 0.46,
     "fields": 0,
     "pages": 5000,
     "status": "ok"
   },
   "rect_flood.pdf": {
     "detail": "detect() returned",
-    "elapsed_s": 3.26,
+    "elapsed_s": 3.3,
     "fields": 0,
     "pages": 1,
     "status": "ok"

@@ -5,6 +5,15 @@ CHECK_GLYPHS = {"\uf063", "\uf06f"}          # Webdings box, Wingdings box
 MASK_ONLY = set("()- $.")
 SIGNATURE = re.compile(r"signatur", re.I)      # signature lines get no input box
 
+# R3: a column header that marks the cells below as off-limits to the
+# applicant. Measured on the tuning corpus, every single "Office Use"-headed
+# column R3 claimed was a false positive (318 of them, 0 true positives) --
+# the cleanest, largest source of R3's false positives. Wording varies, so
+# match the phrase family rather than one exact string.
+OFFICE_USE = re.compile(
+    r"office\s*use|staff\s*use|internal\s*use|official\s*use|"
+    r"do\s*not\s*write|leave\s*blank", re.I)
+
 # R9: a candidate whose area is largely covered by printed text is not a place
 # to write -- it is on top of something already printed. Measured on the real
 # corpus, 29% of emitted boxes sat on ink, which is the main precision failure.
@@ -159,7 +168,10 @@ def detect(page, pno):
             if txt:
                 label = " ".join(w["text"] for w in sorted(txt, key=lambda w: w["x0"]))
                 if 2 <= len(label) <= 60:
-                    header = label
+                    # An "office use" header marks its column off-limits: no
+                    # blank cell below it should be claimed as a field until
+                    # a real header appears further down.
+                    header = None if OFFICE_USE.search(label) else label
                 continue
             x0, top, x1, bot = cell
             if header is None or cell in claimed:
