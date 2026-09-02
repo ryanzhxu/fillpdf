@@ -934,3 +934,61 @@ construct as difficulty. The loop is working as intended — corpus adds
 difficulty, detector solves it, corpus needs more — but the ledger has to stay
 honest about which constructs are spent. `sec_label_below` is now spent, joining
 `dotted_line`, `ragged_table` and `merged_header_table`.
+
+## Iteration 28 — gutter cut in label building (R2, R5, R5b, R10) — MERGED
+
+`feaca36`
+
+The first change specified by a metric rather than merely scored by one.
+`label_plausibility` (added iteration 26) exists to judge label quality on real
+forms, which carry no truth labels. Its `internal_gap` signal found that four
+rules concatenated separate column headers into one label whenever their scan
+crossed a gutter.
+
+Offenders it named, all one mechanism:
+
+    'Name*: Last Name*:'                                  (two column headers)
+    'Address*: City / Town*'
+    'First name: Middle' / 'Middle name: Phone'
+    'street address city, town or village country postal'
+    'Requested change: Amendment Duplicate Reason:'
+    'Landlord Phone # Date:'                              (safer.pdf, page 7)
+
+The last had been there since the first demo of this project.
+
+Fix: `_page_gap_threshold()` takes the page's own median inter-word gap (not a
+fixed point value — font size varies per form) and `_cut_at_gutter()` trims at
+the first gap far wider than that, keeping the run adjacent to the field.
+
+    label_plausibility 0.3720 -> 0.3115    internal_gap 364 -> 68
+    tuning  f1 0.639017 -> 0.639162   P 0.776969 -> 0.777027
+    holdout f1 0.641961 -> 0.641833 (noise)
+    true positives lost: zero   near_miss unchanged 273 / 139
+    label_accuracy 0.725451 unchanged (synthetic only; blind to this)
+    GATE PASSED
+
+f1 being flat is the expected shape: this changes what a field is *called*, not
+whether it is found. Reporting it as a win on f1 would have been the wrong
+claim — `label_plausibility` is the measurement that moved, by 16%.
+
+Two follow-on defects surfaced during verification and were fixed:
+
+1. Cutting the label defeated existing safety filters (R2's wide-colon-header
+   guard, R5b's `OFFICE_USE` guard), because those read the already-shortened
+   label. Precision dropped below baseline and the gate failed. Now the guards
+   check the full pre-cut text while the cut text is emitted.
+2. A lone symbol token could end up as the entire label
+   (`'Amount of rent increase: $'` -> `'$'`). The cut now keeps pulling in words
+   until the kept run contains a letter.
+
+Rejected during the same iteration: applying the cut to R3 as well. R3's label
+feeds a column-pitch/header-inheritance state machine, and shortening a label
+there re-triggers header updates — ~10 new false positives for 2 true positives.
+R3 was not among the named offenders; left alone.
+
+**Test note.** `test_finds_the_real_cross_column_header_merge_bug` failed on
+merge. Its own docstring said it pinned a live-detector defect and left the
+detector out of scope — so it was a test *of the defect*, and fixing the defect
+had to break it. Rewritten to feed the guard a handmade merged label (testing
+the guard, which is what the file is for), plus a new regression test that the
+detector returns `'Landlord Phone #'` and `'Date:'` as two fields. 107 tests.
