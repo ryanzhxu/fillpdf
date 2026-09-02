@@ -583,3 +583,45 @@ that found it.
 Fetch more real forms. The corpus is 16 forms; the constructs we keep inventing
 may well exist out there, and the honest way to find out is to go look rather
 than to keep scoring against our own inventions.
+
+
+## Corpus expansion — 16 forms to 117
+
+Acting on the standing concern instead of writing a fourth synthetic-only rule.
+295 real PDFs fetched and labelled; 117 admitted, 5,638 reachable widgets.
+
+    tuning   78 real forms, 3,941 widgets (+ 25 hard synthetic)
+    holdout  39 real forms, 1,697 widgets
+    9 producer families
+
+    tuning  f1 0.6478  P 0.7334  R 0.5800
+    holdout f1 0.6740  P 0.7496  R 0.6123
+
+### Holdout size was the hidden variable
+
+    6 forms  -> holdout f1 0.66
+    14 forms -> holdout f1 0.44
+    39 forms -> holdout f1 0.67
+
+The 0.44 was sampling noise, not a discovery — that draw happened to put the
+hard producer families in the holdout. Every gate verdict taken while the
+holdout was six forms rested on a noisier signal than it appeared to. The
+verdicts that were structural (matched count unchanged, bit-identical f1) still
+stand; the marginal ones were closer to coin flips than the tolerances implied.
+
+**A holdout must be large enough that its own sampling noise is smaller than the
+effects being gated on.** Ours was not, for most of this run.
+
+### R11 and R14 across 117 real forms
+
+Still zero detections. The rule firing distribution on real input:
+
+    R5  1178 in 55 forms    R2  1055 in 63    R3   971 in 54
+    R5b  925 in 62          R1   583 in 27    R4    64 in  7
+    R6    51 in 10          R12   24 in  8    R10   21 in  9
+    R11    0                R14    0
+
+Kept, on the earlier reasoning that both constructs do occur and the rules
+correctly declined each specific instance. But two rules out of eleven that have
+never once fired on 117 real forms is the honest state of it, and a fourth would
+not be defensible.
