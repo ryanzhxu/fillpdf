@@ -1414,7 +1414,12 @@ EXTRA_WEIGHT = ([sec_label_below] * 12 + [sec_shaded_field] * 12
                 + [sec_bilingual_grid] * 10
                 + [sec_group_caption] * 22 + [sec_margin_caption] * 22
                 + [sec_whitespace_field] * 22
-                + [sec_bracket_checkbox] * 22 + [sec_short_underscore_field] * 22)
+                + [sec_bracket_checkbox] * 22)
+# sec_short_underscore_field is SPENT: R5's floor dropped from 25pt to 12pt
+# with a contiguous-caption guard, so short captioned runs are now found
+# (+38 true positives on tuning, +2 on holdout, zero false positives).
+# De-boosted to base weight the same way every solved construct above was.
+# It stays in HARD_FUNCS for page variety.
 LEGIT_FUNCS = [sec_legit_grid, sec_legit_checkbox, sec_legit_line]
 
 # How many of the 40-ish placement attempts a column gets, and how many

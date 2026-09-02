@@ -1698,6 +1698,56 @@ def detect(page, pno, carry_in=None):
                     "rect": [x0 + 2, H - bot + 2, x1 - 2, H - top - 2]})
 
     # ---- R5  runs of underscores are write-on lines -------------------------
+    # SHORT_RUN_FLOOR/CEIL: below 25pt was an all-or-nothing guard against
+    # decorative mid-sentence underscore use. Measured on the real corpus
+    # (see the scan behind this change): genuine single-character fields
+    # (middle initial, suffix, apartment letter, and comb-style land-survey
+    # / phone-number blanks) draw runs from about 12pt to just under 25pt,
+    # and are silently skipped by the old unconditional floor.
+    #
+    # A run in that narrow band is claimed only with three extra checks,
+    # each earning its keep against a specific false-positive family found
+    # by the same scan:
+    #   - SHORT_RUN_GAP_MAX (contiguous caption): the immediate preceding
+    #     word must sit within 4pt of the run's own start. This is what
+    #     separates a genuine "Qtr____Sec____Twp____" comb (gap ~2.2, every
+    #     short run directly touches its own short caption) from a run
+    #     sitting well after unrelated prose ("Contact Phone" then a run
+    #     41pt later, "Unit:" then a run 30pt later) -- neither of those is
+    #     in the real corpus's own ground truth.
+    #   - HAS_LETTER + >=2 alpha characters on that immediate word: rejects
+    #     a chain continuation (the previous token is itself a run of
+    #     underscores/punctuation, as in a "$___,___.__" digit comb, where
+    #     only the FIRST run in the chain carries a real caption) and
+    #     rejects a single stray glyph a scanned form's header sometimes
+    #     carries next to a short underscore run (measured on this corpus:
+    #     a `'L_` artifact sitting at the very top of the page, no ground
+    #     truth widget anywhere near it).
+    #   - SHORT_RUN_STOPWORDS: the immediate word, punctuation-stripped, is
+    #     rejected if it is a bare function word ("this", "of", ...). This
+    #     is what a notarization clause's own fill-in blank looks like --
+    #     "given under my hand this ____ day of ________," -- contiguous,
+    #     lettered, but captioned by a word that names no field. The other
+    #     recurring false-positive family, a "Page __ of __" footer stamp,
+    #     is already excluded by SHORT_RUN_FLOOR (measured width 10pt on
+    #     every occurrence in this corpus, under the 12pt floor) without
+    #     needing a stopword at all.
+    #
+    # Measured on the tuning + holdout corpora: this recovers the land-
+    # survey comb (c83888e63ca7.pdf, ~20 genuine fields on one page), a
+    # "$_,___.__" digit comb and a contiguous "REQUESTED @ $2 EACH:" field
+    # (cc15fd260573.pdf), and part of a "vacant? ___ weeks" comb
+    # (1f697fad5785.pdf, holdout) and a parking-count field
+    # (63d383a1290d.pdf, holdout) -- while rejecting every false-positive
+    # shape found by the same scan (page-footer stamps, a notary date
+    # clause, and a scanned-glyph artifact).
+    SHORT_RUN_FLOOR = 12
+    SHORT_RUN_GAP_MAX = 4
+    SHORT_RUN_STOPWORDS = {
+        "this", "that", "these", "those", "the", "a", "an", "of", "on",
+        "in", "at", "and", "or", "is", "are", "was", "were", "to", "for",
+        "by", "with", "as", "it", "its", "be",
+    }
     runs, cur = [], []
     for c in sorted((c for c in page.chars if c["text"] == "_"),
                     key=lambda c: (round(c["top"]), c["x0"])):
@@ -1711,12 +1761,24 @@ def detect(page, pno, carry_in=None):
         runs.append(cur)
     for run in runs:
         x0, x1 = run[0]["x0"], run[-1]["x1"]
-        if x1 - x0 < 25:
+        run_w = x1 - x0
+        if run_w < SHORT_RUN_FLOOR:
             continue
         base, top = run[0]["bottom"], run[0]["top"]
         before = [w for w in words
                   if abs(w["bottom"] - base) < 6 and w["x1"] <= x0 + 2 and w["x1"] > x0 - 240]
         before_sorted = sorted(before, key=lambda w: w["x0"])
+        if run_w < 25:
+            last = before_sorted[-1] if before_sorted else None
+            if last is None or (x0 - last["x1"]) > SHORT_RUN_GAP_MAX:
+                continue
+            if not HAS_LETTER.search(last["text"]):
+                continue
+            if sum(1 for ch in last["text"] if ch.isalpha()) < 2:
+                continue
+            stripped = last["text"].strip(".,:;?!'\"()").lower()
+            if stripped in SHORT_RUN_STOPWORDS:
+                continue
         # Unlike R2/R10's cell-bounded org_label, `before` is a fixed 240pt
         # reach across the whole page -- it can cross MORE than one gutter
         # (measured: safer.pdf's "Landlord Signature" caption sits within
