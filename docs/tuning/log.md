@@ -16,6 +16,9 @@ precision, and the label-free guards. The holdout is never tuned against.
 | 7b | exempt dot leaders from the ink guard | 0.5546 -> 0.5541 (-.0005) | -.0002 | **REJECTED** |
 | 8 | merge doubled ruling lines in grid_cells | 0.5546 -> 0.5586 (P +.019) | +.0003 | **MERGED** |
 | 9 | R1 gives checkboxes real labels | f1 unchanged, R1 label acc 0.0 -> 1.0 | unchanged | **MERGED** |
+| — | *corpus corrected; numbers below are on clean data* | | | |
+| 10 | grid_cells merges segmented borders over a single-span row | 0.6977 -> 0.7104 | 0.6187 -> 0.6331 | **MERGED** |
+| 11 | R2/R3 extend a claimed cell across false column splits | 0.7104 -> 0.7129 | 0.6331 -> 0.6559 | **MERGED** |
 
 ## Iteration 1 — MERGED
 
@@ -401,3 +404,55 @@ polluted corpus was scoring R10 against widgets it had itself excluded.
 Worth noting as a general lesson: a flagged merge was flagged on bad evidence.
 The other marginal verdicts from that era deserve the same scepticism, in both
 directions — a rejection can be as wrong as an approval.
+
+
+## Iterations 10 and 11 — two agents, one root cause, both worth keeping
+
+Two agents were briefed on different symptoms (Microsoft® forms scoring 0.262,
+and 48 near misses) and independently found the SAME underlying cause:
+
+**Word and Publisher render a table row's border as one rect PER COLUMN, not one
+per row.** `grid_cells()` treated each segment's x0/x1 as a cell boundary even
+where no vertical rule is drawn, so a label cell and the blank strip beside it —
+visually one continuous white area — were split apart. Detections boxed only the
+first narrow slice while truth spanned the whole writable strip. All 48 near
+misses had a horizontal width error (median ~270pt too narrow) and only ~6.6pt
+of vertical error.
+
+They fixed it at different levels, and the fixes turned out to be complementary:
+
+    10  grid_cells emits ONE wide cell when a row's top border has several
+        segments and the row below has exactly one spanning their full width
+    11  after R2/R3 claim a cell, extend it rightward through adjoining blank
+        unclaimed cells, stopping at a real vertical rule, a cell with its own
+        text, or a checkbox-shaped cell
+
+                    tuning f1   holdout f1   holdout P   near_miss (t/h)
+    baseline          0.6977      0.6187      0.6898       48 / 22
+    10 alone          0.7104      0.6331      0.7268       31 / 20
+    11 alone          0.7072      0.6544      0.7500       33 / 13
+    10 + 11           0.7129      0.6559      0.7615       27 / 13
+
+Both real families improve at every step, so neither is a trade against the
+other: real/Adobe 0.743 -> 0.767, real/Microsoft® 0.262 -> 0.320.
+
+Iteration 11's author was asked to say whether its change was a principled
+geometry fix or a constant tuned to the corpus, and made the case for the
+former: it tunes no threshold, it corrects a structural misreading, and it only
+widens a box where no drawn rule justifies stopping — i.e. it targets where a
+person would actually put ink. Its holdout improving by roughly the same
+relative amount as tuning, measured once at the end, is corroborating.
+
+It also reported that 2 new near misses appeared alongside 17 conversions, and
+traced them: a baseline R3 detection with a garbled label had been matching one
+truth widget at IoU 0.557 by luck, and that cell is now absorbed into a
+neighbouring R2 field. Reported rather than hidden, which is the right instinct.
+
+### Residual, and the next highest-value fix
+
+Microsoft® recall moved only 0.254 -> 0.268 despite near_miss falling 46 -> 30.
+Once merged, many of these are multi-line comment areas over 70pt tall. R3 caps
+a claimed cell at 70pt and R2 wants a header-band-then-blank shape these
+free-text boxes lack, so no rule claims them — they moved from near-miss to no
+detection at all. A rule for large blank unruled cells as multi-line text fields
+is the next change for this family.

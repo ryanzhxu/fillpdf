@@ -395,6 +395,62 @@ def _ink_fraction(rect, ink):
     return min(covered / area, 1.0)
 
 
+ROW_EPS = 0.5           # points; same-row tolerance, matches R10's row_eps
+ROW_SPAN_MAX_CELLS = 10  # safety cap on how many blank cells one span absorbs
+
+
+def _looks_like_checkbox_cell(cell):
+    """True when a cell's own shape is R6's small-square checkbox footprint.
+
+    Used only to keep row-span extension from swallowing a checkbox cell
+    that happens to sit blank and unclaimed to the right of a text field --
+    R6 claims cells like this on its own later in detect().
+    """
+    x0, top, x1, bot = cell
+    w_, h_ = x1 - x0, bot - top
+    return 20 <= w_ <= 34 and 14 <= h_ <= 34 and abs(w_ - h_) < 14
+
+
+def _extend_row_span(cell, cells, claimed, words, vrules):
+    """Extend a claimed cell rightward through blank cells in the same row.
+
+    Word draws a table row's top border as one rect PER underlying grid
+    column, not one rect for the whole row. So a row can be split into more
+    grid_cells() cells than the form actually shows dividers for: a label
+    cell and the blank cell(s) beside it are visually one continuous white
+    strip, with no drawn vertical rule between them, and a person filling
+    the form writes straight across the whole strip -- not just the first
+    narrow slice of it. Measured on the tuning corpus, this was the cause of
+    every near-miss the detector produced: the claimed cell matched truth's
+    left edge and top/bottom almost exactly, but stopped short of truth's
+    right edge by tens to hundreds of points.
+
+    Stop absorbing at the first real division: a vertical rule spanning the
+    row, a cell that carries its own text (a new field, not blank space), a
+    cell already claimed by another rule, or a cell shaped like a checkbox
+    (left for R6). Returns the new right edge and the list of absorbed cells
+    (the caller marks them claimed so no other rule reuses that space).
+    """
+    x0, top, x1, bot = cell
+    absorbed = []
+    while len(absorbed) < ROW_SPAN_MAX_CELLS:
+        nxt = [c for c in cells if c not in claimed and c not in absorbed
+               and abs(c[0] - x1) <= ROW_EPS
+               and abs(c[1] - top) <= ROW_EPS and abs(c[3] - bot) <= ROW_EPS]
+        if not nxt:
+            break
+        nxt_cell = min(nxt, key=lambda c: c[0])
+        if _text_in(words, nxt_cell) or _looks_like_checkbox_cell(nxt_cell):
+            break
+        if any(abs(v["x0"] - x1) <= 2
+               for v in vrules
+               if v["top"] <= top + 3 and v["bottom"] >= bot - 3):
+            break                       # a real rule marks a true division
+        absorbed.append(nxt_cell)
+        x1 = nxt_cell[2]
+    return x1, absorbed
+
+
 def detect(page, pno):
     H, W = page.height, page.width
     words = page.extract_words()
@@ -413,6 +469,7 @@ def detect(page, pno):
 
     cells = grid_cells(page)
     claimed = set()
+    vrules = [r for r in page.rects if r["width"] < 3 and r["height"] >= 5]
 
     # ---- R2  labelled cell: label in the top band, blank below --------------
     for cell in cells:
@@ -430,10 +487,12 @@ def detect(page, pno):
             continue
         if label.endswith(":") and (x1 - x0) > W * 0.8:           # R7
             continue
+        ext_x1, absorbed = _extend_row_span(cell, cells, claimed, words, vrules)
         claimed.add(cell)
+        claimed.update(absorbed)
         out.append({"page": pno, "type": "text", "label": label, "rule": "R2",
                     "confidence": 0.8,
-                    "rect": [x0 + 2, H - bot + 1.5, x1 - 2, H - entry_top - 1.5]})
+                    "rect": [x0 + 2, H - bot + 1.5, ext_x1 - 2, H - entry_top - 1.5]})
 
     # ---- R3  empty cell, name inherited from the column header above --------
     for group in _cluster_columns(cells):
@@ -454,10 +513,12 @@ def detect(page, pno):
                 continue
             if not (11 <= bot - top <= 70) or (x1 - x0) < 30:
                 continue
+            ext_x1, absorbed = _extend_row_span(cell, cells, claimed, words, vrules)
             claimed.add(cell)
+            claimed.update(absorbed)
             out.append({"page": pno, "type": "text", "label": header, "rule": "R3",
                         "confidence": 0.6,
-                        "rect": [x0 + 2, H - bot + 2, x1 - 2, H - top - 2]})
+                        "rect": [x0 + 2, H - bot + 2, ext_x1 - 2, H - top - 2]})
 
     # ---- R10  blank cell whose LEFT neighbour in the same row is a label ----
     # "Last Name |          |" -- the label sits in the cell to the left of the
