@@ -114,9 +114,30 @@ Two design decisions in it were learned the hard way and should not be undone:
    fields), across all 165. Both constructs occur, and in each case the rule
    correctly declined the specific instance. Re-validate when the corpus grows;
    a third such rule was rejected on this basis.
-4. **The reachability filter defines "reachable" by what current rules read.** A
-   future rule reading a new signal will find its evidence pre-filtered. Add the
-   signal to `MARK_CHARS` in `eval/label.py` whenever a rule learns one.
+4. **The reachability filter deletes 54% of all checkbox truth. This is the
+   most important thing in this file.** `keep_reachable()` in `eval/label.py`
+   drops any widget sitting over nothing a rule can read, and `MARK_CHARS` is
+   `CHECK_GLYPHS | {_, ., middot}` — glyph checkmarks, underscores, dot
+   leaders. A plain *stroked box* checkbox matches none of them, so it is
+   filtered out of truth. Measured across all 165 forms, comparing each
+   original fillable PDF to its truth file:
+
+        original /Btn (checkbox/radio) fields          2,783
+        kept as checkbox truth                         1,285   (46%)
+        LOST to the filter                             1,498   (54%)
+        forms with >=5 buttons and ZERO checkbox truth    41
+
+   The bias runs one way: a rule that correctly detects one of the dropped
+   checkboxes is scored a **false positive**, because truth has no widget
+   there. **Checkbox precision is understated project-wide**, and any checkbox
+   rule is currently unevaluable in either direction. R6 was deleted for firing
+   53 times and matching 0 — against a truth set that had already removed what
+   it was looking for. That judgement needs re-running.
+
+   Fixing this means adding a stroked-box signal to `eval/label.py`,
+   regenerating truth, and re-baselining. It moves the baseline, so do it at
+   the START of a session with no candidates in flight.
+
 5. **Score files record `git_sha` at scoring time**, which is usually before the
    commit. Trust `detector_fingerprint` and `git_dirty` instead.
 
@@ -127,6 +148,13 @@ rule landed as R17 (`8250261`); the `label_plausibility` mislabelling — includ
 `'Landlord Phone # Date:'` on safer.pdf — was fixed by the gutter cut in
 `feaca36`; R10 now reads past a blank gutter cell (`89bcac9`).
 
+- **Fix checkbox truth first — see limitation 4.** 1,498 of 2,783 checkbox
+  widgets are filtered out of ground truth. Until that is fixed no checkbox
+  rule can be judged, and a rejected candidate for standalone stroked boxes is
+  parked on branch `worktree-agent-a1e4f8784aa9b4f57` waiting on it (it finds
+  safer.pdf's Option 1 / Option 2 boxes, which no rule has ever found). Re-run
+  it with principled bounds (8-30pt) after the corpus is corrected, not the
+  SAFER-shaped 20-30pt window it was narrowed to.
 - **The hard corpus is thin and it is the most urgent item.** Five constructs are
   spent: `dotted_line`, `ragged_table`, `merged_header_table`, `sec_label_below`,
   `sec_gutter_left_label`. Of the boosted difficulty only `sec_whitespace_field`
