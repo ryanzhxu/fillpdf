@@ -40,6 +40,10 @@
      and left of its box. Zero it and let the input fill the detected rect. */
   .fld input[type=checkbox]{inset:0;margin:0;width:100%;height:100%;
              accent-color:var(--accent);cursor:pointer}
+  .cap{position:absolute;left:calc(100% + 6px);top:50%;transform:translateY(-50%);
+       white-space:nowrap;font-size:11px;background:#111;color:#fff;padding:2px 6px;
+       border-radius:4px;opacity:0;pointer-events:none;transition:opacity .1s;z-index:12}
+  .fld:hover .cap,.fld.sel .cap{opacity:.92}
   .grip,.mv{position:absolute;width:12px;height:12px;background:var(--accent);border:1.5px solid #fff;
             box-shadow:0 0 0 1px rgba(0,0,0,.25);opacity:0;transition:opacity .1s;z-index:10}
   .mv{left:-7px;top:-7px;border-radius:50%;cursor:move}
@@ -68,7 +72,7 @@
 <div class="hint" id="hint">
   Type in any box. <b>Hover a box</b> to reveal its handles — drag the circle to move, the square to resize.
   <b>Alt-drag</b> anywhere on a box also moves it, and <b>arrow keys</b> nudge the selected one.
-  <b>+ Add box</b>, then click the page. Signature lines deliberately get no box. The original PDF text stays selectable in the gaps.
+  <b>+ Add box</b>, then click the page. Hover a box to see what it is. Signature lines deliberately get no box. The original PDF text stays selectable in the gaps.
 </div>
 <main id="main"><div id="load">rendering…</div></main>
 
@@ -163,12 +167,19 @@ function draw(){
     const b = document.createElement('div');
     b.dataset.i = i;
     b.className = 'fld' + (f.origin === 'detected' ? '' : ' user') + (sel === i ? ' sel' : '');
-    b.title = `${f.id}${f.rule ? '  ('+f.rule+')' : ''}`;
+    // Lead with the label. It is the only thing that tells a person what a
+    // box actually is -- especially a checkbox, where the id is just chk_7.
+    b.title = (f.label ? f.label + '\n' : '') + `${f.id}${f.rule ? '  ('+f.rule+')' : ''}`;
     place(b, f);
     const inp = document.createElement('input');
     const [,y0,,y1] = f.rect;
     if (f.type === 'checkbox'){
       inp.type='checkbox'; inp.checked=!!f.value; inp.onchange = e => f.value = e.target.checked;
+      if (f.label){                       // caption on hover, so a tick is never anonymous
+        const cap = document.createElement('span');
+        cap.className = 'cap'; cap.textContent = f.label;
+        b.appendChild(cap);
+      }
     } else {
       inp.type='text'; inp.value = f.value || '';
       inp.oninput = e => f.value = e.target.value;
@@ -208,7 +219,7 @@ function showBar(){
   if (!f) return $('#bar').classList.remove('on');
   $('#bar').classList.add('on');
   $('#nm').value = f.id;
-  $('#rl').textContent = f.rule ? f.rule : 'added';
+  $('#rl').textContent = (f.label ? f.label.slice(0, 60) + '  ·  ' : '') + (f.rule || 'added');
   $('#tt').textContent = f.type === 'text' ? '→ checkbox' : '→ text';
 }
 
