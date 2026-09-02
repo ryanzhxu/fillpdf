@@ -1225,6 +1225,26 @@ def detect(page, pno, carry_in=None):
     # ---- R5b  write-on line drawn as a thin rect, not underscore characters --
     # A cell border has vertical rules standing at its endpoints. A write-on line
     # has none. That single test separates them cleanly on this corpus.
+    #
+    # R5b's largest false-positive group, measured on the tuning corpus: a rule
+    # that is a decorative underline drawn beneath ALREADY-PRINTED text (a
+    # heading, a caption, a filled specimen value), not blank space for someone
+    # to write on -- "Total Gross Expected Income", "SECTION 4: DECLARATION",
+    # a manually-underlined phrase in a Word export, and the "underline_trap"
+    # synthetic construct (a heading's own decorative rule, tight above a
+    # caption that merely happens to read like a field name) all take this
+    # shape. The tell is coverage, not mere proximity: text sitting on the
+    # rule's own baseline that spans a large FRACTION of the rule's own width
+    # is that rule's underline; an ordinary field's same-row label brushing a
+    # much WIDER write-on rule by a few points (font-metric bleed, or this
+    # corpus's most tightly-packed real form) covers only a small sliver of
+    # it. Measured: every true positive on this corpus covers at most 27% of
+    # its own rule this way; the largest false positive below that line
+    # belongs to a near-miss (wrong geometry, not a wrong claim) a few points
+    # further down the same crowded form -- so the cut sits at 35%, clear of
+    # both. 42 false positives removed, 0 true positives lost.
+    ON_RULE_TOL_Y = 3
+    ON_RULE_MAX_COVER = 0.35
     vrules = [r for r in page.rects if r["width"] < 3 and r["height"] >= 5]
     for r in page.rects:
         if r["height"] >= 3 or not (40 <= r["width"] <= W * 0.77):
@@ -1233,6 +1253,11 @@ def detect(page, pno, carry_in=None):
                for x in vrules
                if x["top"] <= r["top"] + 3 and x["bottom"] >= r["top"] - 3):
             continue
+        rule_w = r["x1"] - r["x0"]
+        covered = sum(max(0.0, min(w["x1"], r["x1"]) - max(w["x0"], r["x0"]))
+                      for w in words if abs(w["bottom"] - r["top"]) < ON_RULE_TOL_Y)
+        if rule_w > 0 and min(covered, rule_w) / rule_w >= ON_RULE_MAX_COVER:
+            continue                       # underlines existing print, not blank space
         left = [w for w in words if abs(w["bottom"] - r["top"]) < 9
                 and w["x1"] <= r["x0"] + 3 and w["x1"] > r["x0"] - 260]
         under = [w for w in words if 0 < w["top"] - r["top"] < 14

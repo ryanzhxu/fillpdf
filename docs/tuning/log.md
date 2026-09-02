@@ -714,3 +714,47 @@ beat are 62 FP / 21 TP for the naive test.
 The author also declined to nudge the 40pt threshold to recover its two holdout
 losses, correctly identifying that as tuning against the holdout. That was the
 right call even though it made its own result look worse.
+
+
+## Iteration 21 — R5b rejects rules that underline printed text: MERGED
+
+    R5b detected 983 -> 929, matched 557 -> 557, precision 0.567 -> 0.600
+    tuning  f1 0.6461 -> 0.6489  P 0.7790 -> 0.7871  recall unchanged
+    holdout f1 0.6392 -> 0.6408  P 0.6985 -> 0.7022  recall unchanged
+    42 of 184 tuning FPs removed, 0 of 345 TPs lost
+
+118 of R5b's 184 false positives (64%) claimed a spot with no field at all. Its
+"no vertical rule at the endpoints" test could not tell a blank write-on line
+from a DECORATIVE UNDERLINE beneath already-printed text — a heading's own rule,
+a Word-style manual underline, a footer caption.
+
+The discriminating signal is **coverage, not proximity**: text on a rule's own
+baseline covering a large fraction of that rule's OWN WIDTH means the rule
+underlines that text. A field's label merely brushing a much wider write-on rule
+covers only a sliver. Measured: every true positive on this corpus covers 27% or
+less. The cut is at 35%.
+
+### Compare with iteration 20, rejected an hour earlier
+
+    20 (rejected)   3 tuned constants   +0.0014 tuning   0.0000 holdout   2 fields lost
+    21 (merged)     1 constant, with a
+                    measured 27%/35% margin
+                                        +0.0028 tuning   +0.0016 holdout  0 fields lost
+
+Same rule file, same gate, opposite verdicts. The difference is not the size of
+the number — both are small — it is whether the signal is a mechanism with a
+measured margin or a set of thresholds fitted until the tuning corpus moved.
+
+The author also traced the single near_miss delta (262 to 261) back to its truth
+widget to confirm it was a decorative underline coincidentally overlapping a
+separate nearby field, not a real detection lost.
+
+### Left alone, with numbers, for whoever continues
+
+- R5b never applies `_merge_ruling_lines`, so one visual line drawn as 2-3
+  stacked rects yields duplicates. ~5 FP, 0 TP, in 1-2 forms.
+- R5b has no OFFICE_USE guard although R2, R3, R12 and R14 all do. ~4-6 FP.
+- `2312b040cb7e.pdf` draws one printed line as two abutting segments while truth
+  expects one wide field — genuine wrong geometry, not a wrong claim.
+- All-caps heading, word count, under-vs-left label source, and header-margin
+  position were each tested as discriminators and none separated cleanly.
