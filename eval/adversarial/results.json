@@ -1,7 +1,7 @@
 {
   "char_flood.pdf": {
     "detail": "RSS crossed 512MB (RSS watchdog); killed before it could send a result",
-    "elapsed_s": 2.13,
+    "elapsed_s": 2.29,
     "status": "memory"
   },
   "cyclic_references.pdf": {
@@ -18,7 +18,7 @@
   },
   "deep_nesting.pdf": {
     "detail": "pdfplumber.utils.exceptions.PdfminerException: maximum recursion depth exceeded",
-    "elapsed_s": 0.1,
+    "elapsed_s": 0.11,
     "status": "rejected"
   },
   "empty_file.pdf": {
@@ -66,7 +66,7 @@
   },
   "rect_flood.pdf": {
     "detail": "detect() returned",
-    "elapsed_s": 3.26,
+    "elapsed_s": 3.27,
     "fields": 0,
     "pages": 1,
     "status": "ok"

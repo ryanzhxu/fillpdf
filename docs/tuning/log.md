@@ -539,3 +539,47 @@ instead.
 
 `engine/detect/rules.py` is now 1,317 lines. Complexity is a cost that no gate
 measures.
+
+
+## Iteration 17 — R13 shaded fill areas: REJECTED, by the rule written one commit earlier
+
+R13 was correct on its own terms: 67 detected, 67 matched, precision 1.0,
+label accuracy 0.910, gate PASSED, tuning f1 0.6388 -> 0.6622.
+
+Rejected anyway. Three reasons, in order of weight.
+
+**1. The survey disproved the brief's premise.** I briefed this rule believing
+"a shaded box with no ruled border" was a real detection gap. It is not. 12 of 16
+real forms do use shaded fill, but 416 of 434 instances already carry printed
+text — table headers, section banners, highlighter annotations. And every
+field-sized BLANK shaded rect in the real corpus sits inside a table that also
+draws ordinary ruling, so R2/R3/R4/R10 already claim that space. The one
+promising candidate was already being detected by R10.
+
+**2. It is the third synthetic-only rule in a row.** R11, R14, now R13 — all
+firing zero times on all 16 real forms. The standing concern recorded one commit
+earlier says exactly this: a third such rule is a reason to go fetch more real
+forms rather than write it. Following that rule when it is inconvenient is the
+only thing that makes writing it worth anything.
+
+**3. It trips the hard-corpus tripwire** (f1 0.682 against a 0.66 ceiling).
+Merging would mean recalibrating the corpus to accommodate a gain that exists
+only inside that corpus. That is circular, and the tripwire firing here is
+evidence rather than an obstacle.
+
+Rejecting a technically sound, gate-passing change is uncomfortable, and the
++149 lines it would have added to an already 1,300-line file is not the reason —
+the reason is that the evidence for it does not exist outside our own generator.
+
+### The genuinely valuable finding, extracted and queued
+
+R10 already claims the real shaded field on f6b53f5f6901.pdf, but with a
+TRUNCATED label: "operating expenses" instead of "Net increase in operating
+expenses". That is a real naming bug on a real form, worth more than the rule
+that found it.
+
+### What happens instead
+
+Fetch more real forms. The corpus is 16 forms; the constructs we keep inventing
+may well exist out there, and the honest way to find out is to go look rather
+than to keep scoring against our own inventions.
