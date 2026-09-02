@@ -224,13 +224,24 @@ actually needed.
 attributed, and an accepted pair may contain one improvement and one regression
 that happen to cancel.
 
-**Bounds.** The loop is not open-ended. It stops when a fixed iteration count is
-reached, or when three consecutive proposals fail the gate. Both are cheaper
-than discovering next month that it ran all along.
+**Bounds.** The loop is never open-ended. It stops at whichever comes first:
 
-**Cost.** Each iteration spends model time. A nightly bounded run is the
-sensible default. A continuously running loop is not, and would be easy to
-forget about.
+1. A wall-clock deadline supplied at the start of the run.
+2. Three consecutive proposals failing the acceptance gate — the signal that the
+   remaining errors need a new idea, not another tuning pass.
+3. A hard iteration ceiling, as a backstop if the deadline is missed.
+
+The deadline is a required argument, not an option. A loop with no stop time is
+the failure mode that costs money quietly.
+
+**On stopping.** When the loop stops it writes a handover: the score at start and
+end, every proposal made, which passed the gate and which did not, and the
+failure clusters still open. A stopped run must leave the next run able to begin
+without re-deriving anything.
+
+**Cost.** Each iteration spends model time. Diagnosis and proposal are the only
+steps that need a model at all — fetching, labeling, scoring and gating are
+ordinary code and must never be delegated to one.
 
 ## 9. Honest risks
 
@@ -260,3 +271,24 @@ make it.
 
 `score.py` printing a trustworthy number is the milestone. Everything after it
 is comparatively easy. Nothing before it can be judged at all.
+
+## 11. How this gets built
+
+Contracts first, then parallel batches, then one verification pass per batch.
+
+**Batch 0 — contracts. Not delegated.** The `truth.json` shape, the `scores/*.json`
+shape, and the `detect(pdf) -> fields` signature the scorer calls. Every later
+agent builds against these. Nothing starts until they exist.
+
+| Batch | Tasks, run in parallel | Owns |
+|---|---|---|
+| 1 | `fetch.py` · `label.py` · `score.py` · adversarial corpus | `eval/fetch.py`, `eval/label.py`, `eval/score.py`, `eval/adversarial/` |
+| 2 | `report.py` · holdout labeling tool · acceptance gate | `eval/report.py`, `eval/holdout/`, `eval/gate.py` |
+| 3 | loop driver · handover writer | `eval/loop.py` |
+
+Each task is given to one agent as a brief stating: the goal, the contract to
+honor, the files it owns exclusively, the files it must not touch, and the test
+it must make pass. Directories are disjoint, so no two agents can collide.
+
+Verification happens once per batch, over the whole batch, never per task. A
+per-task check passes things that still fail at the seams.

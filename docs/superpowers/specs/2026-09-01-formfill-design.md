@@ -428,6 +428,11 @@ other track builds against these. Nothing starts until T0 lands.
 | **T5 Template memory** | `store/**` | T0 | Fingerprint is stable across re-saves of the same blank form and distinct across different forms; ranking and value-rejection tested |
 | **T6 Security/Deploy** | `infra/**` | T0 | Container has no egress, is non-root and read-only; limits enforced by kill; rate limiter tested; deploys to Render |
 
+Execution rhythm: contracts first, then parallel batches, then one verification
+pass over each finished batch. T1–T6 are one batch, since T0 makes them
+independent. Verify the batch as a whole — checking each track as it lands
+passes work that still fails at the seams.
+
 Notes on running these:
 
 - T3 and T4 both live under `web/` and must not share files. T3 owns components
@@ -436,7 +441,7 @@ Notes on running these:
 - Give each track its own git worktree so the trees never collide.
 - Each is a Sonnet subagent. Each brief states: the goal, the exact contract to
   honor, the files it owns, the files it must not touch, and the acceptance test
-  it must make pass.
+  it must make pass. Briefs are written in full before any agent starts.
 - T4's spike gates the rest of T4. If `pdf-lib` cannot create fields reliably,
   T4 stops and reports before building on it.
 - Integration is a separate step after T1–T6 land, done in one place, not by the
