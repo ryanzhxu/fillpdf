@@ -483,3 +483,31 @@ and the verdict rested on a 0.0022 holdout wobble. Now it rests on evidence.
 A field with the right box and the wrong name is worse than a missing field: it
 maps a stored profile value into somebody else's box. Rejected, and now for a
 reason worth trusting.
+
+
+## QUEUED — R3 runs past the end of its table (found by looking, not by metric)
+
+Rendering the current detector over safer.pdf for the review queue showed two
+false positives no score had surfaced:
+
+    R3  p3_name_of_sponsor_3   240x30  sitting on "...that apply"  (§5 heading)
+    R3  p3_landlord_name_4     199x16  sitting on "following:"     (4c heading)
+
+`p3_name_of_sponsor_3` inherited "Name of Sponsor" from the 4c table and carried
+it DOWN PAST that table onto a section heading 200pt below.
+
+Cause: `_cluster_columns` groups cells page-wide by left edge, so a cell
+anywhere further down the page joins the same logical column and inherits its
+header. A column's header should apply to CONTIGUOUS rows — a large vertical gap
+between one cell and the next means the table ended.
+
+Fix to try: while walking a column downward, stop inheriting when the gap
+between consecutive cells exceeds some multiple of the typical row height in
+that column. Derive the threshold from the column's own row spacing rather than
+a fixed constant, so it adapts to dense and sparse tables alike.
+
+Worth noting how this was found. Thirteen gated iterations, every one measured,
+and these two survived because the corpus has no truth widget there — a false
+positive on a heading costs precision only if some truth widget is nearby to
+make the denominator move. Rendering the page and looking at it caught what the
+metric could not. Both kinds of checking are needed.
