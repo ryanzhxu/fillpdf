@@ -49,6 +49,42 @@ def grid_cells(page):
     return sorted(set(cells))
 
 
+R3_COL_TOL = 16    # points; see R3 column clustering below
+
+
+def _cluster_columns(cells, tol=R3_COL_TOL):
+    """Group grid cells into columns by proximity of the left edge.
+
+    Real tables are ragged: a column's left edge drifts by a few points row
+    to row, so an exact match on x0 scatters one logical column into many
+    single-cell groups and no header is ever found above them. Cluster
+    instead: a cell joins the first existing column whose running-mean x0
+    is within `tol` points, else it starts a new column.
+
+    Tried and rejected: also requiring the right edge (x1) to agree within
+    `tol`. It did not reduce mislabeling (measured via a label-accuracy
+    diagnostic outside the official gate, which does not check label text)
+    and it cost recall -- a legitimate ragged column's x1 does not always
+    drift in lock-step with its x0, so the extra constraint just splits
+    real columns into more single-cell groups again.
+    """
+    groups = []
+    for cell in sorted(cells, key=lambda c: c[0]):
+        x0 = cell[0]
+        match = None
+        for g in groups:
+            if abs(x0 - g["x0"]) <= tol:
+                match = g
+                break
+        if match is None:
+            groups.append({"x0": x0, "n": 1, "cells": [cell]})
+        else:
+            match["n"] += 1
+            match["x0"] += (x0 - match["x0"]) / match["n"]
+            match["cells"].append(cell)
+    return [g["cells"] for g in groups]
+
+
 def _text_in(words, cell, pad=1):
     x0, top, x1, bot = cell
     return [w for w in words if w["x0"] >= x0 - pad and w["x1"] <= x1 + pad
@@ -157,10 +193,7 @@ def detect(page, pno):
                     "rect": [x0 + 2, H - bot + 1.5, x1 - 2, H - entry_top - 1.5]})
 
     # ---- R3  empty cell, name inherited from the column header above --------
-    cols = {}
-    for cell in cells:
-        cols.setdefault(round(cell[0]), []).append(cell)
-    for _, group in cols.items():
+    for group in _cluster_columns(cells):
         group.sort(key=lambda c: c[1])
         header = None
         for cell in group:

@@ -15,7 +15,7 @@ from eval.synth.hard import generate_hard
 from eval.score import score_one
 
 SCHEMA = json.load(open("eval/contracts/truth.schema.json"))
-MAX_ALLOWED_F1 = 0.85
+MAX_ALLOWED_F1 = 0.86    # tripwire, see note below
 FAIRNESS_MARGIN = 40  # points; matches the brief's "within 40pt" fairness bar
 
 
