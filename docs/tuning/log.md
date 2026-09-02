@@ -9,6 +9,7 @@ precision, and the label-free guards. The holdout is never tuned against.
 | 2 | R2 accepts multi-line labels | 0.5133 -> 0.5622 (+.0488) | 0.1810 -> 0.1788 (-.0022) | **REJECTED** |
 | 3 | R1 uses the glyph's real bbox | 0.5133 -> 0.5304 (+.0170) | 0.1810 (unchanged) | **MERGED** |
 | 3b | harness: per-rule metrics could exceed 1.0 | n/a | n/a | **MERGED** |
+| 4 | R3 refuses office-use columns | 0.5304 -> 0.5558 (P +.105) | unchanged | **MERGED** |
 
 ## Iteration 1 — MERGED
 
@@ -79,3 +80,31 @@ unavailable recall reads as unavailable rather than as a perfect score.
 
 **Read per_rule as diagnostic only.** Gating uses overall, holdout, per_family,
 precision and the guards, none of which are affected.
+
+
+## Iteration 4 — MERGED
+
+R3 claimed every blank cell under a column header. An "office use only" column
+is bordered, headed, and must not be filled by the applicant.
+
+    tuning   precision 0.7280 -> 0.8329 (+.1049), recall 0.4171 unchanged
+    matched  1839 -> 1839
+
+The matched count being exactly equal is a structural guarantee, not luck: the
+change only turns a header into "no header", never the reverse, so R3's true
+positives can shrink or stay equal but never grow. Zero real fields discarded.
+
+Evidence: of 410 R3 false positives, 318 carried the label "Office Use", which
+had zero true positives anywhere in the corpus. Width and height were tried as
+discriminators first and rejected — their TP and FP distributions overlap almost
+entirely.
+
+**The gate design earned its keep here.** box_over_ink rose +0.011 while the
+offender list stayed byte-identical. That is the arithmetic of removing 318
+correctly-placed boxes from the denominator — exactly the false alarm the guards
+author warned about. A hard absolute threshold would have blocked a change worth
+10 points of precision. Gating on a rise PLUS new offenders let it through.
+
+Caveats kept in view: the holdout has no office-use columns, so "not worse" is
+satisfied trivially rather than demonstrated. And 92 non-office R3 false
+positives remain, concentrated in four forms with repeated line-item rows.
