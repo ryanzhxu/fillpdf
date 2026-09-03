@@ -376,6 +376,22 @@ R3_VRULE_TOL_Y = 3         # points; top/bottom coverage slack, mirrors
 # break -- there is no baseline yet to break from -- and the row is simply
 # accepted, becoming the new thing the next row is compared to.
 
+# R3 multi-line-header guard: grid_cells() only splits a column into
+# separate cells where a real horizontal rule exists. A producer that draws
+# per-item checkboxes but no full-width rule between them (each item its own
+# small square, not a ruled row) leaves several real, UNRELATED text lines
+# merged into ONE tall cell -- confirmed on a real fetched form
+# (eval/corpus/real/ebe4beb36bad2b41.pdf) where four checklist rows,
+# ~19pt apart, collapsed into a single cell whose words (read purely by x0,
+# ignoring which line each came from) happened to fall inside the ordinary
+# 2-60-char header-length window, got accepted as a column header, and were
+# then inherited by an unrelated row below as a bogus field. A genuine
+# header, even wrapped across several lines, keeps ordinary text leading
+# between its lines (~1-1.3x the font height, confirmed on a real 3-line
+# wrapped header on fixtures/safer.pdf, "Relationship" / "to" / "Applicant",
+# 1.15x); a merged block of separate list rows does not (~1.9x, measured on
+# the motivating file above) -- see _row_gap_exceeds.
+
 
 def _row_has_vertical_support(cell, vrules):
     """True if a real vertical rule spans this cell's full height on BOTH
@@ -494,6 +510,27 @@ def _text_in(words, cell, pad=1):
     x0, top, x1, bot = cell
     return [w for w in words if w["x0"] >= x0 - pad and w["x1"] <= x1 + pad
             and w["top"] >= top - pad and w["bottom"] <= bot + pad]
+
+
+def _row_gap_exceeds(words, ratio=1.6, line_tol=3):
+    """True when the vertical gap between two consecutive text lines in
+    `words` is much larger than the words' own line height.
+
+    That gap is the signature of grid_cells() merging several separate,
+    unruled rows into a single cell (each row its own short phrase, spaced
+    like list items) rather than one label wrapping onto multiple lines
+    (spaced like ordinary text leading, roughly 1-1.3x the font height).
+    See the R3 multi-line-header guard below."""
+    if not words:
+        return False
+    line_h = sum(w["bottom"] - w["top"] for w in words) / len(words)
+    if line_h <= 0:
+        return False
+    line_tops = []
+    for t in sorted(w["top"] for w in words):
+        if not line_tops or t - line_tops[-1] > line_tol:
+            line_tops.append(t)
+    return any(b - a > line_h * ratio for a, b in zip(line_tops, line_tops[1:]))
 
 
 # R3 group header: a wide, undivided row (a single grid_cells() cell) sitting
@@ -1539,9 +1576,13 @@ def detect(page, pno, carry_in=None):
                 label = " ".join(w["text"] for w in sorted(txt, key=lambda w: w["x0"]))
                 forced = wide_labels.get(cell)
                 own_extent = (cell[0], cell[2])
+                # See the R3 multi-line-header guard above -- a forced
+                # (group-header split) label is already vetted by its own
+                # source and is exempt from this check.
+                multiline = forced is None and _row_gap_exceeds(txt)
                 if forced is not None:
                     label, own_extent = forced[0], (forced[1], forced[2])
-                if 2 <= len(label) <= 60:
+                if 2 <= len(label) <= 60 and not multiline:
                     # An "office use" header marks its column off-limits: no
                     # blank cell below it should be claimed as a field until
                     # a real header appears further down.
