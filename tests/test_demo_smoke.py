@@ -257,6 +257,41 @@ def test_demo_pipeline_carries_a_scanned_notice_to_fields_json(tmp_path, monkeyp
     assert doc["notice"]["message"].strip()
 
 
+def test_demo_pipeline_carries_a_no_fields_notice_to_fields_json(tmp_path, monkeypatch):
+    """End to end: a real, non-scanned PDF with zero detected fields (an
+    instructions page, a notice) still lands a `notice` in fields.json, so
+    the browser never renders a blank page with no explanation."""
+    import io
+    import socketserver as _ss
+    import webbrowser as _wb
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+
+    def _blocked(*a, **k):
+        raise AssertionError("demo.build() must not open a server or a browser")
+
+    monkeypatch.setattr(_wb, "open", _blocked)
+    monkeypatch.setattr(_ss.TCPServer, "__init__", _blocked)
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=letter)
+    c.drawString(72, 700, "This document explains the application process in general terms.")
+    c.drawString(72, 680, "Please read every section carefully before you begin.")
+    c.showPage()
+    c.save()
+    prose = tmp_path / "prose.pdf"
+    prose.write_bytes(buf.getvalue())
+
+    mod = _load_demo_module()
+    monkeypatch.setattr(mod, "OUT", tmp_path / "demo_out")
+    mod.build(prose)
+
+    doc = json.loads((mod.OUT / "fields.json").read_text())
+    assert doc["fields"] == []
+    assert doc.get("notice", {}).get("code") == "no_fields"
+    assert doc["notice"]["message"].strip()
+
+
 def test_served_index_html_surfaces_deferred_appearances(built):
     """The demo must tell the user when values can't be baked into the file.
 

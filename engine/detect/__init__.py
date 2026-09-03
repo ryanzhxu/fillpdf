@@ -26,6 +26,20 @@ SCANNED_MESSAGE = (
     "text-layer PDF) and try again."
 )
 
+# A text-layer PDF that is not a scan can still yield zero fields: it may
+# genuinely not be a form (an instructions sheet, a cover letter, a notice),
+# or it may be a form whose layout none of the rules in rules.py reach. Either
+# way the result today is an empty fields list with no explanation -- the same
+# "silently does nothing" gap the scanned guard closes, just on the other side
+# of that check. Say so plainly rather than let a blank page stand for both
+# "there was nothing here" and "the detector missed it".
+NO_FIELDS_MESSAGE = (
+    "FormFill could not find any fillable fields in this document. It may not "
+    "be a form (for example, an instructions sheet or a notice), or it may use "
+    "a layout the detector does not recognize yet. You can still add fields by "
+    "hand where you need to write."
+)
+
 
 def _page_is_scanned(pg) -> bool:
     """True when a page is a page-filling image with almost no text."""
@@ -111,4 +125,6 @@ def detect(pdf_path: Union[str, Path]) -> dict:
     # image page in an otherwise text PDF is not a scan, so require a majority.
     if pages and scanned_pages / len(pages) >= 0.5:
         out["notice"] = {"code": "scanned", "message": SCANNED_MESSAGE}
+    elif pages and not fields:
+        out["notice"] = {"code": "no_fields", "message": NO_FIELDS_MESSAGE}
     return out

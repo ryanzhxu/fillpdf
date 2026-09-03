@@ -8,7 +8,7 @@
     "source": {"type": "object", "properties": {"pages": {"type": "integer"}}},
     "notice": {
       "type": "object",
-      "description": "Present only when the detector cannot do its job on this input (e.g. a scanned, image-only PDF). A message the UI can show the user.",
+      "description": "Present only when the detector could not produce a useful result for this input (e.g. a scanned, image-only PDF, or a document where no fillable fields were found). A message the UI can show the user.",
       "required": ["code", "message"],
       "properties": {
         "code": {"type": "string"},
