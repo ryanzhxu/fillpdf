@@ -44,11 +44,6 @@
        white-space:nowrap;font-size:11px;background:#111;color:#fff;padding:2px 6px;
        border-radius:4px;opacity:0;pointer-events:none;transition:opacity .1s;z-index:12}
   .fld:hover .cap,.fld.sel .cap{opacity:.92}
-  .grip,.mv{position:absolute;width:12px;height:12px;background:var(--accent);border:1.5px solid #fff;
-            box-shadow:0 0 0 1px rgba(0,0,0,.25);opacity:0;transition:opacity .1s;z-index:10}
-  .mv{left:-7px;top:-7px;border-radius:50%;cursor:move}
-  .grip{right:-7px;bottom:-7px;border-radius:2px;cursor:nwse-resize}
-  .fld:hover .grip,.fld:hover .mv,.fld.sel .grip,.fld.sel .mv{opacity:1}
   .adding .layer{pointer-events:auto;cursor:crosshair}
   .adding .page{outline:3px dashed var(--ok);outline-offset:-3px}
   #bar{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:50;background:#fff;
@@ -70,8 +65,8 @@
   <button id="dlForm">Download fillable</button>
 </header>
 <div class="hint" id="hint">
-  Type in any box. <b>Hover a box</b> to reveal its handles — drag the circle to move, the square to resize.
-  <b>Alt-drag</b> anywhere on a box also moves it, and <b>arrow keys</b> nudge the selected one.
+  Type in any box. Boxes are fixed where the detector put them — a box in the wrong place
+  can simply be left empty. Use <b>+ Add box</b> for a field it missed, or <b>Delete</b> to remove one.
   <b>+ Add box</b>, then click the page. Hover a box to see what it is. Signature lines deliberately get no box. The original PDF text stays selectable in the gaps.
 </div>
 <main id="main"><div id="load">rendering…</div></main>
@@ -187,12 +182,6 @@ function draw(){
     }
     inp.onfocus = () => select(i);
     b.appendChild(inp);
-    const mv = document.createElement('div'); mv.className='mv';
-    const gr = document.createElement('div'); gr.className='grip';
-    mv.onmousedown = e => drag(e, i, 'move');
-    gr.onmousedown = e => drag(e, i, 'size');
-    b.onmousedown = e => { if (e.altKey) drag(e, i, 'move'); };
-    b.append(mv, gr);
     pageEl(f.page).querySelector('.layer').appendChild(b);
   });
   stat();
@@ -234,26 +223,6 @@ function onLayer(e, p){
   draw(); select(FIELDS.length-1);
 }
 
-function drag(e, i, mode){
-  e.preventDefault(); e.stopPropagation();
-  select(i);
-  const f = FIELDS[i], p = pageOf(f.page);
-  const r = pageEl(f.page).getBoundingClientRect();
-  const el = elOf(i), sx = e.clientX, sy = e.clientY, o = [...f.rect];
-  const move = ev => {
-    const dx = (ev.clientX-sx)/r.width * p.width;
-    const dy = -(ev.clientY-sy)/r.height * p.height;
-    f.rect = mode === 'move'
-      ? [o[0]+dx, o[1]+dy, o[2]+dx, o[3]+dy]
-      : [o[0], Math.min(o[1]+dy, o[3]-6), Math.max(o[2]+dx, o[0]+12), o[3]];
-    place(el, f);                       // restyle one element, never redraw all 234
-  };
-  const up = () => { document.removeEventListener('mousemove', move);
-                     document.removeEventListener('mouseup', up); };
-  document.addEventListener('mousemove', move);
-  document.addEventListener('mouseup', up);
-}
-
 function setAdding(v){
   adding = v;
   document.body.classList.toggle('adding', v);
@@ -289,14 +258,6 @@ document.addEventListener('keydown', e => {
   const typing = document.activeElement.tagName === 'INPUT'
               && document.activeElement.type === 'text';
   if (sel == null) return;
-  if (e.key.startsWith('Arrow')){
-    if (typing && document.activeElement.closest('#bar')) return;
-    e.preventDefault();
-    const d = e.shiftKey ? 10 : 1, f = FIELDS[sel];
-    const [dx,dy] = {ArrowLeft:[-d,0],ArrowRight:[d,0],ArrowUp:[0,d],ArrowDown:[0,-d]}[e.key] || [0,0];
-    f.rect = [f.rect[0]+dx, f.rect[1]+dy, f.rect[2]+dx, f.rect[3]+dy];
-    place(elOf(sel), f);
-  }
   if ((e.key==='Backspace'||e.key==='Delete') && !typing) $('#del').click();
 });
 
