@@ -167,6 +167,62 @@ def _merge_ruling_lines(rects, gap_tol=3, span_tol=2):
     return merged
 
 
+# A genuine ruling/write-on line is thin (height < 3) by construction. A
+# thin rect that is instead the TOP or BOTTOM edge of a large filled,
+# unstroked panel -- same x-range, touching it -- COULD be the border of a
+# shaded structural block (an instruction panel, a section band) rather
+# than a real table/write-on rule. But height and fill alone do not tell
+# the two apart: a legitimate freeform answer box (R3's own documented
+# "please describe" case, measured at 183pt tall on a holdout form) is
+# built the exact same way -- a tall, unstroked, filled rect with a thin
+# rule at its edge -- and is meant to be READ AS BLANK, ready for the
+# applicant's own writing. The tell that actually separates them is
+# content: a real answer box is empty (or carries one short caption); a
+# decorative panel is already full of the FORM'S OWN printed prose,
+# multiple sentences deep. Measured on safer.pdf's two page-1 panels: 6 and
+# 19 distinct text lines already printed inside them. PANEL_MIN_LINES sits
+# well clear of a single caption line while remaining well below either.
+PANEL_MIN_H = 45
+PANEL_MIN_LINES = 3
+PANEL_X_TOL = 2
+PANEL_Y_TOL = 1.5
+
+
+def _prose_panels(rects, words, min_h=PANEL_MIN_H, min_lines=PANEL_MIN_LINES):
+    """Large unstroked fill rects whose interior is already dense running
+    prose (see the module comment above) -- structural panels, not blank
+    answer boxes."""
+    out = []
+    for f in rects:
+        if not (f.get("fill") and not f.get("stroke") and f["height"] > min_h):
+            continue
+        inside = [w for w in words
+                  if w["x0"] >= f["x0"] - 2 and w["x1"] <= f["x1"] + 2
+                  and w["top"] >= f["top"] - 1 and w["bottom"] <= f["bottom"] + 1]
+        if len({round(w["top"]) for w in inside}) >= min_lines:
+            out.append(f)
+    return out
+
+
+def _borders_shaded_panel(rect, panel_fills, vrules, x_tol=PANEL_X_TOL, y_tol=PANEL_Y_TOL):
+    # A real ruled table's row divider stands on real vertical rules at its
+    # endpoints (this is R5b's own cell-border tell, reused here in the
+    # other direction). safer.pdf's page-1 panel has none anywhere on the
+    # page. Measured on a genuine "real/Adobe" form with a repeated,
+    # shaded, multi-line answer cell (one even carries its own printed
+    # "Example: ..." sentence) that would otherwise match on fill height
+    # and prose alone: every one of its row dividers stands on a real
+    # vertical, so this guard clears it and the field survives.
+    if any((abs(v["x0"] - rect["x0"]) < 3 or abs(v["x0"] - rect["x1"]) < 3)
+           and v["top"] <= rect["top"] + 3 and v["bottom"] >= rect["top"] - 3
+           for v in vrules):
+        return False
+    return any(abs(f["x0"] - rect["x0"]) <= x_tol and abs(f["x1"] - rect["x1"]) <= x_tol
+               and (abs(f["top"] - rect["bottom"]) <= y_tol
+                    or abs(f["bottom"] - rect["top"]) <= y_tol)
+               for f in panel_fills)
+
+
 def _merged_answer_rows(h):
     """Rows whose top border is inherited column segmentation, not real columns.
 
@@ -217,6 +273,20 @@ def grid_cells(page):
     v = [r for r in page.rects if r["width"] < 3 and r["height"] >= 5]
     h = [r for r in page.rects if r["height"] < 3 and r["width"] >= 5]
     h = _merge_ruling_lines(h)
+    # A thin rect bordering a large shaded PROSE panel (see _prose_panels
+    # above) is a panel edge, not a table rule -- drop it before it can be
+    # paired into a manufactured cell. Confirmed on safer.pdf's page-1
+    # instruction panel: a decorative top-border hairline, paired by the
+    # loop below with the next unrelated rule further down the page, was
+    # producing a spurious cell across the panel's own blank margin. Scoped
+    # to prose fills specifically (not just "large and filled") so a
+    # genuine large blank/lightly-captioned answer box keeps its cell, and
+    # further scoped to rules with no real vertical-rule support (see
+    # _borders_shaded_panel) so a genuine gridded table -- verticals and
+    # all -- is never touched even if one of its shaded cells is prose-dense.
+    panel_fills = _prose_panels(page.rects, page.extract_words())
+    if panel_fills:
+        h = [r for r in h if not _borders_shaded_panel(r, panel_fills, v)]
     if len(v) + len(h) > 2000:                      # complexity guard from the spec
         return []
     merged_rows = _merged_answer_rows(h)
@@ -1845,6 +1915,23 @@ def detect(page, pno, carry_in=None):
     # belongs to a near-miss (wrong geometry, not a wrong claim) a few points
     # further down the same crowded form -- so the cut sits at 35%, clear of
     # both. 42 false positives removed, 0 true positives lost.
+    #
+    # A second, geometrically distinct trap: a thin rect that is not a stray
+    # rule at all, but the TOP or BOTTOM edge of a large filled, unstroked
+    # panel already dense with the FORM'S OWN prose -- a shaded instruction
+    # block, printed with its own caption ("PLEASE:", "Avoid Processing
+    # Delays:") sitting just inside it. Unlike the decorative-underline trap
+    # above (heading THEN rule, text sitting ON the rule's own baseline),
+    # this shape is inverted: rule THEN heading, so the ON_RULE_MAX_COVER
+    # check above -- which only ever looks for text ABOVE the rule -- cannot
+    # see it. Scoped to prose fills specifically, not just "large and
+    # filled": a real write-on line can legitimately sit at the edge of a
+    # large BLANK shaded answer box too (R3's own documented 183pt freeform
+    # box), and that box must keep its rule. Same _prose_panels test
+    # grid_cells() uses above, for the same reason -- R5b builds its own
+    # `hrules` straight from page.rects rather than reusing grid_cells()'
+    # filtered `h`, so it needs its own copy of the check.
+    panel_fills = _prose_panels(page.rects, words)
     ON_RULE_TOL_Y = 3
     ON_RULE_MAX_COVER = 0.35
     vrules = [r for r in page.rects if r["width"] < 3 and r["height"] >= 5]
@@ -1858,6 +1945,8 @@ def detect(page, pno, carry_in=None):
                for x in vrules
                if x["top"] <= r["top"] + 3 and x["bottom"] >= r["top"] - 3):
             continue
+        if _borders_shaded_panel(r, panel_fills, vrules):
+            continue                       # top/bottom edge of a shaded panel, not a rule
         covered = sum(max(0.0, min(w["x1"], r["x1"]) - max(w["x0"], r["x0"]))
                       for w in words if abs(w["bottom"] - r["top"]) < ON_RULE_TOL_Y)
         if rule_w > 0 and min(covered, rule_w) / rule_w >= ON_RULE_MAX_COVER:
