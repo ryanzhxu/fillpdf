@@ -283,19 +283,32 @@ document.addEventListener('keydown', e => {
 // and for the caveat about demo.py needing to expose tools/ alongside
 // index.html for this import to resolve when served from demo/out/.
 async function build(flatten){
-  const { injectFields } = await import('../tools/inject.mjs');
-  const pdfBytes = await (await fetch('source.pdf')).arrayBuffer();
-  const { bytes, made, failed } = await injectFields(pdfBytes, { fields: FIELDS }, { flatten });
-  console.log(`[inject] created ${made}/${FIELDS.length} fields; ${failed.length} failed`);
-  if (failed.length) console.warn('[inject] failures:', failed.slice(0,10));
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([bytes], {type:'application/pdf'}));
-  a.download = flatten ? 'filled.pdf' : 'fillable.pdf';
-  a.click();
-  $('#hint').innerHTML = `<b>pdf-lib:</b> created ${made} of ${FIELDS.length} fields`
-    + (failed.length ? `, <span style="color:#c2410c">${failed.length} failed — see console</span>`
-                     : ', <span style="color:#15803d">0 failures</span>')
-    + `. Downloaded <code>${a.download}</code>.`;
+  try {
+    const { injectFields } = await import('../tools/inject.mjs');
+    const pdfBytes = await (await fetch('source.pdf')).arrayBuffer();
+    const { bytes, made, failed } = await injectFields(pdfBytes, { fields: FIELDS }, { flatten });
+    console.log(`[inject] created ${made}/${FIELDS.length} fields; ${failed.length} failed`);
+    if (failed.length) console.warn('[inject] failures:', failed.slice(0,10));
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([bytes], {type:'application/pdf'}));
+    a.download = flatten ? 'filled.pdf' : 'fillable.pdf';
+    a.click();
+    $('#hint').innerHTML = `<b>pdf-lib:</b> created ${made} of ${FIELDS.length} fields`
+      + (failed.length ? `, <span style="color:#c2410c">${failed.length} failed — see console</span>`
+                       : ', <span style="color:#15803d">0 failures</span>')
+      + `. Downloaded <code>${a.download}</code>.`;
+  } catch (err){
+    // A failed dynamic import, a missing/corrupt/encrypted source.pdf, or a
+    // pdf-lib load error rejects this promise. Without this catch the click
+    // does nothing at all -- no download, no message -- the one 'app silently
+    // does nothing' case value item #5 forbids. Say what broke and that no
+    // file was produced, and keep the console detail for debugging.
+    console.error('[inject] build failed:', err);
+    const h = $('#hint');
+    h.classList.add('notice');
+    h.innerHTML = `<b>Could not build the PDF —</b> ${escapeHtml(err.message || String(err))}. `
+      + `Nothing was downloaded. See the browser console for details.`;
+  }
 }
 $('#dlFlat').onclick = () => build(true);
 $('#dlForm').onclick = () => build(false);

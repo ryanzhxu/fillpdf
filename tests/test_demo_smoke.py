@@ -140,6 +140,23 @@ def test_served_index_html_surfaces_a_detector_notice(built):
         "index.html renders no notice message text"
 
 
+def test_served_index_html_reports_a_failed_build(built):
+    """A failed inject/import/corrupt PDF must surface, not leave Download silent.
+
+    build() runs inside a click handler. If injectFields rejects -- a failed
+    dynamic import, a corrupt or encrypted source.pdf, a pdf-lib load error --
+    an un-caught rejection produces no download and no message: the button
+    looks dead. Assert the catch and its user-visible message are wired up so
+    this cannot rot into the 'app silently does nothing' case item #5 forbids.
+    """
+    mod, _ = built
+    html = (mod.OUT / "index.html").read_text(encoding="utf-8")
+    assert "async function build(flatten){\n  try {" in html, \
+        "build() no longer wraps its work in a try -- a failed build is silent"
+    assert "Could not build the PDF" in html, \
+        "build() has no user-visible failure message"
+
+
 def test_demo_pipeline_carries_a_scanned_notice_to_fields_json(tmp_path, monkeypatch):
     """End to end: a scanned PDF through demo.build() lands the notice in fields.json.
 
