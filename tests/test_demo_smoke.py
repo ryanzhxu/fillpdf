@@ -214,3 +214,20 @@ def test_demo_pipeline_carries_a_scanned_notice_to_fields_json(tmp_path, monkeyp
     doc = json.loads((mod.OUT / "fields.json").read_text())
     assert doc.get("notice", {}).get("code") == "scanned"
     assert doc["notice"]["message"].strip()
+
+
+def test_served_index_html_surfaces_deferred_appearances(built):
+    """The demo must tell the user when values can't be baked into the file.
+
+    tools/inject.mjs falls back to NeedAppearances (and an un-flattened save)
+    when a value has characters the standard PDF font cannot draw, returning
+    `deferredAppearances`. If index.html ignores that flag, a person who typed
+    non-Latin text clicks "Download filled", gets a fillable (not flattened)
+    file whose text their browser may not render, and is told nothing -- the
+    silent-degradation case value item #5 forbids. Assert the wiring is present.
+    """
+    mod, _ = built
+    html = (mod.OUT / "index.html").read_text(encoding="utf-8")
+    assert "deferredAppearances" in html, "index.html never reads deferredAppearances"
+    assert "!deferredAppearances" in html, \
+        "index.html does not correct the filename when appearances are deferred"

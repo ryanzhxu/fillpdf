@@ -305,17 +305,25 @@ async function build(flatten){
   try {
     const { injectFields } = await import('../tools/inject.mjs');
     const pdfBytes = await (await fetch('source.pdf')).arrayBuffer();
-    const { bytes, made, failed } = await injectFields(pdfBytes, { fields: FIELDS }, { flatten });
-    console.log(`[inject] created ${made}/${FIELDS.length} fields; ${failed.length} failed`);
+    const { bytes, made, failed, deferredAppearances } = await injectFields(pdfBytes, { fields: FIELDS }, { flatten });
+    console.log(`[inject] created ${made}/${FIELDS.length} fields; ${failed.length} failed; deferredAppearances=${deferredAppearances}`);
     if (failed.length) console.warn('[inject] failures:', failed.slice(0,10));
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([bytes], {type:'application/pdf'}));
-    a.download = flatten ? 'filled.pdf' : 'fillable.pdf';
+    // A deferred-appearance save cannot be flattened (flattening bakes text
+    // with the standard font, which is exactly what failed), so it is always a
+    // fillable form -- name the file for what it actually is.
+    a.download = (flatten && !deferredAppearances) ? 'filled.pdf' : 'fillable.pdf';
     a.click();
     $('#hint').innerHTML = `<b>pdf-lib:</b> created ${made} of ${FIELDS.length} fields`
       + (failed.length ? `, <span style="color:#c2410c">${failed.length} failed — see console</span>`
                        : ', <span style="color:#15803d">0 failures</span>')
-      + `. Downloaded <code>${a.download}</code>.`;
+      + `. Downloaded <code>${a.download}</code>.`
+      + (deferredAppearances
+          ? ` <span style="color:#c2410c">Some values use characters the standard PDF font cannot draw, so the file relies on your PDF viewer to render them`
+            + (flatten ? ` and was saved as a fillable form, not flattened` : ``)
+            + `.</span>`
+          : ``);
   } catch (err){
     // A failed dynamic import, a missing/corrupt/encrypted source.pdf, or a
     // pdf-lib load error rejects this promise. Without this catch the click

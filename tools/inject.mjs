@@ -28,11 +28,11 @@ async function getPDFLib() {
  * @param {Uint8Array|ArrayBuffer} pdfBytes  the flat, unmodified source PDF
  * @param {{fields: Array<object>}} fieldsDoc  the fields.json-shaped document
  * @param {{flatten?: boolean}} [opts]
- * @returns {Promise<{bytes: Uint8Array, made: number, failed: string[]}>}
+ * @returns {Promise<{bytes: Uint8Array, made: number, failed: string[], deferredAppearances: boolean}>}
  */
 export async function injectFields(pdfBytes, fieldsDoc, opts = {}) {
   const { flatten = false } = opts;
-  const { PDFDocument } = await getPDFLib();
+  const { PDFDocument, PDFName, PDFBool } = await getPDFLib();
   const doc = await PDFDocument.load(pdfBytes);
   const form = doc.getForm();
 
@@ -81,13 +81,28 @@ export async function injectFields(pdfBytes, fieldsDoc, opts = {}) {
     }
   }
 
+  // pdf-lib draws every field's appearance with the standard PDF font
+  // (Helvetica / WinAnsi) at save() time. A value with any character outside
+  // WinAnsi -- CJK, emoji, Cyrillic, most non-Latin scripts -- cannot be
+  // encoded by that font, so ONE such character in ONE field otherwise makes
+  // the WHOLE doc.save() throw and the user cannot download their form at all.
+  // We do not bundle a Unicode font (a large asset with its own licence), so
+  // for those values we defer appearance generation to the PDF viewer via the
+  // AcroForm NeedAppearances flag. The field value (/V) is written either way,
+  // so no typed data is lost -- the viewer just draws it with its own fonts.
+  let deferredAppearances = false;
+  let bytes;
   try {
-    form.updateFieldAppearances();
-  } catch (e) {
-    // matches the demo's original best-effort behavior
+    if (flatten) form.flatten();   // flatten bakes appearances, so it can throw too
+    bytes = await doc.save();       // default: regenerates appearances with Helvetica
+  } catch (err) {
+    if (!/encode/i.test(String((err && err.message) || err))) throw err;
+    // A value needs characters the standard font cannot draw. flatten() bakes
+    // appearances, so a deferred save is necessarily an un-flattened (still
+    // fillable) form -- the caller should say so.
+    deferredAppearances = true;
+    form.acroForm.dict.set(PDFName.of("NeedAppearances"), PDFBool.True);
+    bytes = await doc.save({ updateFieldAppearances: false });
   }
-  if (flatten) form.flatten();
-
-  const bytes = await doc.save();
-  return { bytes, made, failed };
+  return { bytes, made, failed, deferredAppearances };
 }
