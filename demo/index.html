@@ -261,32 +261,21 @@ document.addEventListener('keydown', e => {
   if ((e.key==='Backspace'||e.key==='Delete') && !typing) $('#del').click();
 });
 
-// ---- the pdf-lib spike: create real AcroForm fields client-side, then fill -----
+// ---- create real AcroForm fields client-side, then fill -----
+// The injection logic itself (create/place/fill each field type) lives in
+// tools/inject.mjs, not here -- this is a consumer of that module, not a
+// second implementation of it. See tools/inject.mjs for why this stayed a
+// dynamic import() (this file is a classic <script>, not type="module")
+// and for the caveat about demo.py needing to expose tools/ alongside
+// index.html for this import to resolve when served from demo/out/.
 async function build(flatten){
-  const { PDFDocument } = PDFLib;
-  const doc = await PDFDocument.load(await (await fetch('source.pdf')).arrayBuffer());
-  const form = doc.getForm();
-  let made = 0; const failed = [];
-  for (const f of FIELDS){
-    const page = doc.getPage(f.page-1), [x0,y0,x1,y1] = f.rect;
-    const box = {x:x0, y:y0, width:Math.max(6,x1-x0), height:Math.max(6,y1-y0), borderWidth:0};
-    try {
-      if (f.type === 'checkbox'){
-        const cb = form.createCheckBox(f.id); cb.addToPage(page, box); if (f.value) cb.check();
-      } else {
-        const tf = form.createTextField(f.id); tf.addToPage(page, box);
-        tf.setFontSize(Math.max(8, Math.min(12, (y1-y0)*0.62)));  // pdf-lib auto-sizes too big
-        if (f.value) tf.setText(String(f.value));
-      }
-      made++;
-    } catch (err){ failed.push(`${f.id}: ${err.message}`); }
-  }
-  try { form.updateFieldAppearances(); } catch(e){}
-  if (flatten) form.flatten();
-  console.log(`[spike] created ${made}/${FIELDS.length} fields; ${failed.length} failed`);
-  if (failed.length) console.warn('[spike] failures:', failed.slice(0,10));
+  const { injectFields } = await import('../tools/inject.mjs');
+  const pdfBytes = await (await fetch('source.pdf')).arrayBuffer();
+  const { bytes, made, failed } = await injectFields(pdfBytes, { fields: FIELDS }, { flatten });
+  console.log(`[inject] created ${made}/${FIELDS.length} fields; ${failed.length} failed`);
+  if (failed.length) console.warn('[inject] failures:', failed.slice(0,10));
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([await doc.save()], {type:'application/pdf'}));
+  a.href = URL.createObjectURL(new Blob([bytes], {type:'application/pdf'}));
   a.download = flatten ? 'filled.pdf' : 'fillable.pdf';
   a.click();
   $('#hint').innerHTML = `<b>pdf-lib:</b> created ${made} of ${FIELDS.length} fields`

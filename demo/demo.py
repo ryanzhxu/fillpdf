@@ -35,7 +35,23 @@ def build(pdf_path: Path):
         shutil.rmtree(OUT)
     OUT.mkdir(parents=True)
     shutil.copy(pdf_path, OUT / "source.pdf")
-    shutil.copy(HERE / "index.html", OUT / "index.html")
+    # index.html imports tools/inject.mjs -- the ONE implementation of field
+    # injection, shared with the render tests so the two cannot drift. Two
+    # different layouts have to agree here: in the repo, index.html sits in
+    # demo/ and tools/ is at the root, so the source says "../tools/". Served,
+    # OUT is the document root and "../" escapes it, which the stdlib handler
+    # answers with a 404 -- silently, since it is a dynamic import inside a
+    # click handler, so the page would look fine until Download did nothing.
+    # Copy the module in and rewrite the one specifier. This demo has been
+    # broken by exactly this shape before: a move left an import pointing at
+    # nothing and it went unnoticed while the whole test suite passed.
+    shutil.copytree(HERE.parent / "tools", OUT / "tools")
+    html = (HERE / "index.html").read_text(encoding="utf-8")
+    served = html.replace("'../tools/inject.mjs'", "'./tools/inject.mjs'")
+    if served == html:
+        sys.exit("demo build: expected \"'../tools/inject.mjs'\" in index.html; "
+                 "the import moved and this rewrite is now wrong")
+    (OUT / "index.html").write_text(served, encoding="utf-8")
 
     with pdfplumber.open(pdf_path) as pdf:
         if len(pdf.pages) > 30:

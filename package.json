@@ -1,0 +1,12 @@
+{
+  "name": "formfill-tools",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Node-side tooling for FormFill (field injection, shared by demo/ and tests/).",
+  "type": "module",
+  "dependencies": {
+    "canvas": "^3.2.3",
+    "pdf-lib": "1.17.1",
+    "pdfjs-dist": "^3.11.174"
+  }
+}
