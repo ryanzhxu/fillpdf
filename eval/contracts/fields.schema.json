@@ -6,6 +6,15 @@
   "properties": {
     "version": {"const": 1},
     "source": {"type": "object", "properties": {"pages": {"type": "integer"}}},
+    "notice": {
+      "type": "object",
+      "description": "Present only when the detector cannot do its job on this input (e.g. a scanned, image-only PDF). A message the UI can show the user.",
+      "required": ["code", "message"],
+      "properties": {
+        "code": {"type": "string"},
+        "message": {"type": "string"}
+      }
+    },
     "pages": {
       "type": "array",
       "items": {
