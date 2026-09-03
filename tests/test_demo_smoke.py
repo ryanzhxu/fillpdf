@@ -122,3 +122,58 @@ def test_demo_calls_the_same_detector_the_eval_harness_scores(built):
     _, demo_doc = built
     direct_doc = detect(str(FIXTURE))
     assert demo_doc == direct_doc
+
+
+def test_served_index_html_surfaces_a_detector_notice(built):
+    """The demo must show detect()'s notice, not swallow it.
+
+    detect() flags a scanned / image-only PDF with a `notice` the UI can show.
+    If index.html never reads it, a scan renders as a blank page with no boxes
+    and no reason why -- the one 'app silently does nothing' case value item #5
+    forbids. Assert the wiring is present so it cannot rot away unnoticed.
+    """
+    mod, _ = built
+    html = (mod.OUT / "index.html").read_text(encoding="utf-8")
+    assert "d.notice" in html, "index.html never reads the detector notice"
+    assert "showNotice" in html, "index.html has no notice renderer"
+    assert "n.message" in html or "notice.message" in html, \
+        "index.html renders no notice message text"
+
+
+def test_demo_pipeline_carries_a_scanned_notice_to_fields_json(tmp_path, monkeypatch):
+    """End to end: a scanned PDF through demo.build() lands the notice in fields.json.
+
+    The demo dumps detect()'s output verbatim, and the browser reads notice
+    from fields.json, so this proves the notice reaches the file the page loads.
+    """
+    import io
+    import socketserver as _ss
+    import webbrowser as _wb
+    from PIL import Image
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.utils import ImageReader
+
+    def _blocked(*a, **k):
+        raise AssertionError("demo.build() must not open a server or a browser")
+
+    monkeypatch.setattr(_wb, "open", _blocked)
+    monkeypatch.setattr(_ss.TCPServer, "__init__", _blocked)
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=letter)
+    w, h = letter
+    img = ImageReader(Image.new("RGB", (600, 800), (235, 235, 235)))
+    c.drawImage(img, 0, 0, width=w, height=h)
+    c.showPage()
+    c.save()
+    scan = tmp_path / "scan.pdf"
+    scan.write_bytes(buf.getvalue())
+
+    mod = _load_demo_module()
+    monkeypatch.setattr(mod, "OUT", tmp_path / "demo_out")
+    mod.build(scan)
+
+    doc = json.loads((mod.OUT / "fields.json").read_text())
+    assert doc.get("notice", {}).get("code") == "scanned"
+    assert doc["notice"]["message"].strip()

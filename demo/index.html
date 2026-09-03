@@ -18,6 +18,7 @@
   .sp{flex:1}
   .stat{color:#666;font-variant-numeric:tabular-nums}
   .hint{background:#fffbeb;border-bottom:1px solid #fde68a;padding:8px 16px;color:#78350f;font-size:13px}
+  .hint.notice{background:#fef2f2;border-bottom-color:#fecaca;color:#7f1d1d;font-size:14px}
   main{padding:20px;display:flex;flex-direction:column;align-items:center;gap:22px}
   .page{position:relative;box-shadow:0 1px 6px rgba(0,0,0,.18);background:#fff}
   .page canvas{display:block}
@@ -88,6 +89,14 @@ const pageEl = n => document.querySelector(`.page[data-page="${n}"]`);
 const pageOf = n => PAGES.find(p => p.page === n);
 // DOM order is grouped by page and does NOT match FIELDS order — always look up by index.
 const elOf   = i => document.querySelector(`.fld[data-i="${i}"]`);
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// Replace the usage hint with the detector's notice, styled as a warning.
+function showNotice(n){
+  const h = $('#hint');
+  h.classList.add('notice');
+  h.innerHTML = `<b>Heads up —</b> ${escapeHtml(n.message)}`;
+}
 
 async function boot(){
   const CDN = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/';
@@ -95,6 +104,11 @@ async function boot(){
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   const d = await (await fetch('fields.json')).json();
   PAGES = d.pages; FIELDS = d.fields;
+
+  // An image-only / scanned PDF yields no fields. detect() flags it with an
+  // honest notice; without this the page would render blank with no boxes and
+  // no reason why -- the one 'app silently does nothing' case that must not ship.
+  if (d.notice) showNotice(d.notice);
 
   // 1. Build every page container and every box FIRST, from geometry alone.
   //    Nothing here waits on rendering, so a slow or stalled page never hides the boxes.
