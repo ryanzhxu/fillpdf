@@ -1349,6 +1349,56 @@ def _drop_double_writeon_cells(cells, write_on_lines):
     return kept
 
 
+RECT_CURVE_CORNER_TOL = 6   # points; see _rect_like_curves
+
+
+def _rect_like_curves(page):
+    """Curve objects whose path draws a rectangle -- square-cornered or
+    rounded -- instead of a plain pdfplumber "rect". Some form producers
+    draw a checkbox or radio button this way (four straight edges plus
+    four short corner arcs, "m c l c l c l c h"), and every rule below
+    reads page.rects only, so page.curves is otherwise invisible to them
+    no matter how the box is captioned.
+
+    Confirmed while chasing eval.blind's "structured, zero fields" list:
+    13 of 16 curve-heavy fetched real PDFs (no ground truth, so this
+    can't move tuning/holdout) share an IDENTICAL 16.8x16.8 rounded-
+    square curve, corner radius ~2.8pt, drawing a Yes/No radio pair on
+    eval/corpus/real/1bdaa5e8fd5eaace.pdf -- undetected because R1 keys
+    on a glyph character and R18 reads page.rects, and this box is
+    neither.
+
+    A curve counts as rect-like only if EVERY anchor point in its path
+    sits within RECT_CURVE_CORNER_TOL of the path's own bounding-box
+    corner -- true of a rectangle at any corner radius, false of an
+    arbitrary vector shape (an arrow, a tick mark, a logo) that would
+    otherwise slip into a rect-based rule as a false positive. Returns
+    dicts shaped like page.rects entries (x0, x1, top, bottom, width,
+    height, fill, stroke).
+    """
+    out = []
+    for c in page.curves:
+        path = c.get("path")
+        if not path or path[0][0] != "m" or path[-1][0] != "h":
+            continue
+        if any(op[0] not in ("m", "l", "c", "h") for op in path):
+            continue
+        x0, x1, top, bot = c["x0"], c["x1"], c["top"], c["bottom"]
+        w, h = x1 - x0, bot - top
+        if w <= 0 or h <= 0:
+            continue
+        tol = min(RECT_CURVE_CORNER_TOL, min(w, h) / 2 + 0.5)
+        pts = [op[1] for op in path if op[0] != "h"]
+        if not all(min(abs(x - x0), abs(x - x1)) <= tol
+                   and min(abs(y - top), abs(y - bot)) <= tol
+                   for x, y in pts):
+            continue
+        out.append({"x0": x0, "x1": x1, "top": top, "bottom": bot,
+                     "width": w, "height": h,
+                     "fill": bool(c.get("fill")), "stroke": bool(c.get("stroke"))})
+    return out
+
+
 def detect(page, pno, carry_in=None):
     """Detect fields on one page.
 
@@ -2157,6 +2207,13 @@ def detect(page, pno, carry_in=None):
     # checkbox and a decorative list bullet are visually identical, and
     # geometry cannot separate them.
     R18_CHK_MIN, R18_CHK_MAX = 18, 32
+    # Curve-drawn candidates (see _rect_like_curves) get their own, lower
+    # floor: R18_CHK_MIN was measured from SAFER's 25x25.9 plain-rect
+    # boxes, but the recurring curve-drawn checkbox/radio size measured
+    # across 13 real fetched PDFs is 16.8x16.8 -- below it. Widening
+    # R18_CHK_MIN itself would also loosen the rect path on the already-
+    # tuned corpus for no reason; this only affects curve-sourced candidates.
+    R18_CURVE_CHK_MIN = 14
     R18_CHK_SQUARE_TOL = 8       # points; |width - height| tolerance for "square"
     R18_EDGE_TRIM_TOL = 8        # points; how close to ITS OWN nearer edge a word
                                  # must sit to be trimmed rather than disqualifying
@@ -2165,6 +2222,11 @@ def detect(page, pno, carry_in=None):
     def _r18_is_chk_band(r):
         return (R18_CHK_MIN <= r["width"] <= R18_CHK_MAX
                 and R18_CHK_MIN <= r["height"] <= R18_CHK_MAX
+                and abs(r["width"] - r["height"]) <= R18_CHK_SQUARE_TOL)
+
+    def _r18_is_chk_band_curve(r):
+        return (R18_CURVE_CHK_MIN <= r["width"] <= R18_CHK_MAX
+                and R18_CURVE_CHK_MIN <= r["height"] <= R18_CHK_MAX
                 and abs(r["width"] - r["height"]) <= R18_CHK_SQUARE_TOL)
 
     def _r18_contains(outer, inner, tol=1.0):
@@ -2255,6 +2317,35 @@ def detect(page, pno, carry_in=None):
 
     raw_shaded = [r for r in page.rects if r["fill"] and not r["stroke"]
                   and _r18_is_chk_band(r)]
+    curve_chk_cands = [r for r in _rect_like_curves(page) if r["fill"] and not r["stroke"]
+                       and _r18_is_chk_band_curve(r)]
+    # A real checkbox/radio button drawn this way is essentially always one
+    # of a same-sized group sitting on the same or the next line (Yes/No,
+    # Mr/Mrs/Ms/Miss, a checklist row wrapping onto a second line -- measured
+    # up to 18pt apart on eval/holdout/b642646180f3.pdf's real "who helps
+    # you" checklist). A lone curve candidate with no similarly-sized,
+    # nearby sibling is far more likely a decorative icon badge next to
+    # boilerplate text -- confirmed: a "Translating and Interpreting
+    # Service" phone-icon badge is the only curve-square anywhere near it
+    # and would otherwise be claimed as a checkbox (measured false positive,
+    # scripts/verify.sh). R18_CURVE_SIBLING_Y_TOL is deliberately page-
+    # local, not page-wide -- a same-sized icon in a different section of
+    # the SAME page must not borrow siblinghood from an unrelated group.
+    # The same icon is sometimes painted twice at IDENTICAL coordinates (a
+    # duplicate fill pass); that duplicate must not count as a sibling
+    # either, or the icon looks like a same-sized group of one.
+    R18_CURVE_SIBLING_Y_TOL = 25   # points
+    R18_CURVE_DUP_TOL = 3          # points; same spot -- a repeated paint, not a sibling
+
+    def _r18_curve_siblings(r, others):
+        return any(abs(r["width"] - o["width"]) <= 4 and abs(r["height"] - o["height"]) <= 4
+                   and abs(r["top"] - o["top"]) <= R18_CURVE_SIBLING_Y_TOL
+                   and (abs(r["x0"] - o["x0"]) > R18_CURVE_DUP_TOL
+                        or abs(r["top"] - o["top"]) > R18_CURVE_DUP_TOL)
+                   for o in others if o is not r)
+
+    curve_chk_cands = [r for r in curve_chk_cands if _r18_curve_siblings(r, curve_chk_cands)]
+    raw_shaded += curve_chk_cands
     r18_chk_cands = [r for r in raw_shaded
                      if not any(_r18_contains(r, o) for o in raw_shaded if o is not r)]
 
