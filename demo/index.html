@@ -35,8 +35,11 @@
        border-radius:2px;pointer-events:auto}
   .fld.user{border-color:rgba(21,128,61,.65);background:rgba(21,128,61,.09)}
   .fld.sel{outline:2px solid var(--accent);outline-offset:1px;z-index:9}
-  .fld input{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent;
+  .fld input,.fld textarea{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent;
              font:inherit;padding:0 3px;color:#111;outline:none}
+  /* A multiline field wraps text in the downloaded PDF, so its box gets a
+     textarea, not a one-line input: fill the rect, wrap, no drag handle. */
+  .fld textarea{padding:2px 3px;line-height:1.2;resize:none;overflow:auto}
   /* A UA default of margin:3px 3.5px shifts an absolutely-placed checkbox up
      and left of its box. Zero it and let the input fill the detected rect. */
   .fld input[type=checkbox]{inset:0;margin:0;width:100%;height:100%;
@@ -214,16 +217,28 @@ function draw(){
     // box actually is -- especially a checkbox, where the id is just chk_7.
     b.title = (f.label ? f.label + '\n' : '') + `${f.id}${f.rule ? '  ('+f.rule+')' : ''}`;
     place(b, f);
-    const inp = document.createElement('input');
     const [,y0,,y1] = f.rect;
+    let inp;
     if (f.type === 'checkbox'){
+      inp = document.createElement('input');
       inp.type='checkbox'; inp.checked=!!f.value; inp.onchange = e => f.value = e.target.checked;
       if (f.label){                       // caption on hover, so a tick is never anonymous
         const cap = document.createElement('span');
         cap.className = 'cap'; cap.textContent = f.label;
         b.appendChild(cap);
       }
+    } else if (f.type === 'multiline'){
+      // A multiline field (a comment / description block) wraps its value in
+      // the downloaded PDF (tools/inject.mjs calls enableMultiline). A single
+      // <input> would let the user type only one line that scrolls off the
+      // box, so the demo would not match what it produces. A <textarea> lets
+      // them see the wrapped lines and press Enter, exactly as the box behaves.
+      inp = document.createElement('textarea');
+      inp.value = f.value || '';
+      inp.oninput = e => f.value = e.target.value;
+      inp.style.fontSize = '13px';        // tall box; a height-scaled size would be huge
     } else {
+      inp = document.createElement('input');
       inp.type='text'; inp.value = f.value || '';
       inp.oninput = e => f.value = e.target.value;
       inp.style.fontSize = Math.max(9, Math.min(15, (y1-y0)*0.7)) + 'px';
@@ -285,7 +300,7 @@ $('#next').onclick = () => {
   const i = navOrder[(pos + 1) % navOrder.length];
   const el = elOf(i);
   el.scrollIntoView({behavior:'smooth', block:'center'});
-  el.querySelector('input').focus();
+  el.querySelector('input,textarea').focus();   // a multiline box is a textarea
   select(i);
 };
 $('#nm').oninput = e => { if (FIELDS[sel]) FIELDS[sel].id = e.target.value.replace(/[^A-Za-z0-9_]/g,'_').slice(0,64); };
@@ -305,8 +320,10 @@ document.addEventListener('mousedown', e => {
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { setAdding(false); deselect(); }
-  const typing = document.activeElement.tagName === 'INPUT'
-              && document.activeElement.type === 'text';
+  // A multiline box is a <textarea>; treat editing one as typing too, or
+  // Backspace/Delete inside it would delete the whole field, not a character.
+  const ae = document.activeElement;
+  const typing = (ae.tagName === 'INPUT' && ae.type === 'text') || ae.tagName === 'TEXTAREA';
   if (sel == null) return;
   if ((e.key==='Backspace'||e.key==='Delete') && !typing) $('#del').click();
 });

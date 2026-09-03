@@ -195,6 +195,29 @@ def test_served_index_html_navigates_in_reading_order(built):
     assert "navOrder.indexOf(cursor)" in html, "Next field no longer walks reading order"
 
 
+def test_served_index_html_renders_multiline_as_a_textarea(built):
+    """A multiline field must get a textarea, not a one-line input.
+
+    detect() emits `type: "multiline"` for comment / description blocks (R12,
+    common: 4 of the first 40 tuning forms, one with 16 of them), and
+    tools/inject.mjs wraps their value in the downloaded PDF. If the demo drew
+    them as a single-line <input>, the user could type only one line that
+    scrolls off the box -- the editing experience would not match the file it
+    produces. Assert the textarea path is wired, and that the two spots that
+    would break with a textarea child are guarded: "Next field" must focus
+    input,textarea (a multiline box has no <input>), and the keydown guard must
+    treat a focused TEXTAREA as typing so Backspace does not delete the field.
+    """
+    mod, _ = built
+    html = (mod.OUT / "index.html").read_text(encoding="utf-8")
+    assert "f.type === 'multiline'" in html, "draw() has no multiline branch"
+    assert "createElement('textarea')" in html, "multiline field is not a textarea"
+    assert "querySelector('input,textarea')" in html, \
+        "Next field would throw on a multiline box (no <input> child)"
+    assert "ae.tagName === 'TEXTAREA'" in html, \
+        "keydown guard would delete the field on Backspace inside a textarea"
+
+
 def test_demo_pipeline_carries_a_scanned_notice_to_fields_json(tmp_path, monkeypatch):
     """End to end: a scanned PDF through demo.build() lands the notice in fields.json.
 
