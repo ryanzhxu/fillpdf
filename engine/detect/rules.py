@@ -1233,6 +1233,122 @@ def _comb_label(run, words, max_len=60):
     return None
 
 
+def _qualified_write_on_lines(page, words, gap_threshold):
+    """Every hrule on the page that, on its own, passes the full R5b test
+    for a genuine write-on line -- see the R5b section below for the
+    reasoning behind each guard here (this is that same test, factored out
+    so it can be run once and reused before R5b's own loop -- see the cell
+    filter that calls this, right below). Returns a list of
+    {"rule": r, "label": label} for every qualifying hrule.
+    """
+    W = page.width
+    panel_fills = _prose_panels(page.rects, words)
+    vrules = [r for r in page.rects if r["width"] < 3 and r["height"] >= 5]
+    hrules = _merge_ruling_lines(
+        [r for r in page.rects if r["height"] < 3 and r["width"] >= 5])
+    ON_RULE_TOL_Y = 3
+    ON_RULE_MAX_COVER = 0.35
+    results = []
+    for r in hrules:
+        rule_w = r["x1"] - r["x0"]
+        if not (40 <= rule_w <= W * 0.77):
+            continue
+        if any(abs(x["x0"] - r["x0"]) < 3 or abs(x["x0"] - r["x1"]) < 3
+               for x in vrules
+               if x["top"] <= r["top"] + 3 and x["bottom"] >= r["top"] - 3):
+            continue
+        if _borders_shaded_panel(r, panel_fills, vrules):
+            continue                       # top/bottom edge of a shaded panel, not a rule
+        covered = sum(max(0.0, min(w["x1"], r["x1"]) - max(w["x0"], r["x0"]))
+                      for w in words if abs(w["bottom"] - r["top"]) < ON_RULE_TOL_Y)
+        if rule_w > 0 and min(covered, rule_w) / rule_w >= ON_RULE_MAX_COVER:
+            continue                       # underlines existing print, not blank space
+        left = [w for w in words if abs(w["bottom"] - r["top"]) < 9
+                and w["x1"] <= r["x0"] + 3 and w["x1"] > r["x0"] - 260]
+        under = [w for w in words if 0 < w["top"] - r["top"] < 14
+                 and w["x1"] > r["x0"] - 2 and w["x0"] < r["x1"] + 2]
+        left_sorted = sorted(left, key=lambda w: w["x0"])
+        under_sorted = sorted(under, key=lambda w: w["x0"])
+        if left_sorted:
+            org_label = " ".join(w["text"] for w in left_sorted)
+            src = _cut_at_gutter(left_sorted, gap_threshold, "last")[-7:]
+        else:
+            org_label = " ".join(w["text"] for w in under_sorted)
+            src = _cut_at_gutter(under_sorted, gap_threshold, "first")
+        label = " ".join(w["text"] for w in src).strip()
+        if not label:                      # unlabelled rules are decorative
+            continue
+        if OFFICE_USE.search(org_label):   # office-only block -- not for the applicant
+            continue
+        results.append({"rule": r, "label": label[:60]})
+    return results
+
+
+def _drop_double_writeon_cells(cells, write_on_lines):
+    """Drop a grid cell whose top AND bottom border are each, independently,
+    one of `write_on_lines` -- lines that already qualify, entirely on
+    their own, as an R5b write-on field (see _qualified_write_on_lines).
+
+    grid_cells() builds a cell by pairing an hrule with the closest one
+    below it that shares its x-range, with no notion of whether either
+    line already stands as a complete field in its own right. A common
+    form shape defeats that: two independent, vertically stacked write-on
+    lines that share an x-range purely because they belong to two
+    same-shaped rows (e.g. "Print Name ____  Date ____" repeated for a
+    second signer directly below the first). grid_cells() pairs the first
+    line's own rule with the second line's own rule and manufactures a
+    cell spanning both, reading whatever caption sits near the first line
+    as that cell's label -- one spurious "ruled box" straddling two real,
+    independent write-on fields.
+
+    Confirmed on safer.pdf: the page-2 signature block's two "Date" write-
+    on lines (each correctly found by R5b on its own) get paired this way
+    into one manufactured cell, which R2 then claims as a third, 29.9pt-
+    tall "Date" box overlapping both real ones.
+
+    Requiring BOTH edges to independently qualify, rather than just one, was
+    measured NOT to be enough on its own: on a dense, prose-heavy form
+    (595e918dae36.pdf, an appellate court form) nearly every line of running
+    text is narrow and captioned by the next line below it, so most of its
+    ordinary paragraph lines independently pass _qualified_write_on_lines
+    too -- dropping every cell bounded by two such lines cost 92 real
+    matches across the tuning/holdout corpus (measured), almost all on
+    forms with nothing to do with a stacked signature block.
+
+    The tell that actually separates the two shapes is not "both edges
+    qualify" but WHAT they are captioned: two independent copies of the
+    SAME repeated field (the shape this rule targets -- "Date" printed
+    twice, once per signer) get the SAME label from
+    _qualified_write_on_lines, because each is read the same way in
+    isolation. Two borders of one real table row, or two consecutive lines
+    of running prose, essentially never share an exact caption -- each
+    line's own words differ. Requiring the two labels to match (after
+    normalizing case and whitespace) keeps the appellate form's cells (no
+    two of its "qualifying" neighbours ever share a caption) while still
+    catching safer.pdf's page-2 block (both borders read "Date").
+    """
+    by_top = {}
+    for entry in write_on_lines:
+        by_top.setdefault(round(entry["rule"]["top"], 1), entry["label"])
+    if len(by_top) < 2:
+        return cells
+    def edge_label(y):
+        for t, label in by_top.items():
+            if abs(y - t) <= 1:
+                return label
+        return None
+    def norm(s):
+        return " ".join(s.split()).casefold() if s else s
+    kept = []
+    for cell in cells:
+        top_label = edge_label(cell[1])
+        bot_label = edge_label(cell[3])
+        if top_label is not None and bot_label is not None and norm(top_label) == norm(bot_label):
+            continue
+        kept.append(cell)
+    return kept
+
+
 def detect(page, pno, carry_in=None):
     """Detect fields on one page.
 
@@ -1259,6 +1375,14 @@ def detect(page, pno, carry_in=None):
     cells = grid_cells(page)
     claimed = set()
     vrules = [r for r in page.rects if r["width"] < 3 and r["height"] >= 5]
+    # See _drop_double_writeon_cells: a "cell" whose top and bottom border
+    # are each independently a complete R5b write-on line is not a real
+    # box, just two independent write-on lines grid_cells() paired by
+    # x-range proximity. Computed once, up front, so every rule that
+    # consumes `cells` (R2, R3, R12, R16, ...) sees the same corrected
+    # grid -- not just R2, which is where this shape was first caught.
+    write_on_lines = _qualified_write_on_lines(page, words, gap_threshold)
+    cells = _drop_double_writeon_cells(cells, write_on_lines)
 
     # ---- R2  labelled cell: label in the top band, blank below --------------
     for cell in cells:
@@ -1931,56 +2055,16 @@ def detect(page, pno, carry_in=None):
     # grid_cells() uses above, for the same reason -- R5b builds its own
     # `hrules` straight from page.rects rather than reusing grid_cells()'
     # filtered `h`, so it needs its own copy of the check.
-    panel_fills = _prose_panels(page.rects, words)
-    ON_RULE_TOL_Y = 3
-    ON_RULE_MAX_COVER = 0.35
-    vrules = [r for r in page.rects if r["width"] < 3 and r["height"] >= 5]
-    hrules = _merge_ruling_lines(
-        [r for r in page.rects if r["height"] < 3 and r["width"] >= 5])
-    for r in hrules:
-        rule_w = r["x1"] - r["x0"]
-        if not (40 <= rule_w <= W * 0.77):
-            continue
-        if any(abs(x["x0"] - r["x0"]) < 3 or abs(x["x0"] - r["x1"]) < 3
-               for x in vrules
-               if x["top"] <= r["top"] + 3 and x["bottom"] >= r["top"] - 3):
-            continue
-        if _borders_shaded_panel(r, panel_fills, vrules):
-            continue                       # top/bottom edge of a shaded panel, not a rule
-        covered = sum(max(0.0, min(w["x1"], r["x1"]) - max(w["x0"], r["x0"]))
-                      for w in words if abs(w["bottom"] - r["top"]) < ON_RULE_TOL_Y)
-        if rule_w > 0 and min(covered, rule_w) / rule_w >= ON_RULE_MAX_COVER:
-            continue                       # underlines existing print, not blank space
-        left = [w for w in words if abs(w["bottom"] - r["top"]) < 9
-                and w["x1"] <= r["x0"] + 3 and w["x1"] > r["x0"] - 260]
-        under = [w for w in words if 0 < w["top"] - r["top"] < 14
-                 and w["x1"] > r["x0"] - 2 and w["x0"] < r["x1"] + 2]
-        left_sorted = sorted(left, key=lambda w: w["x0"])
-        under_sorted = sorted(under, key=lambda w: w["x0"])
-        # org_label mirrors R2's own org_label/label split for OFFICE_USE:
-        # "For Office Use Only: Approved by:" governs the whole row it
-        # introduces, so the office-only tell must be checked on the FULL
-        # pre-cut text even once the emitted label is narrowed to "Date:".
-        # SIGNATURE is deliberately NOT checked against org_label here: this
-        # is a fixed 260pt reach across the whole page, not a bounded cell
-        # (unlike R2/R10), so it can cross MORE than one gutter -- measured,
-        # safer.pdf's unrelated "Landlord Signature" caption sits within
-        # reach of the "Landlord Phone #" line two columns over, and
-        # org_label would wrongly rule out that field for a word naming a
-        # different one. The global end-of-detect SIGNATURE filter (on the
-        # cut, final label) is the right scope, same as before this change.
-        if left_sorted:
-            org_label = " ".join(w["text"] for w in left_sorted)
-            src = _cut_at_gutter(left_sorted, gap_threshold, "last")[-7:]
-        else:
-            org_label = " ".join(w["text"] for w in under_sorted)
-            src = _cut_at_gutter(under_sorted, gap_threshold, "first")
-        label = " ".join(w["text"] for w in src).strip()
-        if not label:                      # unlabelled rules are decorative
-            continue
-        if OFFICE_USE.search(org_label):   # office-only block -- not for the applicant
-            continue
-        out.append({"page": pno, "type": "text", "label": label[:60], "rule": "R5b",
+    #
+    # The full test (rule-width bounds, no anchoring vertical rule, no
+    # shaded-panel edge, no on-rule text coverage, a real caption, no
+    # office-use block) lives in _qualified_write_on_lines, computed once
+    # near the top of detect() and reused here -- the cell filter right
+    # after `cells = grid_cells(page)` needs the exact same qualifying set
+    # to know which manufactured cells are really two of these lines.
+    for entry in write_on_lines:
+        r = entry["rule"]
+        out.append({"page": pno, "type": "text", "label": entry["label"], "rule": "R5b",
                     "confidence": 0.6,
                     "rect": [r["x0"] + 1, H - r["top"] + 1, r["x1"] - 1, H - r["top"] + 15]})
 
