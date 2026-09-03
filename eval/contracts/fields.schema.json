@@ -41,6 +41,7 @@
             "description": "[x0,y0,x1,y1] in PDF points, origin bottom-left"
           },
           "label": {"type": "string"},
+          "group": {"type": "string", "pattern": "^[A-Za-z0-9_]{1,64}$", "description": "Present only on mutually-exclusive checkboxes (a Yes/No question). Checkboxes sharing a group value are one radio group: at most one may be ticked."},
           "rule": {"type": "string", "description": "R1..R8, which rule fired"},
           "confidence": {"type": "number", "minimum": 0, "maximum": 1},
           "origin": {"enum": ["detected", "user_added", "user_moved"]}

@@ -1,4 +1,5 @@
 """Field detection. The single entry point every consumer calls."""
+import re
 from pathlib import Path
 from typing import Union
 
@@ -40,6 +41,42 @@ def _page_is_scanned(pg) -> bool:
     )
 
 
+# A checkbox question whose two answers are "Yes" and "No" is mutually
+# exclusive: a person must never tick both, and a form that lets them is wrong
+# in law, not just in software (AUTOPILOT value item #1). R1 already writes the
+# question into each option's label as "<question> (Yes)" / "<question> (No)".
+# When one "Yes" option and one "No" option sit under an identical question on a
+# page, tag both with a shared `group` id so a consumer can inject one radio
+# group instead of two independent checkboxes. Only this unambiguous shape is
+# grouped: a multi-select list (a "cc:" recipient list, a "check all that apply"
+# block) does not have one Yes plus one No under a shared prompt, so it stays
+# independent. This adds only a `group` key -- geometry, type, label and id are
+# untouched, so detection scoring is unaffected.
+_YESNO_OPTION = re.compile(r"^(.*?)\s*\(([^()]+)\)\s*$")
+
+
+def _group_yes_no(fields: list) -> None:
+    buckets: dict = {}
+    for f in fields:
+        if f["type"] != "checkbox":
+            continue
+        m = _YESNO_OPTION.match(f.get("label", "") or "")
+        if not m:
+            continue
+        prefix, option = m.group(1).strip(), m.group(2).strip().lower()
+        if not prefix or prefix[-1] not in "?:" or option not in ("yes", "no"):
+            continue
+        buckets.setdefault((f["page"], prefix), []).append((option, f))
+    n = 0
+    for members in buckets.values():
+        if sorted(o for o, _ in members) != ["no", "yes"]:   # exactly one Yes, one No
+            continue
+        n += 1
+        gid = f"grp_{n}"
+        for _option, f in members:
+            f["group"] = gid
+
+
 def detect(pdf_path: Union[str, Path]) -> dict:
     """Detect fillable regions in a flat PDF.
 
@@ -66,6 +103,8 @@ def detect(pdf_path: Union[str, Path]) -> dict:
         seen[base] = seen.get(base, 0) + 1
         f["id"] = base if seen[base] == 1 else f"{base}_{seen[base]}"
         f["origin"] = "detected"
+
+    _group_yes_no(fields)
 
     out = {"version": 1, "source": {"pages": len(pages)}, "pages": pages, "fields": fields}
     # Flag the whole document when most content pages are scanned images. One

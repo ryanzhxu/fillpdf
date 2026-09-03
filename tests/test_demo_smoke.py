@@ -272,3 +272,27 @@ def test_served_index_html_surfaces_deferred_appearances(built):
     assert "deferredAppearances" in html, "index.html never reads deferredAppearances"
     assert "!deferredAppearances" in html, \
         "index.html does not correct the filename when appearances are deferred"
+
+
+def test_served_index_html_renders_a_group_as_a_radio(built):
+    """A grouped checkbox (a Yes/No answer) must be a radio, not a checkbox.
+
+    detect() tags a Yes/No question's two options with a shared `group`, and
+    tools/inject.mjs injects them as one AcroForm radio group so a person
+    cannot tick both answers. If the demo drew them as independent checkboxes,
+    the on-screen form would let a person tick both -- not matching the file it
+    produces, and wrong in law. Assert the radio branch is wired: a shared
+    `name` makes the browser enforce exclusivity, and picking one clears the
+    others in FIELDS so exactly one value is true when the PDF is built.
+    """
+    mod, _ = built
+    doc = json.loads((mod.OUT / "fields.json").read_text())
+    assert any(f.get("group") for f in doc["fields"]), \
+        "the fixture should produce at least one Yes/No radio group"
+
+    html = (mod.OUT / "index.html").read_text(encoding="utf-8")
+    assert "if (f.group){" in html, "draw() has no grouped-checkbox branch"
+    assert "inp.type='radio'; inp.name=f.group" in html, \
+        "a grouped checkbox is not rendered as a radio sharing the group name"
+    assert "g.group===f.group" in html, \
+        "picking a radio does not clear its group siblings in FIELDS"

@@ -15,9 +15,13 @@
 //     instance instead of asking the browser to fetch a second copy.
 //
 // Field shape consumed (per field, from fields.json):
-//   { id, type: 'text'|'multiline'|'checkbox', page, rect: [x0,y0,x1,y1], value? }
+//   { id, type: 'text'|'multiline'|'checkbox', page, rect: [x0,y0,x1,y1], value?, group? }
 // `page` is 1-indexed. `rect` is [x0,y0,x1,y1] in PDF points, origin
 // bottom-left -- exactly engine.detect's convention, unchanged here.
+// `group` is present only on mutually-exclusive checkboxes (a Yes/No question,
+// tagged by engine.detect). Checkboxes sharing a group value become ONE
+// AcroForm radio group, so a person cannot tick both answers -- the injected
+// PDF enforces what the law requires.
 
 async function getPDFLib() {
   if (typeof window !== "undefined" && window.PDFLib) return window.PDFLib;
@@ -55,13 +59,27 @@ export async function injectFields(pdfBytes, fieldsDoc, opts = {}) {
     return name;
   };
 
+  // A `group` value ties mutually-exclusive checkboxes (a Yes/No question) into
+  // one AcroForm radio group, created lazily on first sight so its widgets are
+  // added as options of a single field -- selecting one deselects the other.
+  const radioGroups = new Map();
+  const getRadioGroup = (gid) => {
+    let g = radioGroups.get(gid);
+    if (!g) { g = form.createRadioGroup(uniqueName(gid)); radioGroups.set(gid, g); }
+    return g;
+  };
+
   for (const f of fieldsDoc.fields) {
     const page = doc.getPage(f.page - 1);
     const [x0, y0, x1, y1] = f.rect;
     const box = { x: x0, y: y0, width: Math.max(6, x1 - x0), height: Math.max(6, y1 - y0), borderWidth: 0 };
     const name = uniqueName(f.id);
     try {
-      if (f.type === "checkbox") {
+      if (f.type === "checkbox" && f.group) {
+        const rg = getRadioGroup(f.group);
+        rg.addOptionToPage(name, page, box);   // `name` is this option's unique export value
+        if (f.value) rg.select(name);
+      } else if (f.type === "checkbox") {
         const cb = form.createCheckBox(name);
         cb.addToPage(page, box);
         if (f.value) cb.check();

@@ -42,7 +42,7 @@
   .fld textarea{padding:2px 3px;line-height:1.2;resize:none;overflow:auto}
   /* A UA default of margin:3px 3.5px shifts an absolutely-placed checkbox up
      and left of its box. Zero it and let the input fill the detected rect. */
-  .fld input[type=checkbox]{inset:0;margin:0;width:100%;height:100%;
+  .fld input[type=checkbox],.fld input[type=radio]{inset:0;margin:0;width:100%;height:100%;
              accent-color:var(--accent);cursor:pointer}
   .cap{position:absolute;left:calc(100% + 6px);top:50%;transform:translateY(-50%);
        white-space:nowrap;font-size:11px;background:#111;color:#fff;padding:2px 6px;
@@ -221,7 +221,16 @@ function draw(){
     let inp;
     if (f.type === 'checkbox'){
       inp = document.createElement('input');
-      inp.type='checkbox'; inp.checked=!!f.value; inp.onchange = e => f.value = e.target.checked;
+      if (f.group){
+        // A grouped checkbox is one answer to a mutually-exclusive (Yes/No)
+        // question -- a radio, not a checkbox, so a person cannot tick both.
+        // Sharing a `name` makes the browser enforce it; FIELDS is updated so
+        // exactly the picked box carries value=true when the PDF is built.
+        inp.type='radio'; inp.name=f.group; inp.checked=!!f.value;
+        inp.onchange = e => { if (e.target.checked) FIELDS.forEach(g => { if (g.group===f.group) g.value = (g===f); }); };
+      } else {
+        inp.type='checkbox'; inp.checked=!!f.value; inp.onchange = e => f.value = e.target.checked;
+      }
       if (f.label){                       // caption on hover, so a tick is never anonymous
         const cap = document.createElement('span');
         cap.className = 'cap'; cap.textContent = f.label;
