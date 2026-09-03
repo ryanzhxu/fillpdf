@@ -1283,7 +1283,17 @@ def _qualified_write_on_lines(page, words, gap_threshold):
     vrules = [r for r in page.rects if r["width"] < 3 and r["height"] >= 5]
     hrules = _merge_ruling_lines(
         [r for r in page.rects if r["height"] < 3 and r["width"] >= 5])
-    ON_RULE_TOL_Y = 3
+    # 3 used to be the cut, but eval/corpus/real/9e5fa53418722365.pdf (a
+    # zoning-checklist form, no ground truth) draws its heading-underline
+    # gap at a consistent 2.93-3.07pt across 13 separate headings on the
+    # page -- half the same shape landing just inside the old cut, half
+    # just outside it by a few hundredths of a point, so roughly half the
+    # form's decorative underlines slipped through as bogus write-on-line
+    # fields whose "caption" ends up being a stray bullet glyph or the next
+    # unrelated paragraph below. 3.5 closes that specific, measured gap
+    # with a little headroom; the real guard against genuinely rejecting a
+    # tight real caption is still ON_RULE_MAX_COVER below, unchanged.
+    ON_RULE_TOL_Y = 3.5
     ON_RULE_MAX_COVER = 0.35
     results = []
     for r in hrules:
