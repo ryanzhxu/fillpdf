@@ -82,7 +82,21 @@
 
 <script>
 const $ = s => document.querySelector(s);
-let FIELDS = [], PAGES = [], sel = null, adding = false, cursor = -1;
+let FIELDS = [], PAGES = [], sel = null, adding = false, cursor = -1, navOrder = [];
+
+// The detector emits fields grouped by rule, not by where they sit on the page,
+// so raw FIELDS order sends Tab and "Next field" jumping up and down the sheet.
+// navOrder holds FIELDS indices in visual reading order -- page, then row top,
+// then left-to-right -- so keyboard filling follows the page. ROW_TOL treats
+// tops within a few points as the same row so a row reads left-to-right.
+const ROW_TOL = 6;
+function readingOrder(a, b){
+  const fa = FIELDS[a], fb = FIELDS[b];
+  if (fa.page !== fb.page) return fa.page - fb.page;
+  const ta = fa.rect[3], tb = fb.rect[3];
+  if (Math.abs(ta - tb) > ROW_TOL) return tb - ta;   // higher on the page first
+  return fa.rect[0] - fb.rect[0];                     // then left to right
+}
 
 const uid = b => { let i=1,n=b; while(FIELDS.some(f=>f.id===n)) n=`${b}_${++i}`; return n; };
 const pageEl = n => document.querySelector(`.page[data-page="${n}"]`);
@@ -171,8 +185,11 @@ function place(el, f){
 
 function draw(){
   document.querySelectorAll('.layer').forEach(l => l.innerHTML = '');
-  FIELDS.forEach((f,i) => {
-    if (!pageOf(f.page)) return;
+  // Append boxes in reading order so DOM order -- which is what native Tab
+  // follows -- matches the page, not the detector's rule grouping.
+  navOrder = FIELDS.map((_, i) => i).filter(i => pageOf(FIELDS[i].page)).sort(readingOrder);
+  navOrder.forEach(i => {
+    const f = FIELDS[i];
     const b = document.createElement('div');
     b.dataset.i = i;
     b.className = 'fld' + (f.origin === 'detected' ? '' : ' user') + (sel === i ? ' sel' : '');
@@ -245,8 +262,10 @@ function setAdding(v){
 
 $('#add').onclick  = () => setAdding(!adding);
 $('#next').onclick = () => {
-  if (!FIELDS.length) return;
-  const i = (cursor+1) % FIELDS.length;
+  if (!navOrder.length) return;
+  // Walk reading order, not FIELDS index order, so "Next" tracks the page.
+  const pos = navOrder.indexOf(cursor);
+  const i = navOrder[(pos + 1) % navOrder.length];
   const el = elOf(i);
   el.scrollIntoView({behavior:'smooth', block:'center'});
   el.querySelector('input').focus();

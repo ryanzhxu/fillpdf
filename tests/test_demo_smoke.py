@@ -157,6 +157,26 @@ def test_served_index_html_reports_a_failed_build(built):
         "build() has no user-visible failure message"
 
 
+def test_served_index_html_navigates_in_reading_order(built):
+    """Tab and "Next field" must follow the page, not the detector's rule order.
+
+    detect() emits fields grouped by rule, so raw FIELDS order sends the
+    keyboard jumping up and down the sheet (safer.pdf page 2 tops go
+    636 -> 534 -> 670 -> 568 ...). The demo sorts a navOrder in reading order
+    and both the DOM (native Tab) and the "Next field" button walk it. Assert
+    the wiring is present so a refactor cannot silently drop it and bring the
+    jumping back.
+    """
+    mod, _ = built
+    html = (mod.OUT / "index.html").read_text(encoding="utf-8")
+    assert "readingOrder" in html, "index.html has no reading-order comparator"
+    assert "navOrder" in html, "index.html builds no reading-order navigation"
+    # draw() must append boxes by navOrder (native Tab = DOM order), and
+    # "Next field" must walk navOrder rather than a raw FIELDS index.
+    assert "navOrder.forEach" in html, "draw() no longer appends in reading order"
+    assert "navOrder.indexOf(cursor)" in html, "Next field no longer walks reading order"
+
+
 def test_demo_pipeline_carries_a_scanned_notice_to_fields_json(tmp_path, monkeypatch):
     """End to end: a scanned PDF through demo.build() lands the notice in fields.json.
 
