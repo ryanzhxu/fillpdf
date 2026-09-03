@@ -1946,112 +1946,48 @@ def detect(page, pno, carry_in=None):
                     "confidence": 0.6,
                     "rect": [x0 + 1, H - base - 2, x1 - 1, H - top + 9]})
 
-    # ---- R18  shaded rectangle, no ruling at all: a filled box (text) or a
-    # filled square (checkbox), used instead of a ruled border. grid_cells()
-    # only turns a rect into a cell when it is a thin ruling line (height<3
-    # for a horizontal rule, width<3 for a vertical one -- see grid_cells
-    # above); a rect with real width AND height satisfies neither test, so
-    # no cell-walking rule (R2/R3/R4/R10/R12/R14/R16/R17) ever reaches it,
-    # even though a person sees exactly where to write. Confirmed on the
-    # SAFER application form (the fixture that reported this gap): page 4
-    # draws six of these -- Home/Work/Cell Phone #, Email, and two optional
-    # contact numbers -- each a plain grey rect beside its own printed
-    # caption, all six previously undetected. The synthetic hard corpus
-    # already exercises this exact shape (sec_shaded_field, sec_group_
-    # caption in eval/synth/hard.py) and this rule matches it at 36/36
-    # (100% precision).
+    # ---- R18  a checkbox drawn as a filled square, not a glyph ----------
+    # grid_cells() turns a rect into a cell only when it is a thin ruling
+    # line (height<3 horizontal, width<3 vertical), so a rect with real
+    # width AND height satisfies neither test and no cell-walking rule
+    # (R2/R3/R4/R10/R12/R14/R16/R17) ever reaches it, even though a person
+    # sees exactly where to tick. R1 does not reach it either: R1 keys on
+    # the two Webdings/Wingdings codepoints in CHECK_GLYPHS, and these
+    # boxes carry no glyph at all.
     #
-    # The real 165-form corpus is a different story. A first, size-only cut
-    # (fill, not stroke, roughly phone-box sized: width 45-165pt, height
-    # 18-45pt) claimed 66 candidates there at 18% precision (12 matched, 54
-    # false) -- shaded TABLE HEADER cells ("Budget Item", "Amount", "Line",
-    # a wrapped "Date of Last Park Rule Change..."), zebra-striped repeated-
-    # row backgrounds (a rotated-column data table, a per-unit rent
-    # schedule), and a highlighted multiple-choice option background, none
-    # of them a fillable field. Three guards below bring that down to a
-    # handful of residual false positives on OTHER forms in the corpus
-    # (measured: a "File Number:" footer stamp and a stray caption on a
-    # multi-line paragraph box, most likely both office-only fields; a
-    # "DATE (YY/MM/DD)" instruction repeated on two forms with no matching
-    # widget; two bulleted-list checkbox squares mistaken for real ones) --
-    # this rule scores 21/25 matched (84% precision) on the full tuning +
-    # holdout corpus, with the full per-rule breakdown in eval.score's own
-    # per_rule output:
+    # Confirmed on the SAFER application form: page 2's "Option 1: Consent
+    # Granted" / "Option 2: Consent Not Granted" CRA consent boxes, drawn
+    # as 25 x 25.9pt filled squares, reported undetected by the product
+    # owner using the app.
     #
-    #   - CONTAINMENT: a shaded panel that itself contains another
-    #     qualifying shaded rect (safer.pdf p2's 545x68.8 section panel
-    #     wrapping a 535x16.8 heading strip; a real-corpus 128x30 highlight
-    #     wrapping a 118x18 one) is a section wrapper, not a field -- drop
-    #     the outer, keep only the innermost.
-    #   - ROW-MATE: a candidate sharing another candidate's exact top AND
-    #     bottom (within ROW_MATE_TOL) at a different x is one column of a
-    #     multi-column table row -- every zebra-table false positive
-    #     measured here shares its row with at least one sibling this way.
-    #     Not applied to the checkbox band: two option checkboxes sharing a
-    #     row (safer.pdf's own "Option 1" / "Option 2") are the normal,
-    #     wanted shape there.
-    #   - EDGE-TRIM, then a height floor: rather than asking "is the
-    #     interior text-free" as one yes/no test, each word fully inside
-    #     the candidate is checked against its OWN nearer edge (top or
-    #     bottom). A word hugging an edge (within EDGE_TRIM_TOL) is
-    #     presumed to be a caption or a neighbour's text bleeding in by a
-    #     few points -- not this box's own content -- and the emitted rect
-    #     is trimmed to stop just short of it; a word sitting well clear of
-    #     BOTH edges is real interior content and rejects the candidate
-    #     outright. This one test resolves both directions safer.pdf p4
-    #     needs: rows 4-6's tight spacing bleeds a NEIGHBOUR's caption in
-    #     near an edge (trimmed away, box kept) while row 6 -- the last
-    #     box, with no neighbour below to blame it on -- bleeds a stray
-    #     word from the page's own closing disclaimer paragraph the exact
-    #     same way (also trimmed, also kept). What the height floor catches
-    #     is the shape neither of those is: safer.pdf p1's own sidebar
-    #     strips are ordinary instructional TEXT that merely happens to sit
-    #     in a shaded panel -- trimming the near-edge line off one of those
-    #     leaves only ~5pt of "interior" behind (the strip's own line
-    #     height consumed almost the entire box), well under
-    #     MIN_H_AFTER_TRUNC, so it is rejected even though no single word
-    #     was ever more than EDGE_TRIM_TOL from an edge. A word made only
-    #     of MASK_ONLY glyphs ("(", ")", "-", "$") -- a pre-printed phone-
-    #     number mask -- never counts against either test, matching R4's
-    #     own convention for a mask-only cell.
-    #   - CAPTION REQUIRED: an ordinary printed caption must be found --
-    #     beside the box on the same row, or a longer phrase directly
-    #     above it (sec_shaded_field's own convention) -- to emit at all; a
-    #     candidate with neither is left alone rather than guessed at. This
-    #     is also where the label comes from.
-    R18_TEXT_MIN_W, R18_TEXT_MAX_W = 45, 165
-    R18_TEXT_MIN_H, R18_TEXT_MAX_H = 18, 45
+    # SCOPE NOTE. This rule also claimed shaded rects as TEXT fields --
+    # safer.pdf page 4 draws Home/Work/Cell Phone # and Email as plain grey
+    # 84.6 x 30.75pt boxes beside their captions, and it found all six.
+    # That path was REMOVED at the product owner's request after seeing it
+    # in the app. It is not being carried as dead code: the text band, the
+    # row-mate guard, the caption reader and the min-height floor all went
+    # with it. Recovering it means `git show ed8f92a`, which has the whole
+    # thing with its measurements (66 candidates at 18% precision from a
+    # size-only cut, brought to 84% by three guards). Do not rebuild it
+    # from scratch.
+    #
+    # What remains is the checkbox band only, with the guards that band
+    # needs:
+    #   - CONTAINMENT: a shaded panel containing another qualifying rect is
+    #     a section wrapper, not a field -- keep only the innermost.
+    #   - EDGE-TRIM: a square with real content well clear of both its own
+    #     edges is not empty and is not a tick box.
+    #   - ALREADY-CLAIMED: skip anything R1-R17 has taken (30% overlap).
+    #   - A caption is required, and supplies the label.
+    #
+    # Known residual risk, measured: in 1f95bd47c4b0.pdf a genuine consent
+    # checkbox and a decorative list bullet are visually identical, and
+    # geometry cannot separate them.
     R18_CHK_MIN, R18_CHK_MAX = 18, 32
     R18_CHK_SQUARE_TOL = 8       # points; |width - height| tolerance for "square"
-    R18_ROW_MATE_TOL = 2.0       # points; same-row-band tolerance, see ROW-MATE above
     R18_EDGE_TRIM_TOL = 8        # points; how close to ITS OWN nearer edge a word
                                  # must sit to be trimmed rather than disqualifying
-    R18_MIN_H_AFTER_TRUNC = 12   # points; reject rather than emit a sliver -- this
-                                 # is what actually rejects safer.pdf p1's own
-                                 # sidebar strips, see EDGE-TRIM above
-    # Caption geometry, measured on safer.pdf p4's six boxes: a caption's own
-    # vertical CENTER always lands within ~4pt of the box's own top (whether
-    # the caption sits beside the box on the same row, as for "Home Phone
-    # #", or is a longer phrase directly above it, as for "Message person
-    # phone number") -- so one test (TOL_Y) covers both layouts, no separate
-    # left/above split needed. A longer caption's LATER words can run a
-    # little past the box's own left edge into the box's own footprint
-    # (measured up to 31pt, "Work Phone #" over box "Work"), which is why
-    # the horizontal test is "starts before the box's right edge, ends no
-    # more than REACH before its left edge" rather than a tight cutoff at
-    # the box's own x0 -- the gap-based cut below (_cut_at_gutter) is what
-    # actually keeps this from crossing into an unrelated caption further
-    # left on the same line. REACH is generous enough for that (measured
-    # need: up to 76pt) but well under the 221pt an unrelated same-row
-    # sentence needed to false-match on the real corpus (see the "Date of
-    # Last Park..." / "Breakdown column)." false positive above).
-    R18_CAPTION_REACH = 90       # points; see comment above
-    R18_CAPTION_TOL_Y = 10       # points; caption vs the box's own top
     R18_CLAIMED_OVERLAP = 0.3    # fraction; already claimed by an earlier rule
-
-    def _r18_is_text_band(r):
-        return (R18_TEXT_MIN_W <= r["width"] <= R18_TEXT_MAX_W
-                and R18_TEXT_MIN_H <= r["height"] <= R18_TEXT_MAX_H)
 
     def _r18_is_chk_band(r):
         return (R18_CHK_MIN <= r["width"] <= R18_CHK_MAX
@@ -2062,11 +1998,6 @@ def detect(page, pno, carry_in=None):
         return (outer["x0"] <= inner["x0"] + tol and outer["x1"] >= inner["x1"] - tol
                 and outer["top"] <= inner["top"] + tol and outer["bottom"] >= inner["bottom"] - tol
                 and (outer["width"] * outer["height"]) > (inner["width"] * inner["height"]) + 1)
-
-    def _r18_row_mate(cand, others):
-        return any(abs(o["top"] - cand["top"]) <= R18_ROW_MATE_TOL
-                   and abs(o["bottom"] - cand["bottom"]) <= R18_ROW_MATE_TOL
-                   for o in others if o is not cand)
 
     def _r18_trimmed_bounds(cand):
         """(top, bottom) after trimming edge-hugging words, or None if
@@ -2099,17 +2030,6 @@ def detect(page, pno, carry_in=None):
     def _r18_valid_label(label):
         return bool(label) and 2 <= len(label) <= 60 and HAS_LETTER.search(label) \
             and not OFFICE_USE.search(label) and label.rstrip()[-1:] not in ".?"
-
-    def _r18_caption(cand):
-        """The box's own caption -- beside it on the same row, or a longer
-        phrase directly above -- or None. See CAPTION geometry above."""
-        x0, x1, top = cand["x0"], cand["x1"], cand["top"]
-        cands = [w for w in words if w["x0"] < x1 and w["x1"] > x0 - R18_CAPTION_REACH
-                 and abs(((w["top"] + w["bottom"]) / 2) - top) <= R18_CAPTION_TOL_Y]
-        if not cands:
-            return None
-        run = _cut_at_gutter(sorted(cands, key=lambda w: w["x0"]), gap_threshold, "last")
-        return " ".join(w["text"] for w in run).rstrip(":").strip()
 
     def _r18_already_claimed(cand):
         cx0, cx1 = cand["x0"], cand["x1"]
@@ -2161,28 +2081,9 @@ def detect(page, pno, carry_in=None):
         return " ".join(w["text"] for w in picked).rstrip(":").strip()
 
     raw_shaded = [r for r in page.rects if r["fill"] and not r["stroke"]
-                  and (_r18_is_text_band(r) or _r18_is_chk_band(r))]
-    kept_shaded = [r for r in raw_shaded
-                   if not any(_r18_contains(r, o) for o in raw_shaded if o is not r)]
-    r18_text_cands = [r for r in kept_shaded if _r18_is_text_band(r)]
-    r18_chk_cands = [r for r in kept_shaded if _r18_is_chk_band(r)]
-
-    for cand in r18_text_cands:
-        if _r18_row_mate(cand, r18_text_cands) or _r18_already_claimed(cand):
-            continue
-        bounds = _r18_trimmed_bounds(cand)
-        if bounds is None:
-            continue
-        top_b, bot_b = bounds
-        if bot_b - top_b < R18_MIN_H_AFTER_TRUNC:
-            continue
-        label = _r18_caption(cand)
-        if not _r18_valid_label(label):
-            continue
-        x0, x1 = cand["x0"], cand["x1"]
-        out.append({"page": pno, "type": "text", "label": label, "rule": "R18",
-                    "confidence": 0.5,
-                    "rect": [x0 + 2, H - bot_b + 2, x1 - 2, H - top_b - 2]})
+                  and _r18_is_chk_band(r)]
+    r18_chk_cands = [r for r in raw_shaded
+                     if not any(_r18_contains(r, o) for o in raw_shaded if o is not r)]
 
     for cand in r18_chk_cands:
         if _r18_already_claimed(cand):
