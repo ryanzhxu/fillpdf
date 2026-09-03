@@ -116,7 +116,24 @@ async function boot(){
   const CDN = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/';
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  const d = await (await fetch('fields.json')).json();
+  // fields.json is the one file the whole page depends on: without it there
+  // are no pages to lay out and no boxes to draw. If the fetch fails (missing
+  // file, 404, network error) or the body is not JSON, an un-caught rejection
+  // here leaves #main stuck on 'rendering…' forever with no reason why -- the
+  // 'app silently does nothing' case value item #5 forbids, and the load-path
+  // twin of the build() catch below. Say what broke and stop.
+  let d;
+  try {
+    d = await (await fetch('fields.json')).json();
+  } catch (err){
+    console.error('[boot] could not load fields.json:', err);
+    $('#load')?.remove();
+    const h = $('#hint');
+    h.classList.add('notice');
+    h.innerHTML = `<b>Could not load the form —</b> ${escapeHtml(err.message || String(err))}. `
+      + `fields.json failed to load, so there is nothing to show. See the browser console for details.`;
+    return;
+  }
   PAGES = d.pages; FIELDS = d.fields;
 
   // An image-only / scanned PDF yields no fields. detect() flags it with an

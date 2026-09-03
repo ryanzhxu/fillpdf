@@ -140,6 +140,24 @@ def test_served_index_html_surfaces_a_detector_notice(built):
         "index.html renders no notice message text"
 
 
+def test_served_index_html_reports_a_failed_load(built):
+    """A failed fields.json load must surface, not leave #main stuck on 'rendering…'.
+
+    boot() runs on page load and depends on fields.json for every page and box.
+    If the fetch fails (missing file, 404, non-JSON body), an un-caught
+    rejection leaves #main showing 'rendering…' forever with no reason why --
+    the load-path twin of the build() catch, and the 'app silently does
+    nothing' case item #5 forbids. Assert the catch and its user-visible
+    message are wired up so this cannot rot back into a silent failure.
+    """
+    mod, _ = built
+    html = (mod.OUT / "index.html").read_text(encoding="utf-8")
+    assert "[boot] could not load fields.json" in html, \
+        "boot() no longer catches a failed fields.json load -- it is silent again"
+    assert "Could not load the form" in html, \
+        "boot() has no user-visible message when fields.json fails to load"
+
+
 def test_served_index_html_reports_a_failed_build(built):
     """A failed inject/import/corrupt PDF must surface, not leave Download silent.
 
