@@ -160,7 +160,12 @@ Two design decisions in it were learned the hard way and should not be undone:
 **Done since the last handover** (do not re-do these): the caption-in-bottom-band
 rule landed as R17 (`8250261`); the `label_plausibility` mislabelling — including
 `'Landlord Phone # Date:'` on safer.pdf — was fixed by the gutter cut in
-`feaca36`; R10 now reads past a blank gutter cell (`89bcac9`).
+`feaca36`; R10 now reads past a blank gutter cell (`89bcac9`); radio groups for
+Yes/No pairs, a scanned-PDF guard, an honest `no_fields` notice, and rect/curve
+checkbox detection all landed in an autobuild run on 2026-09-03 — full account,
+including several correctly-rejected leads with real technical detail, in
+`docs/AUTOBUILD-2026-09-03.md`. **Read that file before starting the checkbox
+truth fix below** — it now has three independent confirmations, not one.
 
 - **Finish the fill-character label fix — specified, measured, and reverted for
   scope, so it is ready to pick up.** Iteration 32 fixed R5 only. The full fix
@@ -198,9 +203,11 @@ rule landed as R17 (`8250261`); the `label_plausibility` mislabelling — includ
   R5b, R11) and every cell-walking rule needs something *drawn*. Isolated recall
   9%. Ordinary on typewriter-era intake sheets. Solving it needs a genuinely new
   signal, which is why it is the last hard construct standing.
-- **SAFER's "Option 1 / Option 2" consent boxes are undetected.** They are single
-  25pt stroked rects; `grid_cells()` only treats a rect as a ruling line below
-  3pt. R6 was written for these and never once found them.
+- ~~SAFER's "Option 1 / Option 2" consent boxes are undetected~~ **FIXED.** R18
+  (added `c39501e`, extended with curve-drawn variants `da5982e`) now finds both,
+  correctly labelled. Confirmed live: `detect('fixtures/safer.pdf')` returns them
+  as `R18` checkboxes. This bullet was stale — check a claim like this against
+  the live detector before repeating it.
 - **R2 row-label column**, 239 of its false positives, precision 48.7% on
   real/Adobe. Two fixes measured and both rejected: a prose-wrapping-sibling test
   (61 FP but 21 TP lost naive, 21 FP for 0 TP tuned but zero holdout benefit) and
