@@ -49,6 +49,18 @@ def test_classify_safer_pdf_is_flat_wordlike():
 # 2. classify() on a generated synthetic form
 # --------------------------------------------------------------------------
 
+# eval/synth/generate.py draws its checkbox glyphs with Webdings and
+# Wingdings, loaded from /System/Library/Fonts/Supplemental/. That path exists
+# only on macOS, so this test errors on a Linux CI runner. The generator is a
+# protected path (the adversarial corpus and its generator/truth), so the test
+# skips rather than the generator changing -- the same shape as
+# eval/test_guards.py's skip when the real corpus is absent. On macOS nothing
+# changes and the test runs exactly as before.
+_SYNTH_FONT = Path("/System/Library/Fonts/Supplemental/Webdings.ttf")
+
+
+@pytest.mark.skipif(not _SYNTH_FONT.exists(),
+                    reason="synth generator needs macOS Webdings/Wingdings")
 def test_classify_synthetic_form_is_flat_wordlike(tmp_path):
     pdf_path, _truth_path = synth_generate(1, tmp_path)
     record = classify(pdf_path)
