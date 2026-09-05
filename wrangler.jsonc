@@ -1,0 +1,18 @@
+{
+  // Static assets only. There is no Worker script and no server-side code:
+  // the detector runs in the visitor's browser under Pyodide, so Cloudflare
+  // just serves files. That is what makes this free -- Workers Free caps CPU
+  // at 10ms per request, which server-side detection would blow through
+  // instantly, and Containers need the Workers Paid plan.
+  //
+  // Build the directory first:  ./.venv/bin/python scripts/build_site.py
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fillpdf",
+  "compatibility_date": "2026-09-05",
+  "assets": {
+    "directory": "./site",
+    // The site is one page; anything else is a mistyped URL, and there is no
+    // client-side router to hand it to.
+    "not_found_handling": "404-page"
+  }
+}
