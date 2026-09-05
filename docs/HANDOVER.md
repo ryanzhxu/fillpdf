@@ -141,6 +141,51 @@ Two design decisions in it were learned the hard way and should not be undone:
    regenerating truth, and re-baselining. It moves the baseline, so do it at
    the START of a session with no candidates in flight.
 
+   **Update 2026-09-04 — the two detector fixes are written and parked, and
+   the blocker is now the only thing left.** Both were built, tested and
+   measured, then parked on branches rather than merged, because both are
+   rejected by a gate that cannot see what they find:
+
+   - `blocked/ballot-box-checkbox` — R1 keyed only on the two PRIVATE-USE
+     codepoints, so **U+2610/2611/2612, the real Unicode ballot boxes, were
+     never checkboxes at all.** Limitation 4 above describes the stroked-box
+     case only; this is a second, independent construct it does not mention,
+     and `MARK_CHARS` needs these codepoints too. +143 detections, **+0**
+     matched.
+   - `blocked/stroked-square-checkbox` — the stroked-box case itself. R18's
+     filter is `fill and not stroke`; a drawn-border checkbox is the
+     opposite. +259 detections, **+4** matched.
+
+   Both were verified by rendering the page, not by the metric.
+   `tuning/8f464402de3d.pdf` reads "What is your preferred language?
+   [] French [] English"; the fix finds 41 such boxes with correct labels
+   against a truth file holding 12 widgets total, of which it matches 1.
+
+   **Two documented causes were wrong, and both are now disproved:**
+
+   - `AUTOPILOT.md` lists `real/0a399532c0a54567.pdf` (zero fields) as
+     "likely a font-encoding or non-Latin-text assumption". It is not. It is
+     one of **six language variants of one DSHS survey template**; the five
+     Arial/Latin variants fail identically, and the Lao variant's labels come
+     out correct once the boxes are found. The cause was never encoding.
+   - `.autobuild/PROGRESS.md` pass 16 guessed the same file family's
+     checkboxes were "a SymbolMT PUA glyph". Rendering shows that glyph
+     (U+F8E7) is an **em-dash list bullet** before prose. Claiming it would
+     invent 13 false positives on one page. PUA codepoints must stay listed
+     one by one, never matched as a range.
+
+   **Every one of the 12 remaining "structured but zero fields" files in
+   `.autobuild/blind_report.txt` is a checkbox construct**, so no further
+   blind-corpus progress is available until truth is regenerated — each new
+   fix would only join the parked pile.
+
+   **Regeneration is fully possible, which limitation 4 did not establish.**
+   `label()` needs the original fillable PDF, and the corpus stores only the
+   stripped copy — but the corpus stem is `sha256(original bytes)[:12]`, so
+   hashing the fetch pools recovers **all 165 originals** (`eval/corpus/real`
+   plus `eval/corpus/real_v4`). The 25 that do not resolve are the synthetic
+   `hard_*` forms, which their generator rebuilds. Nothing needs re-fetching.
+
 5. **Score files record `git_sha` at scoring time**, which is usually before the
    commit. Trust `detector_fingerprint` and `git_dirty` instead.
 
