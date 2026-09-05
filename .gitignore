@@ -12,3 +12,4 @@ eval/work/
 
 # agent worktrees are separate checkouts, never part of this tree
 .claude/
+site/

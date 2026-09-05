@@ -101,10 +101,16 @@
 </div>
 
 <script>
-// Upload mode. FALSE here so demo.py's baked build (fields.json + source.pdf
-// already on disk) keeps working untouched; web/app.py rewrites this one line
-// to true when it serves the same file, and fails loudly if the marker moved.
-window.FILLPDF_UPLOAD = false;
+// Which of the two builds this is. 'baked' here so demo.py's local build
+// (fields.json + source.pdf already on disk) keeps working untouched;
+// scripts/build_site.py rewrites this one line to 'pyodide' for the deployed
+// static site, and fails loudly if the marker moved.
+//
+// There is no server mode. The deployed site runs engine/detect in the
+// browser under Pyodide, against the very same rules.py the eval harness
+// scores -- so the thing a visitor gets is the thing that is measured, and
+// their PDF never leaves the machine.
+window.FILLPDF_MODE = 'baked';
 
 const $ = s => document.querySelector(s);
 let FIELDS = [], PAGES = [], sel = null, adding = false, cursor = -1, navOrder = [];
@@ -155,10 +161,10 @@ const PDFJS_CDN = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/';
 async function boot(){
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  // Upload mode has no baked fields.json to read: the visitor supplies the
-  // PDF, so show the picker and let onFile() call render() once detection
+  // The deployed build has no baked fields.json to read: the visitor supplies
+  // the PDF, so show the picker and let onFile() call render() once detection
   // comes back. Baked mode keeps the original path exactly.
-  if (window.FILLPDF_UPLOAD) return showPicker();
+  if (window.FILLPDF_MODE === 'pyodide') return showPicker();
   // fields.json is the one file the whole page depends on: without it there
   // are no pages to lay out and no boxes to draw. If the fetch fails (missing
   // file, 404, network error) or the body is not JSON, an un-caught rejection
@@ -428,10 +434,92 @@ async function build(flatten){
 $('#dlFlat').onclick = () => build(true);
 $('#dlForm').onclick = () => build(false);
 
-// ---- upload mode ----------------------------------------------------------
-// Only the detector needs a server. The PDF is posted once, the fields come
-// back, and every other step -- painting the pages, typing, writing the filled
-// file -- happens in this tab against the bytes already in SOURCE.
+// ---- the detector, running in this tab ------------------------------------
+// engine/detect is Python, so it runs under Pyodide (CPython on WebAssembly).
+// The alternative was a server, which would mean uploading the form. A person
+// filling a benefits form is handing over their address and their income, and
+// the only way to promise that goes nowhere is for it to actually go nowhere.
+//
+// This loads the SAME engine/detect/rules.py the eval harness scores, fetched
+// as source from this origin -- not a reimplementation. There is one detector.
+//
+// pdfplumber declares pypdfium2, which has no pure-Python wheel and so cannot
+// install here. It is used only by to_image(); engine/detect never calls it.
+// Stub it, then install pdfplumber with deps off. Both wheels are served from
+// this origin rather than PyPI so the app does not depend on PyPI being up.
+const PYODIDE_URL = 'https://cdn.jsdelivr.net/pyodide/v0.28.0/full/';
+let PY = null;
+
+async function pyodideReady(say){
+  if (PY) return PY;
+  // Loaded on demand, not in a <script> tag: the local demo never runs this
+  // path and must not pay for a Python runtime it does not use.
+  say('Starting the detector…');
+  if (!window.loadPyodide){
+    await new Promise((ok, bad) => {
+      const s = document.createElement('script');
+      s.src = PYODIDE_URL + 'pyodide.js';
+      s.onload = ok;
+      s.onerror = () => bad(new Error('could not load the Python runtime'));
+      document.head.appendChild(s);
+    });
+  }
+  const py = await loadPyodide({ indexURL: PYODIDE_URL });
+
+  say('Loading libraries…');
+  await py.loadPackage(['micropip', 'Pillow', 'cryptography']);
+  // Real wheel filenames, from the build manifest: micropip parses the name,
+  // version and tags back out of the filename, so they cannot be renamed to
+  // something tidier. scripts/build_site.py writes this.
+  const names = await (await fetch('wheels/index.json')).json();
+  py.globals.set('_wheels', py.toPy([
+    new URL('wheels/' + names['pdfminer.six'], location.href).href,
+    new URL('wheels/' + names['pdfplumber'], location.href).href,
+  ]));
+  await py.runPythonAsync(`
+import micropip, sys, types
+await micropip.install(_wheels[0])
+# pypdfium2 is an image-rendering dependency the detector never calls.
+_stub = types.ModuleType("pypdfium2")
+_stub.__version__ = "5.9.0"
+sys.modules["pypdfium2"] = _stub
+await micropip.install(_wheels[1], deps=False)
+`);
+
+  say('Loading the rules…');
+  py.FS.mkdirTree('/app/engine/detect');
+  for (const f of ['engine/detect/__init__.py', 'engine/detect/rules.py']){
+    const res = await fetch(f);
+    if (!res.ok) throw new Error(`could not load ${f} (${res.status})`);
+    py.FS.writeFile('/app/' + f, await res.text());
+  }
+  await py.runPythonAsync(`
+import sys
+sys.path.insert(0, '/app')
+from engine.detect import detect as _detect
+`);
+  PY = py;
+  return py;
+}
+
+async function detectLocally(bytes, say){
+  const py = await pyodideReady(say);
+  say('Reading the form…');
+  py.FS.writeFile('/in.pdf', new Uint8Array(bytes));
+  try {
+    const json = await py.runPythonAsync(`
+import json
+json.dumps(_detect('/in.pdf'))
+`);
+    return JSON.parse(json);
+  } finally {
+    // The bytes are gone from the sandbox as soon as detection returns. They
+    // were never sent anywhere; this just does not leave them lying around.
+    try { py.FS.unlink('/in.pdf'); } catch (_){}
+  }
+}
+
+// ---- the picker -----------------------------------------------------------
 function showPicker(){
   document.body.classList.add('picking');
   $('#main').innerHTML = `
@@ -440,8 +528,9 @@ function showPicker(){
       <p>Drop a PDF here, or <label class="pick">choose a file<input id="file" type="file" accept="application/pdf" hidden></label>.</p>
       <p class="fine">FormFill finds the blanks, boxes and tick-boxes on forms that have no
       fillable fields, so you can type into them and download the result.</p>
-      <p class="fine">Your file is sent once so the detector can read the page layout, then
-      discarded. It is never stored. Filling and download happen entirely in your browser.</p>
+      <p class="fine"><b>Your file never leaves this device.</b> The whole thing — reading the
+      form, filling it, writing the finished PDF — runs inside your browser. There is no
+      upload and no server. The first form takes a few seconds while the detector loads.</p>
     </div>`;
   const drop = $('#drop');
   $('#file').onchange = e => e.target.files[0] && onFile(e.target.files[0]);
@@ -468,21 +557,13 @@ async function onFile(file){
   const drop = $('#drop');
   drop.classList.add('busy');
   pickerError('');
-  drop.querySelector('h2').textContent = 'Reading the form…';
+  const say = m => { const h = drop.querySelector('h2'); if (h) h.textContent = m; };
+  say('Reading the form…');
   try {
     SOURCE = await file.arrayBuffer();
-    const res = await fetch('api/detect', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/pdf'},
-      // SOURCE must survive for pdf.js and the download, so post a copy.
-      body: SOURCE.slice(0)
-    });
-    if (!res.ok){
-      let msg = `The server returned ${res.status}.`;
-      try { msg = (await res.json()).error || msg; } catch (_){}
-      throw new Error(msg);
-    }
-    const d = await res.json();
+    // A copy, because detection hands the buffer to the WASM sandbox and
+    // SOURCE must survive for pdf.js and the download.
+    const d = await detectLocally(SOURCE.slice(0), say);
     document.body.classList.remove('picking');
     $('#hint').textContent = '';
     $('#hint').className = 'hint';
@@ -493,7 +574,7 @@ async function onFile(file){
     SOURCE = null;
     drop.classList.remove('busy');
     drop.querySelector('h2').textContent = 'Fill any flat PDF';
-    pickerError(`Could not read that PDF — ${err.message || err}. Nothing was uploaded or saved.`);
+    pickerError(`Could not read that PDF — ${err.message || err}. Nothing left your device.`);
   }
 }
 
