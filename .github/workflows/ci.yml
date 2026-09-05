@@ -96,3 +96,8 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           # accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # wrangler.jsonc has no `main` (this is an assets-only deployment,
+          # no Worker script), and wrangler still requires a PATH or
+          # --assets flag in that case -- passing neither is what "Missing
+          # entry-point" means.
+          command: deploy --assets ./site
