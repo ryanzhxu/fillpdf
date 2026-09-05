@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install -r requirements.txt -r requirements-web.txt
+
+      # WHAT THIS DOES AND DOES NOT PROVE.
+      #
+      # scripts/verify.sh is the project's real gate: the test suite AND the
+      # detection eval scored against scores/HEAD_BASELINE.json. Only the first
+      # half can run here. The eval needs eval/corpus/tuning and eval/holdout,
+      # 165 real government forms that are gitignored (36MB, and they are
+      # stripped copies of fetched originals rather than anything this repo
+      # should redistribute). Without them the scorer has nothing to score.
+      #
+      # So CI catches broken behaviour and broken contracts. It CANNOT catch a
+      # recall regression -- a change can pass everything here and still make
+      # the detector worse across the corpus. That is exactly the failure mode
+      # scripts/verify.sh exists for, and it still has to be run locally before
+      # merging anything that touches engine/.
+      #
+      # Tests that need the corpus already skip themselves (skipUnless on the
+      # path), so this is green on a clean checkout rather than red.
+      - name: Tests
+        run: python -m pytest -q --ignore=eval/adversarial
+
+      - name: Detection eval (skipped, corpus not in repo)
+        run: |
+          echo "::notice title=Detection gate not run::scripts/verify.sh's eval"\
+               "half needs eval/corpus (gitignored). Run ./scripts/verify.sh"\
+               "locally before merging changes to engine/."
