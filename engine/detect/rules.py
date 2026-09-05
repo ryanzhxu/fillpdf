@@ -2366,8 +2366,17 @@ def detect(page, pno, carry_in=None):
             prev_edge = w["x1"]
         return " ".join(w["text"] for w in picked).rstrip(":").strip()
 
+    R18_STROKE_CHK_MIN, R18_STROKE_CHK_MAX = 7, 20
+
+    def _r18_is_stroked_chk(r):
+        return (not r["fill"] and r["stroke"]
+                and R18_STROKE_CHK_MIN <= r["width"] <= R18_STROKE_CHK_MAX
+                and R18_STROKE_CHK_MIN <= r["height"] <= R18_STROKE_CHK_MAX
+                and abs(r["width"] - r["height"]) <= 2)
+
     raw_shaded = [r for r in page.rects if r["fill"] and not r["stroke"]
                   and _r18_is_chk_band(r)]
+    stroked_chk = [r for r in page.rects if _r18_is_stroked_chk(r)]
     curve_chk_cands = [r for r in _rect_like_curves(page) if r["fill"] and not r["stroke"]
                        and _r18_is_chk_band_curve(r)]
     # A real checkbox/radio button drawn this way is essentially always one
@@ -2397,6 +2406,7 @@ def detect(page, pno, carry_in=None):
 
     curve_chk_cands = [r for r in curve_chk_cands if _r18_curve_siblings(r, curve_chk_cands)]
     raw_shaded += curve_chk_cands
+    raw_shaded += [r for r in stroked_chk if _r18_curve_siblings(r, stroked_chk)]
     r18_chk_cands = [r for r in raw_shaded
                      if not any(_r18_contains(r, o) for o in raw_shaded if o is not r)]
 
