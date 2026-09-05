@@ -9,6 +9,10 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "fillpdf",
   "compatibility_date": "2026-09-05",
+  // The public address. Declared here rather than clicked in the dashboard so
+  // the domain lives in version control with everything else. Cloudflare
+  // manages the DNS record for a custom_domain route itself.
+  "routes": [{ "pattern": "fillpdf.ryanxu.dev", "custom_domain": true }],
   "assets": {
     "directory": "./site",
     // The site is one page; anything else is a mistyped URL, and there is no
