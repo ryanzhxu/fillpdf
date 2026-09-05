@@ -49,8 +49,15 @@ jobs:
       #
       # Tests that need the corpus already skip themselves (skipUnless on the
       # path), so this is green on a clean checkout rather than red.
+      # eval/synth is ignored, not fixed. Its generators (eval/synth/hard.py,
+      # eval/synth/generate.py) load Webdings and Wingdings from
+      # /System/Library/Fonts/Supplemental/, which exists only on macOS, so all
+      # 13 of its tests error on ubuntu. Those generators are a protected path
+      # under AUTOPILOT.md -- the adversarial corpus and its generator/truth --
+      # so CI works around them rather than editing them. Consequence: the
+      # synthetic hard-corpus suite is macOS-only and runs locally, never here.
       - name: Tests
-        run: python -m pytest -q --ignore=eval/adversarial
+        run: python -m pytest -q --ignore=eval/adversarial --ignore=eval/synth
 
       - name: Detection eval (skipped, corpus not in repo)
         run: |
