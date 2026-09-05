@@ -19,6 +19,20 @@ any score says.
 
 There is no "done". Rank by value each pass and make one change.
 
+## Tonight's run (2026-09-05, until ~00:00)
+
+Same goal, renewed by the user with one explicit priority: the existing
+145-file blind pool from the 2026-09-03 run is largely mined out (it stalled
+twice at 12 consecutive no-change passes — see `.autobuild/notify.log` and
+`.autobuild/PROGRESS.md` entry 14, "every remaining zero-field lead there is
+already dispositioned"). So for THIS run, treat value-ranking item #3
+(fetch more candidates) as a standing priority, not a last resort — spend
+early passes growing the pool with `eval/fetch.py` before assuming the
+existing 145 have nothing left, then chase whatever `eval.blind` surfaces
+against the grown pool per the normal workflow below. Regenerate
+`.autobuild/blind_report.txt` after any fetch batch; it is stale the moment
+new files land.
+
 ## Starting point — already investigated, do not re-derive
 
 `python -m eval.blind` (new this run, `a0051c9`) runs the live detector plus
@@ -159,7 +173,7 @@ gate — grow, probe, and rewrite them freely.
 
 ```autobuild
 verify = ./scripts/verify.sh
-gate = direct
+gate = pr
 notify = sh -c 'printf "\n[%s] %s\n%s\n" "$(date "+%Y-%m-%d %H:%M")" "{title}" "{body}" >> .autobuild/notify.log'
 branch_prefix = autobuild
 email_to = ryan.xu282@gmail.com
@@ -172,14 +186,19 @@ verify   scripts/verify.sh runs the test suite AND the detection eval, gated
          minutes. pytest alone cannot see a recall regression, which is the
          failure mode that matters most in this repo.
 
-gate     direct. This repo has NO git remote and NO CI, so `pr` is impossible.
-         land_direct commits locally FIRST and then pushes, so with no remote
-         the commit still lands and only the push step logs a failure. That is
-         the intended behaviour here: work accumulates in local history for
-         review.
+gate     pr. As of 2026-09-05 this repo has a real GitHub remote
+         (ryanzhxu/fillpdf) and CI (.github/workflows/ci.yml), and `main` has
+         branch protection requiring a passing `tests` status check plus a PR
+         (required_pull_request_reviews is set, required_approving_review_count
+         0). A direct push to main is rejected by GitHub itself, so `direct`
+         would fail outright now. autobuild.sh's own startup check queries
+         this and would force `pr` regardless of what this file says — this
+         value just makes that explicit instead of relying on the override.
 
-notify   Appends to .autobuild/notify.log. `gh issue create` cannot work with
-         no remote.
+notify   Appends to .autobuild/notify.log. Left as a local log rather than
+         `gh issue create` (now possible, since a remote exists) because the
+         user reads milestones directly from this file and PROGRESS.md in an
+         interactive session, not by polling GitHub issues.
 
 email_cmd  EMPTY, deliberately. There is no RESEND_API_KEY and no msmtp on this
          machine, so any email command here would fail silently every pass and
