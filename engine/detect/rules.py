@@ -1,7 +1,16 @@
 """Detection rules. THROWAWAY DEMO quality — the real one is track T1."""
 import re
 
-CHECK_GLYPHS = {"\uf063", "\uf06f"}          # Webdings box, Wingdings box
+# Webdings/Wingdings boxes are PRIVATE-USE codepoints, so they are listed one
+# by one and never matched as a range: on the zoning checklist that prompted
+# this list to grow (eval/corpus/real/9e5fa53418722365.pdf) the neighbouring
+# PUA glyph U+F8E7 renders as an em-dash list bullet, and claiming it would
+# invent a field on every bulleted sentence. U+2610/2611/2612 are the real
+# Unicode ballot boxes and carry no such ambiguity; a producer using them was
+# previously invisible to R1. Measured: 7 tuning, 2 holdout and 15 real
+# fetched files draw checkboxes this way.
+CHECK_GLYPHS = {"\uf063", "\uf06f",          # Webdings box, Wingdings box
+                "\u2610", "\u2611", "\u2612"}  # ballot box, checked, crossed
 MASK_ONLY = set("()- $.")
 SIGNATURE = re.compile(r"signatur", re.I)      # signature lines get no input box
 
