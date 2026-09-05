@@ -27,7 +27,7 @@ jobs:
           cache: npm
 
       - name: Install (python)
-        run: pip install -r requirements.txt -r requirements-web.txt
+        run: pip install -r requirements.txt
 
       - name: Install (node)
         run: npm ci
