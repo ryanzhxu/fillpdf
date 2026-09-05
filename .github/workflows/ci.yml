@@ -17,8 +17,20 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install
+      # tests/render/ drives tools/inject.mjs through node, so the render
+      # goldens need pdf-lib, pdfjs-dist and canvas. node_modules/ is
+      # gitignored, so without this the render suite fails with
+      # ERR_MODULE_NOT_FOUND rather than skipping -- caught on CI's first run.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install (python)
         run: pip install -r requirements.txt -r requirements-web.txt
+
+      - name: Install (node)
+        run: npm ci
 
       # WHAT THIS DOES AND DOES NOT PROVE.
       #
