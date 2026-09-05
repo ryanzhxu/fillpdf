@@ -57,10 +57,27 @@
   #bar input{font:inherit;border:1px solid var(--line);border-radius:5px;padding:4px 6px;width:200px}
   #bar .rl{color:#888;font-size:12px}
   #load{padding:40px;color:#888}
+
+  /* upload mode: the landing screen shown before any file is chosen. The
+     editing chrome is meaningless with no document loaded, so hide it. */
+  body.picking header button,body.picking #stat,body.picking .hint{display:none}
+  #drop{margin:6vh auto 0;max-width:560px;background:#fff;border:2px dashed var(--line);
+        border-radius:12px;padding:44px 32px;text-align:center}
+  #drop.over{border-color:var(--accent);background:#f4f8ff}
+  #drop.busy{opacity:.6;pointer-events:none}
+  #drop h2{margin:0 0 10px;font-size:20px}
+  #drop p{margin:8px 0;color:#555}
+  #drop .fine{font-size:12.5px;color:#777;line-height:1.6}
+  #drop .err:empty{display:none}
+  #drop .err{margin-top:14px;color:var(--warn);background:#fff7ed;border:1px solid #fed7aa;
+             border-radius:6px;padding:8px 10px;font-size:13px}
+  .pick{color:var(--accent);text-decoration:underline;cursor:pointer}
+  #name{color:#666;font-size:13px}
 </style>
 
 <header>
   <h1>FormFill <span style="font-weight:400;color:#888">demo</span></h1>
+  <span id="name"></span>
   <button id="add">+ Add box</button>
   <button id="next">Next field →</button>
   <span class="sp"></span>
@@ -84,8 +101,26 @@
 </div>
 
 <script>
+// Upload mode. FALSE here so demo.py's baked build (fields.json + source.pdf
+// already on disk) keeps working untouched; web/app.py rewrites this one line
+// to true when it serves the same file, and fails loudly if the marker moved.
+window.FILLPDF_UPLOAD = false;
+
 const $ = s => document.querySelector(s);
 let FIELDS = [], PAGES = [], sel = null, adding = false, cursor = -1, navOrder = [];
+
+// The PDF bytes, however they arrived. In baked mode they are fetched from
+// source.pdf on first use; in upload mode the file picker fills this in before
+// anything renders. Both boot() and build() read the document through here, so
+// there is one source of truth and no second fetch path to keep in step.
+let SOURCE = null;
+async function sourceBytes(){
+  if (!SOURCE) SOURCE = await (await fetch('source.pdf')).arrayBuffer();
+  // pdf.js and pdf-lib each take ownership of the buffer they are handed and
+  // may detach it, which would empty SOURCE for the next caller -- Download
+  // after render, or a second Download. Hand out a copy every time.
+  return SOURCE.slice(0);
+}
 
 // The detector emits fields grouped by rule, not by where they sit on the page,
 // so raw FIELDS order sends Tab and "Next field" jumping up and down the sheet.
@@ -115,10 +150,15 @@ function showNotice(n){
   h.innerHTML = `<b>Heads up —</b> ${escapeHtml(n.message)}`;
 }
 
+const PDFJS_CDN = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/';
+
 async function boot(){
-  const CDN = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/';
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  // Upload mode has no baked fields.json to read: the visitor supplies the
+  // PDF, so show the picker and let onFile() call render() once detection
+  // comes back. Baked mode keeps the original path exactly.
+  if (window.FILLPDF_UPLOAD) return showPicker();
   // fields.json is the one file the whole page depends on: without it there
   // are no pages to lay out and no boxes to draw. If the fetch fails (missing
   // file, 404, network error) or the body is not JSON, an un-caught rejection
@@ -137,6 +177,11 @@ async function boot(){
       + `fields.json failed to load, so there is nothing to show. See the browser console for details.`;
     return;
   }
+  return render(d);
+}
+
+async function render(d){
+  const CDN = PDFJS_CDN;
   PAGES = d.pages; FIELDS = d.fields;
 
   // An image-only / scanned PDF yields no fields. detect() flags it with an
@@ -171,7 +216,7 @@ async function boot(){
 
   // 2. Then paint the pages in the background, each independent of the others.
   const pdf = await pdfjsLib.getDocument({
-    url: 'source.pdf',
+    data: await sourceBytes(),
     standardFontDataUrl: CDN + 'standard_fonts/',
     cMapUrl: CDN + 'cmaps/', cMapPacked: true
   }).promise;
@@ -347,7 +392,7 @@ document.addEventListener('keydown', e => {
 async function build(flatten){
   try {
     const { injectFields } = await import('../tools/inject.mjs');
-    const pdfBytes = await (await fetch('source.pdf')).arrayBuffer();
+    const pdfBytes = await sourceBytes();
     const { bytes, made, failed, deferredAppearances } = await injectFields(pdfBytes, { fields: FIELDS }, { flatten });
     console.log(`[inject] created ${made}/${FIELDS.length} fields; ${failed.length} failed; deferredAppearances=${deferredAppearances}`);
     if (failed.length) console.warn('[inject] failures:', failed.slice(0,10));
@@ -382,6 +427,75 @@ async function build(flatten){
 }
 $('#dlFlat').onclick = () => build(true);
 $('#dlForm').onclick = () => build(false);
+
+// ---- upload mode ----------------------------------------------------------
+// Only the detector needs a server. The PDF is posted once, the fields come
+// back, and every other step -- painting the pages, typing, writing the filled
+// file -- happens in this tab against the bytes already in SOURCE.
+function showPicker(){
+  document.body.classList.add('picking');
+  $('#main').innerHTML = `
+    <div id="drop">
+      <h2>Fill any flat PDF</h2>
+      <p>Drop a PDF here, or <label class="pick">choose a file<input id="file" type="file" accept="application/pdf" hidden></label>.</p>
+      <p class="fine">FormFill finds the blanks, boxes and tick-boxes on forms that have no
+      fillable fields, so you can type into them and download the result.</p>
+      <p class="fine">Your file is sent once so the detector can read the page layout, then
+      discarded. It is never stored. Filling and download happen entirely in your browser.</p>
+    </div>`;
+  const drop = $('#drop');
+  $('#file').onchange = e => e.target.files[0] && onFile(e.target.files[0]);
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', e => {
+    e.preventDefault(); drop.classList.remove('over');
+    const f = e.dataTransfer.files[0];
+    if (f) onFile(f);
+  });
+}
+
+function pickerError(msg){
+  const d = $('#drop');
+  if (!d) return;
+  let box = d.querySelector('.err');
+  if (!box){ box = document.createElement('p'); box.className = 'err'; d.appendChild(box); }
+  box.textContent = msg;
+}
+
+async function onFile(file){
+  if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf')
+    return pickerError('That is not a PDF.');
+  const drop = $('#drop');
+  drop.classList.add('busy');
+  pickerError('');
+  drop.querySelector('h2').textContent = 'Reading the form…';
+  try {
+    SOURCE = await file.arrayBuffer();
+    const res = await fetch('api/detect', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/pdf'},
+      // SOURCE must survive for pdf.js and the download, so post a copy.
+      body: SOURCE.slice(0)
+    });
+    if (!res.ok){
+      let msg = `The server returned ${res.status}.`;
+      try { msg = (await res.json()).error || msg; } catch (_){}
+      throw new Error(msg);
+    }
+    const d = await res.json();
+    document.body.classList.remove('picking');
+    $('#hint').textContent = '';
+    $('#hint').className = 'hint';
+    $('#name').textContent = file.name;
+    await render(d);
+  } catch (err){
+    console.error('[upload] failed:', err);
+    SOURCE = null;
+    drop.classList.remove('busy');
+    drop.querySelector('h2').textContent = 'Fill any flat PDF';
+    pickerError(`Could not read that PDF — ${err.message || err}. Nothing was uploaded or saved.`);
+  }
+}
 
 boot();
 </script>

@@ -1,0 +1,11 @@
+# Deployed app only (web/app.py). Deliberately NOT requirements.txt: the
+# server runs the detector and nothing else, so the eval harness and test
+# dependencies (reportlab, jsonschema, pytest) and the PDF-writing libraries
+# used by the render tests (pypdf, pypdfium2) stay out of the image. engine/
+# imports pdfplumber and nothing more -- verified, not assumed.
+#
+# Licences, per AUTOPILOT.md's no-GPL/AGPL/LGPL/SSPL rule:
+#   pdfplumber MIT,  Flask BSD-3-Clause,  gunicorn MIT
+pdfplumber>=0.11
+flask>=3.0
+gunicorn>=23.0
