@@ -64,3 +64,35 @@ jobs:
           echo "::notice title=Detection gate not run::scripts/verify.sh's eval"\
                "half needs eval/corpus (gitignored). Run ./scripts/verify.sh"\
                "locally before merging changes to engine/."
+
+  # Build the static site and push it to Cloudflare. Runs only on a real push
+  # to main (that is, after a PR merges), never on pull_request builds, and
+  # only once the tests job is green -- so a merge that broke the contracts
+  # never reaches production. There is no server: build_site.py assembles the
+  # ./site directory wrangler.jsonc serves, and wrangler uploads it.
+  #
+  # Requires one repo secret, CLOUDFLARE_API_TOKEN (an account-scoped token
+  # with Workers Scripts:Edit). If the account cannot be inferred from the
+  # token, also add CLOUDFLARE_ACCOUNT_ID and pass it as accountId below.
+  deploy:
+    needs: tests
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # build_site.py is pure Python: it pip-downloads the two pure-Python
+      # wheels and assembles ./site. No node step is needed here.
+      - name: Build the static site
+        run: python scripts/build_site.py
+
+      - name: Deploy to Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
