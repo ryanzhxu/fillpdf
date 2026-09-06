@@ -91,6 +91,25 @@ def _group_yes_no(fields: list) -> None:
             f["group"] = gid
 
 
+# A form often prints a fill-in blank as a row of dots -- a "dot leader"
+# (". . . . . .", "......", "…"). Label extraction sometimes picks one up at the
+# start or end of a caption, leaving a field named ". . . . . ." or
+# ". . . . day of" that tells a user nothing (seen on real leader-line forms in
+# the blind corpus). Strip a genuine leader run -- two or more dots, optionally
+# single-spaced, or an ellipsis -- from each end of a label. A single dot is
+# never treated as a leader, so a caption that opens with an abbreviation
+# ("U.S.", ".NET") or ends one ("320 W.") is left untouched.
+_DOT_LEADER = r"(?:…|[.·](?:[ \t]*[.·])+)"
+_LEAD_LEADER = re.compile(r"^\s*" + _DOT_LEADER + r"[ \t,;:]*")
+_TRAIL_LEADER = re.compile(r"[ \t,;:]*" + _DOT_LEADER + r"\s*$")
+
+
+def _strip_dot_leaders(label: str) -> str:
+    s = label or ""
+    stripped = _TRAIL_LEADER.sub("", _LEAD_LEADER.sub("", s))
+    return stripped.strip() if stripped != s else s
+
+
 def detect(pdf_path: Union[str, Path]) -> dict:
     """Detect fillable regions in a flat PDF.
 
@@ -110,6 +129,11 @@ def detect(pdf_path: Union[str, Path]) -> dict:
             page_fields, carry = _detect_page(pg, i, carry_in=carry)
             fields += page_fields
             prev_width = pg.width
+
+    for f in fields:
+        f["label"] = _strip_dot_leaders(f.get("label", "") or "")
+        if f["type"] == "text" and not f["label"]:
+            f["label"] = "value"     # a leader-only blank has no caption of its own
 
     seen: dict = {}
     for f in fields:
