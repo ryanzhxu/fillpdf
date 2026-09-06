@@ -1,10 +1,11 @@
 <!doctype html>
+<html lang="en">
 <meta charset="utf-8">
 <title>FormFill</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+HK:wght@400;500;600&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <style>
@@ -14,8 +15,8 @@
   --line:#dde5e4;--line-strong:#c6d2d0;
   --accent:#0e7c7b;--accent-deep:#0a5c5b;--accent-wash:#e2efee;
   --good:#2f7d4f;--warn:#c2410c;--radius:14px;
-  --font-display:"Bricolage Grotesque",system-ui,sans-serif;
-  --font-body:"Instrument Sans",system-ui,sans-serif;
+  --font-display:"Bricolage Grotesque","Noto Sans HK",system-ui,sans-serif;
+  --font-body:"Instrument Sans","Noto Sans HK",system-ui,sans-serif;
   --font-mono:"JetBrains Mono",monospace;
 }
 *{box-sizing:border-box}
@@ -46,6 +47,8 @@ button.d{color:var(--warn);border-color:var(--line-strong)}
 button.d:hover{border-color:var(--warn);color:var(--warn)}
 .sp{flex:1}
 .stat{color:var(--ink-faint);font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:12.5px}
+.lang-toggle{color:var(--ink-faint);font-size:12.5px;cursor:pointer;padding:4px 2px;user-select:none}
+.lang-toggle:hover,.lang-toggle:focus-visible{color:var(--accent)}
 
 .hint{background:color-mix(in srgb,var(--warn) 10%,var(--surface));
      border-bottom:1px solid color-mix(in srgb,var(--warn) 30%,var(--surface));
@@ -102,7 +105,7 @@ body.picking header button,body.picking #stat,body.picking .hint{display:none}
       border-radius:var(--radius);padding:48px 36px;text-align:center}
 #drop.over{border-color:var(--accent);background:var(--accent-wash)}
 #drop.busy{opacity:.6;pointer-events:none}
-#drop h2{margin:0 0 10px;font-family:var(--font-display);font-size:22px;font-weight:600;color:var(--ink)}
+#drop h2{margin:0 0 10px;font-family:var(--font-display);font-size:22px;font-weight:600;color:var(--ink);line-break:strict}
 #drop p{margin:8px 0;color:var(--ink-soft)}
 #drop .fine{font-size:12.5px;color:var(--ink-faint);line-height:1.6}
 #drop .err:empty{display:none}
@@ -130,7 +133,7 @@ body.picking header button,body.picking #stat,body.picking .hint{display:none}
 .g-step{font-family:var(--font-mono);font-size:12px;color:var(--accent-deep);font-weight:700;
        letter-spacing:.06em;text-transform:uppercase}
 .g-label{font-family:var(--font-display);font-size:20px;font-weight:600;color:var(--ink);
-       margin:5px 0 4px;text-wrap:balance;line-height:1.25}
+       margin:5px 0 4px;text-wrap:balance;line-break:strict;line-height:1.25}
 .g-hint{font-size:13px;color:var(--ink-soft);margin-bottom:12px;line-height:1.5}
 
 .g-inputwrap input[type=text],.g-inputwrap textarea{width:100%;font:inherit;font-family:var(--font-body);
@@ -180,23 +183,24 @@ body.picking header button,body.picking #stat,body.picking .hint{display:none}
 <header>
   <h1>FormFill</h1>
   <span id="name"></span>
-  <button id="add">+ Add box</button>
-  <button id="next">Next field →</button>
+  <button id="add" data-i18n="add_box">+ Add box</button>
+  <button id="next" data-i18n="next_field">Next field →</button>
   <span class="sp"></span>
   <span class="stat" id="stat"></span>
-  <button id="dlFlat" class="p">Download filled</button>
-  <button id="dlForm">Download fillable</button>
+  <button id="dlFlat" class="p" data-i18n="download_filled">Download filled</button>
+  <button id="dlForm" data-i18n="download_fillable">Download fillable</button>
+  <span id="langToggle" class="lang-toggle" role="button" tabindex="0" aria-label="Switch to Chinese">中文</span>
 </header>
-<div class="hint" id="hint">
+<div class="hint" id="hint" data-i18n-html="hint_default">
   Fill fields from the guide on the left, or type straight into any box on the page.
   A box in the wrong place can be left empty. Use <b>+ Add box</b> for a field the detector
   missed, then click the page. Hover a box to see what it is. Signature lines get no box on
   purpose. The original PDF text stays selectable in the gaps.
 </div>
 <div class="stage">
-  <aside id="guide" class="guide" aria-label="Guided fill">
+  <aside id="guide" class="guide" aria-label="Guided fill" data-i18n-aria="guided_fill_aria">
     <div class="g-top">
-      <div class="g-lab">Your progress</div>
+      <div class="g-lab" data-i18n="progress_label">Your progress</div>
       <div class="ptrack"><div id="g-pfill" class="pfill"></div></div>
       <div id="g-pmeta" class="g-pmeta">0 of 0 filled</div>
     </div>
@@ -211,11 +215,11 @@ body.picking header button,body.picking #stat,body.picking .hint{display:none}
 </div>
 
 <div id="bar">
-  <input id="nm" placeholder="field name">
+  <input id="nm" placeholder="field name" data-i18n-placeholder="field_name_placeholder">
   <span class="rl" id="rl"></span>
   <button id="tt">→ checkbox</button>
-  <button id="del" class="d">Delete</button>
-  <button id="close">Done</button>
+  <button id="del" class="d" data-i18n="delete">Delete</button>
+  <button id="close" data-i18n="done">Done</button>
 </div>
 
 <script>
@@ -232,6 +236,162 @@ window.FILLPDF_MODE = 'baked';
 
 const $ = s => document.querySelector(s);
 let FIELDS = [], PAGES = [], sel = null, adding = false, cursor = -1, navOrder = [];
+
+// ---- i18n -------------------------------------------------------------
+// English and Hong Kong Traditional Chinese only -- formal written HK
+// vocabulary (zh-Hant-HK), not colloquial spoken Cantonese, and never
+// machine-converted from the other locale. English is the source of truth;
+// each dictionary is hand-written and hand-kept in sync with it. PDF field
+// labels are the visitor's own document text and are never translated.
+const I18N = {
+  en: {
+    add_box: '+ Add box', next_field: 'Next field →',
+    download_filled: 'Download filled', download_fillable: 'Download fillable',
+    hint_default: 'Fill fields from the guide on the left, or type straight into any box on the page. '
+      + 'A box in the wrong place can be left empty. Use <b>+ Add box</b> for a field the detector '
+      + 'missed, then click the page. Hover a box to see what it is. Signature lines get no box on '
+      + 'purpose. The original PDF text stays selectable in the gaps.',
+    progress_label: 'Your progress', guided_fill_aria: 'Guided fill',
+    field_name_placeholder: 'field name', delete: 'Delete', done: 'Done',
+    to_checkbox: '→ checkbox', to_text: '→ text', added_fallback: 'added',
+    heads_up: 'Heads up',
+    could_not_load_form: 'Could not load the form.',
+    boot_error_detail: '{err}. fields.json failed to load, so there is nothing to show. See the browser console for details.',
+    stat_summary: '{total} boxes · {text} text · {checkbox} checkbox{yours}',
+    stat_yours: ' · {yours} yours',
+    created_fields: 'created {made} of {total} fields',
+    failed_see_console: '{failed} failed, see console', zero_failures: '0 failures',
+    downloaded_file: 'Downloaded {file}.',
+    deferred_appearance_notice: 'Some values use characters the standard PDF font cannot draw, so the file relies on your PDF viewer to render them',
+    deferred_appearance_flatten_suffix: ' and was saved as a fillable form, not flattened',
+    could_not_build_pdf: 'Could not build the PDF.',
+    build_error_detail: '{err}. Nothing was downloaded. See the browser console for details.',
+    starting_detector: 'Starting the detector…', loading_libraries: 'Loading libraries…',
+    loading_rules: 'Loading the rules…', reading_form: 'Reading the form…',
+    python_runtime_load_failed: 'could not load the Python runtime',
+    could_not_load_file: 'could not load {file} ({status})',
+    picker_title: 'Fill any flat PDF',
+    picker_intro_html: 'Drop a PDF here, or <label class="pick">choose a file<input id="file" type="file" accept="application/pdf" hidden></label>.',
+    picker_fine1: 'FormFill finds the blanks, boxes and tick-boxes on forms that have no fillable fields, so you can type into them and download the result.',
+    picker_fine2_html: '<b>Your file never leaves this device.</b> The whole thing, reading the form, filling it, writing the finished PDF, runs inside your browser. There is no upload and no server. The first form takes a few seconds while the detector loads.',
+    not_a_pdf: 'That is not a PDF.',
+    could_not_read_pdf: 'Could not read that PDF. {err}. Nothing left your device.',
+    field_on_page: 'Field on page {page}',
+    hint_multiline: 'You can type multiple lines.', hint_checkbox_group: 'Choose one option.',
+    hint_checkbox_single: 'Tick the box if this applies.',
+    step_of: 'STEP {a} OF {b}', back: 'Back', next_field_nav: 'Next field',
+    this_page: 'This page', empty_value: 'Empty', ticked_value: 'Ticked',
+    guide_empty_message: 'No fillable fields were found on this form. If it is a scanned image, there is nothing to type into.',
+    progress_meta: '<b>{filled}</b> of <b>{total}</b> filled',
+    page_of: 'Page {n} of {total}',
+    notice_scanned: 'This looks like a scanned or image-only PDF: its pages are images with no text layer, so there is nothing for FormFill to read and no fields could be found. Run OCR on it first (for example, export a searchable / text-layer PDF) and try again.',
+    notice_no_fields: 'FormFill could not find any fillable fields in this document. It may not be a form (for example, an instructions sheet or a notice), or it may use a layout the detector does not recognize yet. You can still add fields by hand where you need to write.',
+  },
+  'zh-Hant-HK': {
+    add_box: '+ 新增欄位', next_field: '下一個欄位 →',
+    download_filled: '下載已填寫版', download_fillable: '下載可填寫版',
+    hint_default: '您可以透過左側的引導填寫欄位，也可以直接在頁面上的方框中輸入內容。'
+      + '位置不對的方框可以留空不填。若偵測器漏掉某個欄位，請按一下 <b>+ 新增欄位</b>，'
+      + '再點選頁面上的位置。將滑鼠移到方框上即可看到它是什麼欄位。簽名欄位不會自動加上'
+      + '方框，這是刻意的設計。原始 PDF 的文字在空白處仍可選取複製。',
+    progress_label: '填寫進度', guided_fill_aria: '引導式填寫',
+    field_name_placeholder: '欄位名稱', delete: '刪除', done: '完成',
+    to_checkbox: '→ 剔選格', to_text: '→ 文字框', added_fallback: '自行新增',
+    heads_up: '請注意',
+    could_not_load_form: '無法載入表單。',
+    boot_error_detail: '{err}。fields.json 載入失敗，因此沒有內容可以顯示。詳情請查看瀏覽器主控台。',
+    stat_summary: '{total} 個欄位・{text} 個文字欄位・{checkbox} 個剔選欄位{yours}',
+    stat_yours: '・其中 {yours} 個為您自行新增',
+    created_fields: '已建立 {total} 個欄位中的 {made} 個',
+    failed_see_console: '{failed} 個失敗，詳情請查看主控台', zero_failures: '0 個失敗',
+    downloaded_file: '已下載 {file}。',
+    deferred_appearance_notice: '部分內容使用了 PDF 標準字型無法顯示的字元，因此檔案需要依賴您的 PDF 閱讀器來正確顯示',
+    deferred_appearance_flatten_suffix: '，因此改以可填寫表單的形式儲存，而非轉為平面檔案',
+    could_not_build_pdf: '無法產生 PDF。',
+    build_error_detail: '{err}。沒有下載任何檔案。詳情請查看瀏覽器主控台。',
+    starting_detector: '正在啟動偵測器…', loading_libraries: '正在載入函式庫…',
+    loading_rules: '正在載入規則…', reading_form: '正在讀取表單…',
+    python_runtime_load_failed: '無法載入 Python 執行環境',
+    could_not_load_file: '無法載入 {file}（{status}）',
+    picker_title: '填寫任何平面 PDF',
+    picker_intro_html: '將 PDF 拖放到這裡，或<label class="pick">選擇檔案<input id="file" type="file" accept="application/pdf" hidden></label>。',
+    picker_fine1: 'FormFill 會在沒有可填寫欄位的表單上，找出空白處、方框與剔選格，讓您可以直接輸入內容並下載結果。',
+    picker_fine2_html: '<b>您的檔案不會離開這台裝置。</b>從讀取表單、填寫內容到產生完成的 PDF，整個流程都在您的瀏覽器中執行。沒有上載，也沒有伺服器。第一次使用時，偵測器需要幾秒鐘載入時間。',
+    not_a_pdf: '這不是 PDF 檔案。',
+    could_not_read_pdf: '無法讀取這個 PDF。{err}。沒有任何內容離開您的裝置。',
+    field_on_page: '第 {page} 頁的欄位',
+    hint_multiline: '您可以輸入多行文字。', hint_checkbox_group: '請選擇其中一個選項。',
+    hint_checkbox_single: '如適用，請於方格內剔選。',
+    step_of: '第 {a} 步，共 {b} 步', back: '上一步', next_field_nav: '下一個欄位',
+    this_page: '本頁', empty_value: '尚未填寫', ticked_value: '已剔選',
+    guide_empty_message: '這份表單找不到任何可填寫的欄位。如果它是掃描影像，就沒有可以輸入的地方。',
+    progress_meta: '已填寫 <b>{filled}</b> / <b>{total}</b> 項',
+    page_of: '第 {n} 頁，共 {total} 頁',
+    notice_scanned: '這份 PDF 看起來是掃描或純影像檔：頁面是沒有文字圖層的圖片，因此 FormFill 沒有內容可以讀取，'
+      + '也找不到任何欄位。請先進行 <span lang="en">OCR</span> 處理（例如匯出可搜尋、具備文字圖層的 PDF），再重新嘗試。',
+    notice_no_fields: 'FormFill 在這份文件中找不到任何可填寫的欄位。它可能不是表單（例如說明文件或公告），'
+      + '也可能使用偵測器目前還無法辨識的版面配置。您仍然可以在需要填寫的地方手動新增欄位。',
+  },
+};
+
+let LOCALE = 'en';
+try {
+  const savedLocale = localStorage.getItem('fillpdf_locale');
+  if (savedLocale === 'zh-Hant-HK') LOCALE = savedLocale;
+} catch (_){ /* localStorage unavailable (private mode etc); default to English */ }
+
+function tr(key, vars){
+  const dict = I18N[LOCALE] || I18N.en;
+  let s = dict[key] != null ? dict[key] : (I18N.en[key] != null ? I18N.en[key] : key);
+  if (vars) for (const k in vars) s = s.split('{' + k + '}').join(vars[k]);
+  return s;
+}
+
+let CURRENT_NOTICE = null, HINT_CLEARED = false;
+
+// Re-applies every static translated element to the current LOCALE. Safe to
+// call any time: it skips #hint while a notice/error owns it (those are
+// refreshed separately, see showNotice) and skips the picker screen while a
+// say() status message is mid-flight, so neither gets clobbered.
+function applyI18n(){
+  document.documentElement.lang = LOCALE;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    if (el.closest('#drop.busy')) return;
+    el.textContent = tr(el.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-html]').forEach(el => {
+    if (el.closest('#drop.busy')) return;
+    if (el.id === 'hint' && (el.classList.contains('notice') || HINT_CLEARED)) return;
+    el.innerHTML = tr(el.dataset.i18nHtml);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = tr(el.dataset.i18nPlaceholder);
+  });
+  document.querySelectorAll('[data-i18n-aria]').forEach(el => {
+    el.setAttribute('aria-label', tr(el.dataset.i18nAria));
+  });
+  const toggle = $('#langToggle');
+  if (toggle){
+    toggle.textContent = LOCALE === 'en' ? '中文' : 'English';
+    toggle.setAttribute('aria-label', LOCALE === 'en' ? 'Switch to Chinese' : '切換為英文');
+  }
+}
+
+// Re-renders the parts of the UI that are built from JS strings rather than
+// static markup, so a toggle mid-session updates what is currently on screen.
+function refreshDynamicI18n(){
+  if (CURRENT_NOTICE) showNotice(CURRENT_NOTICE);
+  if (FIELDS && FIELDS.length){ stat(); if (sel != null) showBar(); }
+  if (typeof renderGuide === 'function') renderGuide();
+}
+
+function setLocale(loc){
+  if (loc === LOCALE) return;
+  LOCALE = loc;
+  try { localStorage.setItem('fillpdf_locale', loc); } catch (_){ /* private mode etc */ }
+  applyI18n();
+  refreshDynamicI18n();
+}
 
 // The PDF bytes, however they arrived. In baked mode they are fetched from
 // source.pdf on first use; in upload mode the file picker fills this in before
@@ -268,15 +428,22 @@ const elOf   = i => document.querySelector(`.fld[data-i="${i}"]`);
 const escapeHtml = s => String(s).replace(/[&<>"']/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // Replace the usage hint with the detector's notice, styled as a warning.
+// The notice's `code` is the stable, locale-independent identifier -- the
+// dictionary translates by code, not by re-parsing n.message. An unknown
+// future code falls back to the raw (English) message, escaped since it did
+// not come from our own trusted dictionary.
 function showNotice(n){
+  CURRENT_NOTICE = n;
   const h = $('#hint');
   h.classList.add('notice');
-  h.innerHTML = `<b>Heads up:</b> ${escapeHtml(n.message)}`;
+  const key = n.code === 'scanned' ? 'notice_scanned' : n.code === 'no_fields' ? 'notice_no_fields' : null;
+  h.innerHTML = `<b>${tr('heads_up')}:</b> ${key ? tr(key) : escapeHtml(n.message)}`;
 }
 
 const PDFJS_CDN = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/';
 
 async function boot(){
+  applyI18n();
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   // The deployed build has no baked fields.json to read: the visitor supplies
@@ -297,8 +464,7 @@ async function boot(){
     $('#load')?.remove();
     const h = $('#hint');
     h.classList.add('notice');
-    h.innerHTML = `<b>Could not load the form.</b> ${escapeHtml(err.message || String(err))}. `
-      + `fields.json failed to load, so there is nothing to show. See the browser console for details.`;
+    h.innerHTML = `<b>${tr('could_not_load_form')}</b> ${tr('boot_error_detail', {err: escapeHtml(err.message || String(err))})}`;
     return;
   }
   return render(d);
@@ -445,15 +611,16 @@ function deselect(){
 function stat(){
   const t = FIELDS.filter(f=>f.type==='text').length;
   const u = FIELDS.filter(f=>f.origin!=='detected').length;
-  $('#stat').textContent = `${FIELDS.length} boxes · ${t} text · ${FIELDS.length-t} checkbox${u?` · ${u} yours`:''}`;
+  const yours = u ? tr('stat_yours', {yours: u}) : '';
+  $('#stat').textContent = tr('stat_summary', {total: FIELDS.length, text: t, checkbox: FIELDS.length-t, yours});
 }
 function showBar(){
   const f = FIELDS[sel];
   if (!f) return $('#bar').classList.remove('on');
   $('#bar').classList.add('on');
   $('#nm').value = f.id;
-  $('#rl').textContent = (f.label ? f.label.slice(0, 60) + '  ·  ' : '') + (f.rule || 'added');
-  $('#tt').textContent = f.type === 'text' ? '→ checkbox' : '→ text';
+  $('#rl').textContent = (f.label ? f.label.slice(0, 60) + '  ·  ' : '') + (f.rule || tr('added_fallback'));
+  $('#tt').textContent = f.type === 'text' ? tr('to_checkbox') : tr('to_text');
 }
 
 function onLayer(e, p){
@@ -493,6 +660,12 @@ $('#del').onclick = () => { if (sel==null) return;
   FIELDS.splice(sel,1); sel=null; cursor=-1; $('#bar').classList.remove('on'); draw(); };
 $('#close').onclick = deselect;
 
+const toggleLocale = () => setLocale(LOCALE === 'en' ? 'zh-Hant-HK' : 'en');
+$('#langToggle').onclick = toggleLocale;
+$('#langToggle').onkeydown = e => {
+  if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggleLocale(); }
+};
+
 document.addEventListener('mousedown', e => {
   if (adding) return;                                  // adding handles its own click
   if (e.target.closest('.fld') || e.target.closest('#bar') || e.target.closest('header')) return;
@@ -530,13 +703,13 @@ async function build(flatten){
     // fillable form -- name the file for what it actually is.
     a.download = (flatten && !deferredAppearances) ? 'filled.pdf' : 'fillable.pdf';
     a.click();
-    $('#hint').innerHTML = `<b>pdf-lib:</b> created ${made} of ${FIELDS.length} fields`
-      + (failed.length ? `, <span style="color:#c2410c">${failed.length} failed, see console</span>`
-                       : ', <span style="color:#15803d">0 failures</span>')
-      + `. Downloaded <code>${a.download}</code>.`
+    $('#hint').innerHTML = `<b><span lang="en">pdf-lib</span>:</b> ${tr('created_fields', {made, total: FIELDS.length})}`
+      + `, ` + (failed.length ? `<span style="color:#c2410c">${tr('failed_see_console', {failed: failed.length})}</span>`
+                              : `<span style="color:#15803d">${tr('zero_failures')}</span>`)
+      + `. ${tr('downloaded_file', {file: `<code>${a.download}</code>`})}`
       + (deferredAppearances
-          ? ` <span style="color:#c2410c">Some values use characters the standard PDF font cannot draw, so the file relies on your PDF viewer to render them`
-            + (flatten ? ` and was saved as a fillable form, not flattened` : ``)
+          ? ` <span style="color:#c2410c">${tr('deferred_appearance_notice')}`
+            + (flatten ? tr('deferred_appearance_flatten_suffix') : ``)
             + `.</span>`
           : ``);
   } catch (err){
@@ -548,8 +721,7 @@ async function build(flatten){
     console.error('[inject] build failed:', err);
     const h = $('#hint');
     h.classList.add('notice');
-    h.innerHTML = `<b>Could not build the PDF.</b> ${escapeHtml(err.message || String(err))}. `
-      + `Nothing was downloaded. See the browser console for details.`;
+    h.innerHTML = `<b>${tr('could_not_build_pdf')}</b> ${tr('build_error_detail', {err: escapeHtml(err.message || String(err))})}`;
   }
 }
 $('#dlFlat').onclick = () => build(true);
@@ -575,19 +747,19 @@ async function pyodideReady(say){
   if (PY) return PY;
   // Loaded on demand, not in a <script> tag: the local demo never runs this
   // path and must not pay for a Python runtime it does not use.
-  say('Starting the detector…');
+  say(tr('starting_detector'));
   if (!window.loadPyodide){
     await new Promise((ok, bad) => {
       const s = document.createElement('script');
       s.src = PYODIDE_URL + 'pyodide.js';
       s.onload = ok;
-      s.onerror = () => bad(new Error('could not load the Python runtime'));
+      s.onerror = () => bad(new Error(tr('python_runtime_load_failed')));
       document.head.appendChild(s);
     });
   }
   const py = await loadPyodide({ indexURL: PYODIDE_URL });
 
-  say('Loading libraries…');
+  say(tr('loading_libraries'));
   await py.loadPackage(['micropip', 'Pillow', 'cryptography']);
   // Real wheel filenames, from the build manifest: micropip parses the name,
   // version and tags back out of the filename, so they cannot be renamed to
@@ -607,11 +779,11 @@ sys.modules["pypdfium2"] = _stub
 await micropip.install(_wheels[1], deps=False)
 `);
 
-  say('Loading the rules…');
+  say(tr('loading_rules'));
   py.FS.mkdirTree('/app/engine/detect');
   for (const f of ['engine/detect/__init__.py', 'engine/detect/rules.py']){
     const res = await fetch(f);
-    if (!res.ok) throw new Error(`could not load ${f} (${res.status})`);
+    if (!res.ok) throw new Error(tr('could_not_load_file', {file: f, status: res.status}));
     py.FS.writeFile('/app/' + f, await res.text());
   }
   await py.runPythonAsync(`
@@ -625,7 +797,7 @@ from engine.detect import detect as _detect
 
 async function detectLocally(bytes, say){
   const py = await pyodideReady(say);
-  say('Reading the form…');
+  say(tr('reading_form'));
   py.FS.writeFile('/in.pdf', new Uint8Array(bytes));
   try {
     const json = await py.runPythonAsync(`
@@ -645,13 +817,10 @@ function showPicker(){
   document.body.classList.add('picking');
   $('#main').innerHTML = `
     <div id="drop">
-      <h2>Fill any flat PDF</h2>
-      <p>Drop a PDF here, or <label class="pick">choose a file<input id="file" type="file" accept="application/pdf" hidden></label>.</p>
-      <p class="fine">FormFill finds the blanks, boxes and tick-boxes on forms that have no
-      fillable fields, so you can type into them and download the result.</p>
-      <p class="fine"><b>Your file never leaves this device.</b> The whole thing, reading the
-      form, filling it, writing the finished PDF, runs inside your browser. There is no
-      upload and no server. The first form takes a few seconds while the detector loads.</p>
+      <h2 data-i18n="picker_title">${tr('picker_title')}</h2>
+      <p data-i18n-html="picker_intro_html">${tr('picker_intro_html')}</p>
+      <p class="fine" data-i18n="picker_fine1">${tr('picker_fine1')}</p>
+      <p class="fine" data-i18n-html="picker_fine2_html">${tr('picker_fine2_html')}</p>
     </div>`;
   const drop = $('#drop');
   $('#file').onchange = e => e.target.files[0] && onFile(e.target.files[0]);
@@ -674,12 +843,12 @@ function pickerError(msg){
 
 async function onFile(file){
   if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf')
-    return pickerError('That is not a PDF.');
+    return pickerError(tr('not_a_pdf'));
   const drop = $('#drop');
   drop.classList.add('busy');
   pickerError('');
   const say = m => { const h = drop.querySelector('h2'); if (h) h.textContent = m; };
-  say('Reading the form…');
+  say(tr('reading_form'));
   try {
     SOURCE = await file.arrayBuffer();
     // A copy, because detection hands the buffer to the WASM sandbox and
@@ -688,14 +857,15 @@ async function onFile(file){
     document.body.classList.remove('picking');
     $('#hint').textContent = '';
     $('#hint').className = 'hint';
+    HINT_CLEARED = true; CURRENT_NOTICE = null;
     $('#name').textContent = file.name;
     await render(d);
   } catch (err){
     console.error('[upload] failed:', err);
     SOURCE = null;
     drop.classList.remove('busy');
-    drop.querySelector('h2').textContent = 'Fill any flat PDF';
-    pickerError(`Could not read that PDF. ${err.message || err}. Nothing left your device.`);
+    drop.querySelector('h2').textContent = tr('picker_title');
+    pickerError(tr('could_not_read_pdf', {err: err.message || err}));
   }
 }
 
@@ -751,7 +921,7 @@ function isFieldFilled(f){
 }
 
 function guideBaseLabel(f){
-  return (f.label && String(f.label).length) ? String(f.label) : ('Field on page ' + f.page);
+  return (f.label && String(f.label).length) ? String(f.label) : tr('field_on_page', {page: f.page});
 }
 
 // Resolves the display label for FIELDS index i, disambiguating duplicates
@@ -771,8 +941,8 @@ function guideLabelFor(i, group){
 }
 
 function guideHintFor(f){
-  if (f.type === 'multiline') return 'You can type multiple lines.';
-  if (f.type === 'checkbox') return f.group ? 'Choose one option.' : 'Tick the box if this applies.';
+  if (f.type === 'multiline') return tr('hint_multiline');
+  if (f.type === 'checkbox') return f.group ? tr('hint_checkbox_group') : tr('hint_checkbox_single');
   return '';
 }
 
@@ -874,13 +1044,13 @@ function buildActiveCard(cur, pageGroup){
   var isLast = (navOrder.length === 0) || (cur === navOrder[navOrder.length - 1]);
 
   var html = '';
-  html += '<div class="g-step">STEP ' + a + ' OF ' + b + '</div>';
+  html += '<div class="g-step">' + escHtml(tr('step_of', {a: a, b: b})) + '</div>';
   html += '<div class="g-label">' + escHtml(label) + '</div>';
   if (hint) html += '<div class="g-hint">' + escHtml(hint) + '</div>';
   html += '<div class="g-inputwrap" id="g-inputwrap"></div>';
   html += '<div class="g-nav">';
-  html += '<button type="button" id="g-back-btn" class="btn ghost"' + (isFirst ? ' disabled' : '') + '>Back</button>';
-  html += '<button type="button" id="g-next-btn" class="btn primary">' + (isLast ? 'Done' : 'Next field') + '</button>';
+  html += '<button type="button" id="g-back-btn" class="btn ghost"' + (isFirst ? ' disabled' : '') + '>' + escHtml(tr('back')) + '</button>';
+  html += '<button type="button" id="g-next-btn" class="btn primary">' + (isLast ? escHtml(tr('done')) : escHtml(tr('next_field_nav'))) + '</button>';
   html += '</div>';
   activeEl.innerHTML = html;
 
@@ -904,7 +1074,7 @@ function buildActiveCard(cur, pageGroup){
 function buildGuideList(cur, pageGroup){
   var listEl = document.getElementById('g-list');
   if (!listEl) return;
-  var html = '<div class="g-lab">This page</div>';
+  var html = '<div class="g-lab">' + escHtml(tr('this_page')) + '</div>';
   var i, idx, f, done, label, valueText;
   for (idx = 0; idx < pageGroup.length; idx++){
     i = pageGroup[idx];
@@ -912,9 +1082,9 @@ function buildGuideList(cur, pageGroup){
     done = isFieldFilled(f);
     label = guideLabelFor(i, pageGroup);
     if (f.type === 'text' || f.type === 'multiline'){
-      valueText = (f.value && String(f.value).trim() !== '') ? String(f.value) : 'Empty';
+      valueText = (f.value && String(f.value).trim() !== '') ? String(f.value) : tr('empty_value');
     } else {
-      valueText = f.value === true ? 'Ticked' : 'Empty';
+      valueText = f.value === true ? tr('ticked_value') : tr('empty_value');
     }
     html += '<div class="g-item' + (i === cur ? ' active' : '') + (done ? ' done' : '') + '"'
           + ' data-i="' + i + '" data-n="' + (idx + 1) + '">'
@@ -951,12 +1121,12 @@ function renderGuide(){
   var filled = 0, k;
   for (k = 0; k < total; k++) if (isFieldFilled(FIELDS[k])) filled++;
   if (pfill) pfill.style.width = (total ? (filled / total * 100) : 0) + '%';
-  if (pmeta) pmeta.innerHTML = '<b>' + filled + '</b> of <b>' + total + '</b> filled';
+  if (pmeta) pmeta.innerHTML = tr('progress_meta', {filled: filled, total: total});
 
   if (total === 0){
     if (pagelabel) pagelabel.hidden = true;
     if (emptyEl){
-      emptyEl.textContent = 'No fillable fields were found on this form. If it is a scanned image, there is nothing to type into.';
+      emptyEl.textContent = tr('guide_empty_message');
       emptyEl.hidden = false;
     }
     if (activeEl) activeEl.hidden = true;
@@ -972,7 +1142,7 @@ function renderGuide(){
   if (cur === null || !FIELDS[cur]){
     if (pagelabel) pagelabel.hidden = true;
     if (activeEl) activeEl.innerHTML = '';
-    if (listEl) listEl.innerHTML = '<div class="g-lab">This page</div>';
+    if (listEl) listEl.innerHTML = '<div class="g-lab">' + escHtml(tr('this_page')) + '</div>';
     return;
   }
 
@@ -987,7 +1157,7 @@ function renderGuide(){
       pagelabel.hidden = true;
     } else {
       pagelabel.hidden = false;
-      pagelabel.textContent = 'Page ' + (pages.indexOf(curPage) + 1) + ' of ' + pages.length;
+      pagelabel.textContent = tr('page_of', {n: pages.indexOf(curPage) + 1, total: pages.length});
     }
   }
 
@@ -1012,7 +1182,7 @@ function refreshProgressAndList(){
   var pfill = document.getElementById('g-pfill');
   var pmeta = document.getElementById('g-pmeta');
   if (pfill) pfill.style.width = (total ? (filled / total * 100) : 0) + '%';
-  if (pmeta) pmeta.innerHTML = '<b>' + filled + '</b> of <b>' + total + '</b> filled';
+  if (pmeta) pmeta.innerHTML = tr('progress_meta', {filled: filled, total: total});
 
   var listEl = document.getElementById('g-list');
   if (!listEl) return;
@@ -1027,9 +1197,9 @@ function refreshProgressAndList(){
     var small = item.querySelector('small');
     if (small){
       if (f.type === 'text' || f.type === 'multiline'){
-        small.textContent = (f.value && String(f.value).trim() !== '') ? String(f.value) : 'Empty';
+        small.textContent = (f.value && String(f.value).trim() !== '') ? String(f.value) : tr('empty_value');
       } else {
-        small.textContent = f.value === true ? 'Ticked' : 'Empty';
+        small.textContent = f.value === true ? tr('ticked_value') : tr('empty_value');
       }
     }
   });
