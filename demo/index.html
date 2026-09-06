@@ -136,10 +136,12 @@ body.picking header button,body.picking #stat,body.picking .hint{display:none}
        margin:5px 0 4px;text-wrap:balance;line-break:strict;line-height:1.25}
 .g-hint{font-size:13px;color:var(--ink-soft);margin-bottom:12px;line-height:1.5}
 
-.g-inputwrap input[type=text],.g-inputwrap textarea{width:100%;font:inherit;font-family:var(--font-body);
+.g-inputwrap input[type=text],.g-inputwrap input[type=date],.g-inputwrap input[type=month],
+.g-inputwrap textarea{width:100%;font:inherit;font-family:var(--font-body);
        font-size:15px;color:var(--ink);background:var(--surface);border:1.5px solid var(--line-strong);
        border-radius:10px;padding:11px 13px}
-.g-inputwrap input[type=text]:focus,.g-inputwrap textarea:focus{outline:none;border-color:var(--accent);
+.g-inputwrap input[type=text]:focus,.g-inputwrap input[type=date]:focus,.g-inputwrap input[type=month]:focus,
+.g-inputwrap textarea:focus{outline:none;border-color:var(--accent);
        box-shadow:0 0 0 3px var(--accent-wash)}
 .g-inputwrap textarea{min-height:78px;resize:vertical;line-height:1.4}
 .g-choice{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer;color:var(--ink)}
@@ -540,6 +542,113 @@ function place(el, f){
   el.style.height = (y1-y0)/p.height*100 + '%';
 }
 
+// FIELD_KIND_CLASSIFIER_START -- tests/test_field_kind_classifier.py extracts
+// this block verbatim and evals it in Node, so it must stay a self-contained
+// run of pure functions with no DOM/FIELDS access (unlike the rest of this
+// file). Keep the START/END markers on their own lines if you edit this.
+// ---- date / integer field classification --------------------------------
+// The detector classifies structure only (text/multiline/checkbox), never
+// semantics -- so this reads the label the same way a person would. A field
+// classified here still has FIELDS[i].type === 'text': only the editing
+// widget changes, the stored value is always the plain string
+// tools/inject.mjs already knows how to write, so the download path and
+// engine/detect need no changes for any of this.
+const DATE_TOKEN = '(?:dd|mm|yy|yyyy|ccyy)';
+const DATE_TOKEN_RE = new RegExp(
+  '\\b(' + DATE_TOKEN + ')([\\/\\-.])(' + DATE_TOKEN + ')(?:\\2(' + DATE_TOKEN + '))?\\b', 'i');
+const MONTH_YEAR_WORD_RE = /\bmonth\s*[\/\-.]\s*year\b|\byear\s*[\/\-.]\s*month\b/i;
+const DATE_WORD_RE = /\b(date|dob|birth|expir\w*|issued|effective)\b/i;
+// "number of" must be followed by a plural noun -- "Number of dependents" or
+// "Number of daily work shifts" (a short noun phrase ending in a plural), not
+// "Phone Number of applicant" (an ID field, singular "applicant"). The
+// letters-and-spaces-only run stops at the first punctuation/digit on its
+// own, so this cannot cross into an unrelated later clause in a long label.
+const INT_NUMBER_OF_RE = /\bnumber of\s+(?:[a-z]+\s+){0,4}[a-z]*s\b/i;
+const INT_HOW_MANY_RE = /\bhow many\b/i;
+const INT_AGE_RE = /\bage\b/i;
+
+function dateTokenKind(tok){
+  tok = tok.toLowerCase();
+  if (tok === 'dd') return 'day';
+  if (tok === 'mm') return 'month';
+  return 'year';                        // yy, yyyy, ccyy
+}
+
+// Returns {kind: null} for an ordinary text field, or {kind:'date'|'month',
+// order, sep[, yearLen]} / {kind:'integer'}. `order` and `sep` describe the
+// exact format found in the label (e.g. ['month','day','year'], '/'), so
+// generated text matches what the form itself asked for.
+function classifyFieldKind(f){
+  if (f.type !== 'text' || !f.label) return {kind: null};
+  const label = f.label;
+  const m = DATE_TOKEN_RE.exec(label);
+  if (m){
+    const toks = [m[1], m[3], m[4]].filter(Boolean);
+    const kinds = toks.map(dateTokenKind);
+    if (kinds.length === 3 && kinds.indexOf('day') > -1 && kinds.indexOf('month') > -1 && kinds.indexOf('year') > -1){
+      return {kind: 'date', order: kinds, sep: m[2], yearLen: toks[kinds.indexOf('year')].length};
+    }
+    if (kinds.length === 2 && kinds.indexOf('month') > -1 && kinds.indexOf('year') > -1){
+      return {kind: 'month', order: kinds, sep: m[2]};
+    }
+  }
+  if (MONTH_YEAR_WORD_RE.test(label)) return {kind: 'month', order: ['month', 'year'], sep: '/'};
+  if (DATE_WORD_RE.test(label)) return {kind: 'date', order: null};   // no format hint -> ISO fallback
+  if (INT_AGE_RE.test(label) || INT_NUMBER_OF_RE.test(label) || INT_HOW_MANY_RE.test(label)) return {kind: 'integer'};
+  return {kind: null};
+}
+
+function pad2(n){ n = String(n); return n.length < 2 ? '0' + n : n; }
+
+// iso is a native <input type="date">'s own value, "YYYY-MM-DD". spec.order
+// null means the label gave no format hint, so the ISO string IS the wanted
+// text (that was the fallback chosen for a bare "Date" label) -- no reorder.
+function formatDateFromISO(iso, spec){
+  if (!iso) return '';
+  if (!spec.order) return iso;
+  const [y, mo, d] = iso.split('-');
+  return spec.order.map(function(k){
+    if (k === 'day') return d;
+    if (k === 'month') return mo;
+    return spec.yearLen === 2 ? y.slice(2) : y;
+  }).join(spec.sep);
+}
+
+// Inverse, for pre-filling the picker from an already-stored value. Returns
+// '' (picker stays blank) rather than guess a 2-digit year's century wrong.
+function parseDateToISO(value, spec){
+  if (!value) return '';
+  if (!spec.order) return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
+  const parts = value.split(spec.sep);
+  if (parts.length !== spec.order.length) return '';
+  let y, mo, d;
+  spec.order.forEach(function(k, idx){
+    if (k === 'day') d = parts[idx];
+    else if (k === 'month') mo = parts[idx];
+    else y = parts[idx];
+  });
+  if (!y || y.length !== 4 || !/^\d{1,2}$/.test(d) || !/^\d{1,2}$/.test(mo)) return '';
+  return y + '-' + pad2(mo) + '-' + pad2(d);
+}
+
+// monthValue is a native <input type="month">'s own value, "YYYY-MM".
+function formatMonthFromValue(monthValue, spec){
+  if (!monthValue) return '';
+  const [y, mo] = monthValue.split('-');
+  return spec.order.map(function(k){ return k === 'month' ? mo : y; }).join(spec.sep);
+}
+
+function parseMonthToValue(value, spec){
+  if (!value) return '';
+  const parts = value.split(spec.sep);
+  if (parts.length !== 2) return '';
+  let y, mo;
+  spec.order.forEach(function(k, idx){ if (k === 'year') y = parts[idx]; else mo = parts[idx]; });
+  if (!y || y.length !== 4 || !/^\d{1,2}$/.test(mo)) return '';
+  return y + '-' + pad2(mo);
+}
+// FIELD_KIND_CLASSIFIER_END
+
 function draw(){
   document.querySelectorAll('.layer').forEach(l => l.innerHTML = '');
   // Append boxes in reading order so DOM order -- which is what native Tab
@@ -584,9 +693,22 @@ function draw(){
       inp.oninput = e => f.value = e.target.value;
       inp.style.fontSize = '13px';        // tall box; a height-scaled size would be huge
     } else {
+      const kind = classifyFieldKind(f);
       inp = document.createElement('input');
-      inp.type='text'; inp.value = f.value || '';
-      inp.oninput = e => f.value = e.target.value;
+      if (kind.kind === 'date'){
+        inp.type = 'date'; inp.value = parseDateToISO(f.value, kind);
+      } else if (kind.kind === 'month'){
+        inp.type = 'month'; inp.value = parseMonthToValue(f.value, kind);
+      } else {
+        inp.type = 'text'; inp.value = f.value || '';
+        if (kind.kind === 'integer') inp.inputMode = 'numeric';
+      }
+      inp.oninput = e => {
+        if (kind.kind === 'integer') e.target.value = e.target.value.replace(/[^0-9]/g, '');
+        f.value = kind.kind === 'date' ? formatDateFromISO(e.target.value, kind)
+                : kind.kind === 'month' ? formatMonthFromValue(e.target.value, kind)
+                : e.target.value;
+      };
       inp.style.fontSize = Math.max(9, Math.min(15, (y1-y0)*0.7)) + 'px';
     }
     inp.onfocus = () => select(i);
@@ -975,11 +1097,27 @@ function guideCurrentField(){
 function buildFieldInput(wrap, cur, f){
   wrap.innerHTML = '';
   if (f.type === 'text' || f.type === 'multiline'){
-    var input = document.createElement(f.type === 'multiline' ? 'textarea' : 'input');
-    if (f.type === 'text') input.type = 'text';
-    input.value = f.value || '';
+    var kind = f.type === 'text' ? classifyFieldKind(f) : {kind: null};
+    var input;
+    if (kind.kind === 'date'){
+      input = document.createElement('input');
+      input.type = 'date';
+      input.value = parseDateToISO(f.value, kind);
+    } else if (kind.kind === 'month'){
+      input = document.createElement('input');
+      input.type = 'month';
+      input.value = parseMonthToValue(f.value, kind);
+    } else {
+      input = document.createElement(f.type === 'multiline' ? 'textarea' : 'input');
+      if (f.type === 'text') input.type = 'text';
+      if (kind.kind === 'integer') input.inputMode = 'numeric';
+      input.value = f.value || '';
+    }
     input.oninput = function(){
-      f.value = input.value;
+      if (kind.kind === 'integer') input.value = input.value.replace(/[^0-9]/g, '');
+      f.value = kind.kind === 'date' ? formatDateFromISO(input.value, kind)
+              : kind.kind === 'month' ? formatMonthFromValue(input.value, kind)
+              : input.value;
       var boxEl = elOf(cur);
       var boxInput = boxEl ? boxEl.querySelector('input,textarea') : null;
       if (boxInput) boxInput.value = input.value;
@@ -1236,13 +1374,28 @@ function onFldFocusIn(e){
 
 // The existing per-box oninput/onchange handlers already updated
 // FIELDS[i].value (checkbox/radio go through onchange, text/multiline
-// through oninput, so both events are covered here); this just refreshes
-// the progress bar and this-page list to match.
+// through oninput, so both events are covered here); this refreshes the
+// progress bar and this-page list to match.
+//
+// If the edited box is also the field the active card (#g-active) is
+// showing, that card's own control goes stale too -- refreshProgressAndList()
+// intentionally never rebuilds #g-active, since doing so on the panel's OWN
+// typing would steal focus mid-keystroke. But that risk does not apply here:
+// the focus is on the page box we just detected, not on the panel control, so
+// rebuilding the panel's input from the fresh FIELDS[i] is safe. Reusing
+// buildFieldInput() (rather than poking .value/.checked per type here) keeps
+// text, multiline, checkbox and radio-group all correct through the one
+// function that already knows how to render each.
 function onFldMutate(e){
   var t = e.target;
   if (!t || (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA')) return;
   var box = t.closest ? t.closest('.fld') : null;
   if (!box) return;
+  var i = parseInt(box.dataset.i, 10);
+  if (!isNaN(i) && i === guideCurrentField()){
+    var wrap = document.getElementById('g-inputwrap');
+    if (wrap) buildFieldInput(wrap, i, FIELDS[i]);
+  }
   refreshProgressAndList();
 }
 

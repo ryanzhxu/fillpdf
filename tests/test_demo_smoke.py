@@ -331,3 +331,54 @@ def test_served_index_html_renders_a_group_as_a_radio(built):
         "a grouped checkbox is not rendered as a radio sharing the group name"
     assert "g.group===f.group" in html, \
         "picking a radio does not clear its group siblings in FIELDS"
+
+
+def test_served_index_html_syncs_page_edits_back_to_the_guide_panel(built):
+    """Typing on the page must update the guide panel's own active-field card,
+    not just the this-page list.
+
+    onFldMutate() (delegated on document, so it survives draw() rebuilding the
+    .fld boxes) already refreshed the progress bar and the this-page list on
+    every page-side edit. But it stopped there: if the edited box was also the
+    field #g-active was showing, that card's own input/checkbox went stale,
+    because refreshProgressAndList() deliberately never rebuilds #g-active (to
+    protect focus when the PANEL's own input is what's typing). That guard does
+    not apply to a page-side edit -- focus is on the page box, a separate DOM
+    subtree -- so the fix reuses buildFieldInput() to refresh just the active
+    card's control when the mutated field is the one currently shown. Assert
+    the wiring is present so a refactor of onFldMutate cannot drop it and bring
+    the one-way sync back.
+    """
+    mod, _ = built
+    html = (mod.OUT / "index.html").read_text(encoding="utf-8")
+    assert "i === guideCurrentField()" in html, \
+        "onFldMutate() no longer checks whether the edited box is the active field"
+    assert "if (wrap) buildFieldInput(wrap, i, FIELDS[i]);" in html, \
+        "onFldMutate() no longer refreshes the active card's own control"
+
+
+def test_served_index_html_wires_date_and_integer_pickers(built):
+    """A date-shaped or integer-shaped text field must get a richer widget in
+    both places it is edited, not just one.
+
+    classifyFieldKind() (see tests/test_field_kind_classifier.py for its
+    actual behaviour) is called from both draw() (the on-page box) and
+    buildFieldInput() (the guide panel's own control), so a person sees the
+    same date/month picker or digit-only field wherever they choose to type.
+    The underlying FIELDS[i].type stays 'text' either way -- only the editing
+    widget changes -- so tools/inject.mjs and engine/detect need no changes
+    for this at all. Assert both call sites are wired so a refactor of either
+    function cannot silently drop the classification and fall back to a plain
+    text box everywhere.
+    """
+    mod, _ = built
+    html = (mod.OUT / "index.html").read_text(encoding="utf-8")
+    assert "function classifyFieldKind(f){" in html, "classifyFieldKind() is missing"
+    assert html.count("kind.kind === 'date'") >= 2, \
+        "draw() and/or buildFieldInput() no longer branch on a classified date field"
+    assert html.count("kind.kind === 'month'") >= 2, \
+        "draw() and/or buildFieldInput() no longer branch on a classified month field"
+    assert html.count("inputMode = 'numeric'") >= 2, \
+        "draw() and/or buildFieldInput() no longer set inputMode for a classified integer field"
+    assert "replace(/[^0-9]/g, '')" in html, \
+        "no digit-only filter is wired for an integer-classified field"
