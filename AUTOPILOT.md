@@ -19,19 +19,73 @@ any score says.
 
 There is no "done". Rank by value each pass and make one change.
 
-## Tonight's run (2026-09-05, until ~00:00)
+## Tonight's run (2026-09-06, until 08:00)
 
-Same goal, renewed by the user with one explicit priority: the existing
+Same goal, renewed and sharpened by the user twice tonight. The existing
 145-file blind pool from the 2026-09-03 run is largely mined out (it stalled
 twice at 12 consecutive no-change passes — see `.autobuild/notify.log` and
 `.autobuild/PROGRESS.md` entry 14, "every remaining zero-field lead there is
-already dispositioned"). So for THIS run, treat value-ranking item #3
-(fetch more candidates) as a standing priority, not a last resort — spend
-early passes growing the pool with `eval/fetch.py` before assuming the
-existing 145 have nothing left, then chase whatever `eval.blind` surfaces
-against the grown pool per the normal workflow below. Regenerate
-`.autobuild/blind_report.txt` after any fetch batch; it is stale the moment
-new files land.
+already dispositioned"). Standing priorities for this run, in order:
+
+1. **Fetch aggressively.** Do not treat `eval/fetch.py` as a last resort —
+   run it early and often, across as many distinct public government/
+   institution domains as you can find (search for more form-hosting sites,
+   not just the ones already in the fetch list, subject to the same politeness
+   rules below). The goal is real breadth: more producers, more layouts, more
+   flat/no-AcroForm forms than the existing pool has. Regenerate
+   `.autobuild/blind_report.txt` after every fetch batch — it is stale the
+   moment new files land — and probe each new batch with `eval.blind` before
+   deciding what (if anything) is worth chasing.
+2. **Chase real failures to real fixes**, per the existing workflow below —
+   unchanged.
+3. **Turn confirmed findings into regression tests.** See the new section
+   immediately below — this is a change in scope from earlier runs, not just
+   a restatement.
+
+The `deploy` job in CI is currently broken (an unrelated Cloudflare API token
+problem the user owns) and will keep failing. It is NOT a required status
+check — only `tests` gates a merge — so a red `deploy` job does not mean a PR
+is unmergeable and is not something to investigate or fix in this loop.
+
+## Adding regression tests from fetched PDFs (new tonight)
+
+The user has explicitly authorized growing the test suite using real PDFs
+found via `eval/fetch.py`, with one hard rule: **a test must assert a
+hand-verified fact, never the detector's own current raw output treated as if
+it were ground truth.** Locking in "whatever the code currently does" as a
+golden value defeats the entire point of a regression test and is exactly the
+failure mode the Protected paths section below exists to prevent for the
+scored corpora. Concretely:
+
+- **A bug you found and fixed**: add a test that reproduces the exact
+  before/after, the way `tests/test_r5b_underline_gap.py` already does —
+  confirm by hand (pdfplumber inspection, the same technique used throughout
+  this project) what the correct field set for the relevant region of the
+  document actually is, assert that specific fact, and confirm the test FAILS
+  on the pre-fix code and PASSES after. A field count alone is not a
+  sufficient assertion; assert what was actually found (label text, field
+  type, page).
+- **A crash guard**: if a fetched PDF crashed the detector and you fixed the
+  crash, a regression test asserting `detect()` returns cleanly (with
+  whatever honest result, including zero fields or a `notice`) on that exact
+  file is legitimate and valuable even with no fuller ground truth claim.
+- **A structured document confirmed to genuinely have zero fields**: a test
+  asserting `detect()` returns `no_fields`/empty on it is legitimate — that
+  is itself a hand-verified fact (you looked at the document and confirmed it
+  has nothing to fill), not a detector-output snapshot.
+- Point tests at the file's existing path under `eval/corpus/real/**` (already
+  unprotected — do not copy it into `fixtures/**`, which stays reserved for
+  the one reference form). Do not add it to `eval/corpus/tuning` or
+  `eval/holdout` — those remain human-labelled-only, per Protected paths.
+- "Regression coverage increases" is the real signal for whether a pass was
+  worth landing, alongside `scripts/verify.sh` staying green. A pass that adds
+  a well-verified regression test with no code change is a legitimate,
+  landable contribution on its own.
+
+**Never merge anything that decreases accuracy.** This is already mechanical
+via `scripts/verify.sh`'s gate against `scores/HEAD_BASELINE.json` — a change
+that drops tuning/holdout f1 fails verify and must be reverted, never landed,
+never merged, no exceptions, even if it adds test coverage elsewhere.
 
 ## Starting point — already investigated, do not re-derive
 
@@ -73,13 +127,15 @@ measured yet.
    bugs found this way (duplicate names losing data, non-Latin text crashing
    the save, a missing radio group) are the pattern to keep applying —
    several already fixed this run, see `.autobuild/PROGRESS.md`.
-3. **Fetch a few more candidates and extend the blind pool**, per the workflow
-   below, if the current 145 are exhausted of obvious findings. This alone is a
-   landable, low-risk contribution even with no code fix attached — it grows
-   the thing this whole run is testing against.
-4. **The filling experience.** Keyboard flow, focus, large forms, honest
+3. **Fetch more candidates and extend the blind pool.** Tonight this is a
+   standing priority, not a last resort — see "Tonight's run" above. This
+   alone is a landable, low-risk contribution even with no code fix attached.
+4. **Add a hand-verified regression test** for a finding from #1-#3, per
+   "Adding regression tests from fetched PDFs" above, when the finding itself
+   doesn't already require a code change this pass.
+5. **The filling experience.** Keyboard flow, focus, large forms, honest
    failure messages for anything that currently does nothing silently.
-5. Documentation of a decision that was measured but is not written down.
+6. Documentation of a decision that was measured but is not written down.
 
 ## Blind real-PDF testing workflow
 
