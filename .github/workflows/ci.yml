@@ -96,6 +96,15 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           # accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Pin explicitly. Left unset, wrangler-action tries `npx --no-install
+          # wrangler` against the version it actually wants (4.129.0 as of this
+          # writing), that lookup fails because nothing is pre-installed, and it
+          # silently falls back to installing an old hardcoded 3.90.0 instead --
+          # which does not read `name` out of wrangler.jsonc correctly when
+          # given an explicit --assets flag, and fails with "You need to
+          # provide a name when publishing a worker" despite `name` being set.
+          # Pinning skips that broken fallback path entirely.
+          wranglerVersion: "4"
           # wrangler.jsonc has no `main` (this is an assets-only deployment,
           # no Worker script), and wrangler still requires a PATH or
           # --assets flag in that case -- passing neither is what "Missing
