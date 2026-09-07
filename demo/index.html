@@ -509,6 +509,11 @@ async function render(d){
   draw();
 
   // 2. Then paint the pages in the background, each independent of the others.
+  //    PAGES is empty when the file could not be read as a PDF at all (the
+  //    detector's `unreadable` notice) -- nothing to paint, and pdf.js
+  //    itself cannot open the same bytes either, so skip it rather than let
+  //    an unhandled getDocument() rejection reach the console.
+  if (!PAGES.length) return;
   const pdf = await pdfjsLib.getDocument({
     data: await sourceBytes(),
     standardFontDataUrl: CDN + 'standard_fonts/',
@@ -1237,6 +1242,8 @@ function buildGuideList(cur, pageGroup){
       if (!isNaN(i2)) focusField(i2);
     };
   });
+  var activeItem = listEl.querySelector('.g-item.active');
+  if (activeItem) activeItem.scrollIntoView({block: 'nearest'});
 }
 
 // Full render: progress bar, page label, active-field card, and the

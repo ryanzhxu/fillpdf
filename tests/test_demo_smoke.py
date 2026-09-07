@@ -22,6 +22,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 FIXTURE = REPO_ROOT / "fixtures" / "safer.pdf"
 SCHEMA = json.loads((REPO_ROOT / "eval" / "contracts" / "fields.schema.json").read_text())
 
+# A real fetched file that is not a PDF at all -- an HTML error page saved
+# with a .pdf extension (confirmed live: eval/fetch.py's own manifest already
+# tags it 'unusable', and detect() raises PdfminerException on it). Not part
+# of this worktree's tracked fixtures -- eval/corpus/real is gitignored -- so
+# the test using it skips if the file is not present.
+REAL_UNREADABLE_PDF = "/Users/ryan.xu/Developer/formfill/eval/corpus/real/2fd711d2b14cc710.pdf"
+
 
 def _load_demo_module():
     """Import demo/demo.py by file path.
@@ -382,3 +389,99 @@ def test_served_index_html_wires_date_and_integer_pickers(built):
         "draw() and/or buildFieldInput() no longer set inputMode for a classified integer field"
     assert "replace(/[^0-9]/g, '')" in html, \
         "no digit-only filter is wired for an integer-classified field"
+
+
+def test_demo_pipeline_carries_an_unreadable_notice_to_fields_json(tmp_path, monkeypatch):
+    """End to end: a file that is not a real PDF at all must not crash build().
+
+    detect() is a pure function and is allowed to raise on input it cannot
+    parse (corrupt, truncated, encrypted, or not a PDF) -- confirmed live on 5
+    real fetched files that turned out to be HTML error pages saved with a
+    .pdf extension (eval/corpus/real/manifest.json already tags them
+    'unusable'). Before this test existed, running the demo CLI on one of
+    those produced a raw traceback instead of the honest failure this
+    codebase's scanned/no_fields notices already establish as the standard.
+    build() must catch exactly that known class of parse failure (not any
+    exception) and land an `unreadable` notice in fields.json instead.
+    """
+    import socketserver as _ss
+    import webbrowser as _wb
+
+    def _blocked(*a, **k):
+        raise AssertionError("demo.build() must not open a server or a browser")
+
+    monkeypatch.setattr(_wb, "open", _blocked)
+    monkeypatch.setattr(_ss.TCPServer, "__init__", _blocked)
+
+    not_a_pdf = tmp_path / "not_a_pdf.pdf"
+    not_a_pdf.write_bytes(b"<!doctype html><html><body>404 not found</body></html>")
+
+    mod = _load_demo_module()
+    monkeypatch.setattr(mod, "OUT", tmp_path / "demo_out")
+    result = mod.build(not_a_pdf)
+    assert result == 0
+
+    doc = json.loads((mod.OUT / "fields.json").read_text())
+    assert doc["fields"] == []
+    assert doc["pages"] == []
+    assert doc.get("notice", {}).get("code") == "unreadable"
+    assert doc["notice"]["message"].strip()
+    validate(instance=doc, schema=SCHEMA)
+
+
+def test_build_still_raises_on_a_genuinely_unexpected_error(tmp_path, monkeypatch):
+    """The unreadable-file catch must stay narrow, not swallow every failure.
+
+    A blanket `except Exception` around detect() would hide a real bug (a
+    KeyError from a code regression, say) behind a misleading "corrupted PDF"
+    message. Force detect_pdf to raise something outside
+    UNREADABLE_EXCEPTION_NAMES and confirm build() still lets it propagate.
+    """
+    mod = _load_demo_module()
+    monkeypatch.setattr(mod, "OUT", tmp_path / "demo_out")
+
+    def _boom(_path):
+        raise RuntimeError("not a real PDF-parse failure")
+
+    monkeypatch.setattr(mod, "detect_pdf", _boom)
+    with pytest.raises(RuntimeError):
+        mod.build(FIXTURE)
+
+
+@pytest.mark.skipif(not Path(REAL_UNREADABLE_PDF).exists(), reason="real corpus not present in this worktree")
+def test_demo_pipeline_handles_a_real_fetched_non_pdf_file(tmp_path, monkeypatch):
+    """The exact real-world file that motivated the fix, run end to end."""
+    import socketserver as _ss
+    import webbrowser as _wb
+
+    def _blocked(*a, **k):
+        raise AssertionError("demo.build() must not open a server or a browser")
+
+    monkeypatch.setattr(_wb, "open", _blocked)
+    monkeypatch.setattr(_ss.TCPServer, "__init__", _blocked)
+
+    mod = _load_demo_module()
+    monkeypatch.setattr(mod, "OUT", tmp_path / "demo_out")
+    result = mod.build(Path(REAL_UNREADABLE_PDF))
+    assert result == 0
+
+    doc = json.loads((mod.OUT / "fields.json").read_text())
+    assert doc["fields"] == []
+    assert doc.get("notice", {}).get("code") == "unreadable"
+
+
+def test_served_index_html_skips_pdfjs_when_there_are_no_pages(built):
+    """render() must not hand pdf.js the same unreadable bytes detect() just
+    rejected.
+
+    PAGES is only ever empty when the `unreadable` notice fired (every other
+    path -- including scanned/no_fields -- still has real page geometry).
+    Without this guard, render() still calls pdfjsLib.getDocument() on
+    source.pdf, which cannot parse it either, producing an unhandled
+    InvalidPDFException in the console even though the page itself renders
+    fine (confirmed live: the notice banner shows correctly either way, so
+    nothing here is caught by a UI screenshot -- only the console)."""
+    mod, _ = built
+    html = (mod.OUT / "index.html").read_text(encoding="utf-8")
+    assert "if (!PAGES.length) return;" in html, \
+        "render() no longer skips pdf.js when there is nothing to paint"

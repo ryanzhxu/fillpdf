@@ -9,12 +9,22 @@ the same "silently does nothing" gap the scanned guard closes for scans.
 Run standalone with:  .venv/bin/python -m pytest tests/test_no_fields.py
 """
 import unittest
+from pathlib import Path
 
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 import io
 
 from engine.detect import detect
+
+# A real fetched form hand-confirmed to be genuinely, not just currently,
+# fieldless -- an LA County "Land Use Application Checklist", an
+# informational list of what to submit online with nothing on the page for
+# an applicant to write (confirmed with pdfplumber.extract_text(): no blank,
+# no checkbox, no line to fill). Not part of this worktree's tracked
+# fixtures -- eval/corpus/real is gitignored -- so this test skips if the
+# file is not present rather than failing a clean checkout.
+REAL_EMPTY_PDF = "/Users/ryan.xu/Developer/formfill/eval/corpus/real/81af15ac26eeee6b.pdf"
 
 
 def _prose_pdf():
@@ -82,6 +92,12 @@ class TestNoFieldsGuard(unittest.TestCase):
         path = _write(self.tmp, "scan.pdf", buf.getvalue())
         out = detect(path)
         self.assertEqual(out["notice"]["code"], "scanned")
+
+    @unittest.skipUnless(Path(REAL_EMPTY_PDF).exists(), "real corpus not present in this worktree")
+    def test_real_fetched_checklist_gets_the_no_fields_notice(self):
+        out = detect(REAL_EMPTY_PDF)
+        self.assertEqual(out["fields"], [])
+        self.assertEqual(out["notice"]["code"], "no_fields")
 
 
 if __name__ == "__main__":
