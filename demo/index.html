@@ -390,13 +390,6 @@ function setLocale(loc){
   try { localStorage.setItem('fillpdf_locale', loc); } catch (_){ /* private mode etc */ }
   applyI18n();
   refreshDynamicI18n();
-  // Field labels are the visitor's own PDF text, not a static UI string, so
-  // tr()/applyI18n() above cannot translate them -- kick off in-browser MT
-  // for the guide panel as a separate background task (never on page load,
-  // never for 'en'), so this does not block the toggle. Defined in
-  // tier2-guide.js; guarded the same way refreshDynamicI18n() guards
-  // renderGuide(), in case that script were ever absent.
-  if (loc === 'zh-Hant-HK' && typeof maybeTranslateGuideLabels === 'function') maybeTranslateGuideLabels();
 }
 
 // The PDF bytes, however they arrived. In baked mode they are fetched from
@@ -1051,111 +1044,8 @@ function isFieldFilled(f){
   return f.value === true;
 }
 
-// ---- guide-panel label translation (zh-Hant-HK only) -----------------------
-// f.label is text the detector read off the PDF itself -- the visitor's own
-// document, in whatever language it happens to be in. It is not one of the
-// static UI strings in I18N, so tr() cannot translate it. When the UI
-// switches to zh-Hant-HK this translates it for display in THIS panel only;
-// the on-page hover captions/titles (draw(), first script) are left alone on
-// purpose, since those show the PDF's own text.
-//
-// Runs entirely in this tab via transformers.js, loaded on demand from a CDN
-// exactly the way pyodideReady() (first script) loads Pyodide: nothing here
-// is fetched unless the visitor actually switches to zh-Hant-HK, and no
-// label text is ever sent anywhere -- only the public model weights are
-// downloaded, same direction as this app's "your file never leaves this
-// device" promise. If the CDN, model load or translation call fails for any
-// reason, it is caught and logged below, and labels simply keep showing
-// their original text -- this is a nice-to-have layered on top, never a
-// hard dependency the app needs to keep working.
-var TRANSLATE_CDN = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
-var CJK_RE = /[一-鿿㐀-䶿]/;
-var translateCache = new Map();      // source label -> translated label, tab lifetime only
-var translatorPipeline = null;       // Promise<translate fn>, set on first use
-
-function translatorReady(){
-  if (!translatorPipeline){
-    translatorPipeline = import(TRANSLATE_CDN).then(function(mod){
-      // dtype 'q8': the quantized encoder/decoder pair (~53MB + ~60MB), not
-      // the ~4x larger full-precision default.
-      return mod.pipeline('translation', 'Xenova/opus-mt-en-zh', {dtype: 'q8'});
-    });
-  }
-  return translatorPipeline;
-}
-
-// The one place that decides what text a guide-panel row/choice shows: the
-// cached translation when locale is zh-Hant-HK and one exists for `text`,
-// else `text` itself, untouched. Toggling back to 'en' shows the original
-// instantly because this never consults the cache outside zh-Hant-HK.
-function guideDisplayText(text){
-  if (LOCALE !== 'zh-Hant-HK') return text;
-  var cached = translateCache.get(text);
-  return cached != null ? cached : text;
-}
-
-// Kicks off translation of the current FIELDS' unique labels in the
-// background. Called from setLocale() (first script) only when switching TO
-// zh-Hant-HK. Does not block the UI: setLocale() has already re-rendered
-// synchronously with whatever is (or isn't yet) cached; this re-renders
-// again once translation resolves so the panel picks up the Chinese text.
-function maybeTranslateGuideLabels(){
-  if (typeof FIELDS === 'undefined' || !FIELDS.length) return;
-  var unique = [], seen = {};
-  FIELDS.forEach(function(f){
-    var text = (f.label && String(f.label).length) ? String(f.label) : null;
-    // Skip labels already Chinese (or otherwise CJK) -- an already-Chinese
-    // form must not be force-translated -- and labels already cached.
-    if (!text || seen[text] || translateCache.has(text) || CJK_RE.test(text)) return;
-    seen[text] = true;
-    unique.push(text);
-  });
-  if (!unique.length) return;
-  // Field labels are short, unpunctuated noun phrases ("Social Insurance
-  // Number", "Last Name") far more often than full sentences, and this
-  // model rarely predicts an end-of-sentence token for them: left to
-  // itself it keeps going, filling its whole token budget with a garbled,
-  // repeating tail after an initially correct translation (observed
-  // directly, e.g. "Social Insurance Number" -> a clean start followed by
-  // a run of near-duplicate fragments). This reproduced identically with
-  // both the quantized and full-precision weights and was unaffected by
-  // no_repeat_ngram_size/num_beams, so it is a documented characteristic
-  // of this model on short inputs, not a bug in how it is called here. A
-  // trailing period gives the sentence-trained decoder the boundary cue it
-  // is missing, which measurably improves the translation itself. Capping
-  // tokens by each label's own length -- short labels get a tight budget,
-  // long sentence-style checkbox questions get a larger one -- then bounds
-  // how much garbled tail a short label can accumulate without truncating
-  // a long one; the period (or its full-width Chinese form) is stripped
-  // back off the result before it is cached.
-  var short = [], long = [];
-  unique.forEach(function(text){
-    var withPeriod = /[.!?。！？]$/.test(text) ? text : text + '.';
-    (text.trim().split(/\s+/).length <= 6 ? short : long).push({text: text, withPeriod: withPeriod});
-  });
-  translatorReady().then(function(translate){
-    var batches = [];
-    if (short.length) batches.push({items: short, cap: 14});
-    if (long.length) batches.push({items: long, cap: 80});
-    return Promise.all(batches.map(function(b){
-      return translate(b.items.map(function(it){ return it.withPeriod; }),
-                        {max_new_tokens: b.cap, no_repeat_ngram_size: 3}).then(function(out){
-        var results = Array.isArray(out) ? out : [out];
-        results.forEach(function(r, idx){
-          var t = r && r.translation_text;
-          if (t) translateCache.set(b.items[idx].text, t.replace(/[.。]\s*$/, ''));
-        });
-      });
-    }));
-  }).then(function(){
-    if (typeof renderGuide === 'function') renderGuide();
-  }).catch(function(err){
-    console.warn('[guide] label translation failed:', err);
-  });
-}
-
 function guideBaseLabel(f){
-  if (f.label && String(f.label).length) return guideDisplayText(String(f.label));
+  if (f.label && String(f.label).length) return String(f.label);
   return tr('field_on_page', {page: f.page});
 }
 
@@ -1251,7 +1141,7 @@ function buildFieldInput(wrap, cur, f){
       refreshProgressAndList();
     };
     var span = document.createElement('span');
-    span.textContent = guideDisplayText(f.label || f.id);
+    span.textContent = f.label || f.id;
     choice.appendChild(cb);
     choice.appendChild(span);
     wrap.appendChild(choice);
@@ -1275,7 +1165,7 @@ function buildFieldInput(wrap, cur, f){
         refreshProgressAndList();
       };
       var lab = document.createElement('span');
-      lab.textContent = guideDisplayText(mf.label || mf.id);
+      lab.textContent = mf.label || mf.id;
       row.appendChild(rb);
       row.appendChild(lab);
       wrap.appendChild(row);
@@ -1462,19 +1352,21 @@ function refreshProgressAndList(){
 }
 
 // Navigates to and focuses field i: selects it on the page, scrolls its
-// box into view, focuses its input/textarea, then fully re-renders the
-// guide panel around the new current field.
+// box into view for visual context, re-renders the guide panel around the
+// new current field, then focuses the panel's OWN input -- not the on-page
+// one -- so a click on a field row in the left panel puts the cursor right
+// there, ready to type, instead of leaving focus on a box that may still be
+// off-screen mid-scroll.
 function focusField(i){
   if (typeof FIELDS === 'undefined' || !FIELDS[i]) return;
   select(i);
   cursor = i;
   var el = elOf(i);
-  if (el){
-    el.scrollIntoView({behavior: 'smooth', block: 'center'});
-    var input = el.querySelector('input,textarea');
-    if (input) input.focus({preventScroll: true});
-  }
+  if (el) el.scrollIntoView({behavior: 'smooth', block: 'center'});
   renderGuide();
+  var wrap = document.getElementById('g-inputwrap');
+  var input = wrap ? wrap.querySelector('input,textarea') : null;
+  if (input) input.focus({preventScroll: true});
 }
 
 // Sync FROM the page TO the panel. Delegated on document so it survives
