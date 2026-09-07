@@ -1237,6 +1237,8 @@ function buildGuideList(cur, pageGroup){
       if (!isNaN(i2)) focusField(i2);
     };
   });
+  var activeItem = listEl.querySelector('.g-item.active');
+  if (activeItem) activeItem.scrollIntoView({block: 'nearest'});
 }
 
 // Full render: progress bar, page label, active-field card, and the
