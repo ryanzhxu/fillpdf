@@ -29,6 +29,29 @@ sys.path.insert(0, str(HERE.parent))
 from engine.detect import detect as detect_pdf  # noqa: E402
 OUT = HERE / "out"
 
+# detect() is a pure function over an already-open pdfplumber document and is
+# allowed to raise when the input cannot be parsed as a PDF at all (corrupt,
+# truncated, encrypted, or not actually a PDF -- e.g. an HTML error page saved
+# with a .pdf extension, confirmed live on 5 files in eval/corpus/real/).
+# eval/adversarial/run.py already classifies exactly this exception shape as a
+# "clean rejection", not a detector bug; CLEAN_REJECTION_TYPES there is the
+# source of truth for the class names. Mirrored here by name rather than
+# imported, since importing eval.adversarial.run would pull in its
+# multiprocessing/resource-limit setup for no reason, and rather than
+# importing pdfminer/pypdf's internal exception modules directly, which this
+# throwaway demo has no other reason to depend on.
+UNREADABLE_EXCEPTION_NAMES = {
+    "PdfminerException", "PDFSyntaxError", "PDFEncryptionError",
+    "PDFPasswordIncorrect", "PDFTextExtractionNotAllowed",
+    "PdfReadError", "PdfStreamError", "ValueError", "EOFError",
+}
+UNREADABLE_MESSAGE = (
+    "FormFill could not read this file as a PDF. It may be corrupted, "
+    "password-protected, or not actually a PDF (for example, an HTML error "
+    "page saved with a .pdf extension). Try downloading it again or opening "
+    "it in another PDF viewer first."
+)
+
 
 def build(pdf_path: Path):
     if OUT.exists():
@@ -53,14 +76,23 @@ def build(pdf_path: Path):
                  "the import moved and this rewrite is now wrong")
     (OUT / "index.html").write_text(served, encoding="utf-8")
 
-    with pdfplumber.open(pdf_path) as pdf:
-        if len(pdf.pages) > 30:
-            sys.exit("demo caps at 30 pages")
-
-    # One call into the same entry point the evaluation harness scores. The
-    # demo used to re-implement the per-page loop and the id assignment, which
-    # meant it could silently drift from what was being measured.
-    doc = detect_pdf(str(pdf_path))
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            if len(pdf.pages) > 30:
+                sys.exit("demo caps at 30 pages")
+        # One call into the same entry point the evaluation harness scores.
+        # The demo used to re-implement the per-page loop and the id
+        # assignment, which meant it could silently drift from what was
+        # being measured.
+        doc = detect_pdf(str(pdf_path))
+    except Exception as e:
+        if type(e).__name__ not in UNREADABLE_EXCEPTION_NAMES:
+            raise
+        print(f"could not read {pdf_path.name} as a PDF: {type(e).__name__}: {e}")
+        doc = {"version": 1, "source": {"pages": 0}, "pages": [], "fields": [],
+               "notice": {"code": "unreadable", "message": UNREADABLE_MESSAGE}}
+        json.dump(doc, open(OUT / "fields.json", "w"), indent=1)
+        return 0
     fields, pages = doc["fields"], doc["pages"]
 
     json.dump(doc, open(OUT / "fields.json", "w"), indent=1)

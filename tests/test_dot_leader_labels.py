@@ -16,8 +16,21 @@ Number:") is left untouched.
 Run standalone with:  .venv/bin/python -m pytest tests/test_dot_leader_labels.py
 """
 import unittest
+from pathlib import Path
 
 from engine.detect import _strip_dot_leaders, detect
+
+# The two real files named in the module docstring above. Not part of this
+# worktree's tracked fixtures -- eval/corpus/real is gitignored -- so these
+# tests skip if the files are not present rather than failing a clean
+# checkout.
+REAL_SHORT_FORM = "/Users/ryan.xu/Developer/formfill/eval/corpus/real/1b5c872f5ff35ce0.pdf"
+REAL_LONG_FORM = "/Users/ryan.xu/Developer/formfill/eval/corpus/real/d5a3f643b39a6fac.pdf"
+
+
+def _is_pure_leader(label):
+    stripped = label.replace(" ", "")
+    return bool(stripped) and set(stripped) <= set(".")
 
 
 class StripDotLeaders(unittest.TestCase):
@@ -71,6 +84,39 @@ class DetectInvariants(unittest.TestCase):
         d = detect("fixtures/safer.pdf")
         blank = [f for f in d["fields"] if f["type"] == "text" and not (f.get("label") or "")]
         self.assertEqual(blank, [])
+
+
+class RealLeaderLineForms(unittest.TestCase):
+    """The two bilingual EN/FR Canadian court forms that motivated this
+    fix (see module docstring), each hand-verified against detect()'s
+    current live output."""
+
+    @unittest.skipUnless(Path(REAL_SHORT_FORM).exists(), "real corpus not present in this worktree")
+    def test_short_form_leader_labels_are_readable(self):
+        d = detect(REAL_SHORT_FORM)
+        labels = [f["label"] for f in d["fields"]]
+        self.assertEqual(len(labels), 11)
+        self.assertFalse(any(_is_pure_leader(l) for l in labels))
+        # Hand-verified: the field that used to be labelled ". . . . . ."
+        # now falls back to "value"; "Adresse" is what remains of
+        # ". . . . . Adresse" once its leader run is stripped.
+        self.assertIn("value", labels)
+        self.assertIn("Adresse", labels)
+        # The strip is deliberately conservative about a single LEADING dot
+        # (see _strip_dot_leaders' docstring: never a leader on its own), so
+        # these two French captions keep their leading ". " untouched.
+        self.assertIn(". Raison sociale (s’il y a", labels)
+        self.assertIn(". Nom du demandeur (ou du", labels)
+
+    @unittest.skipUnless(Path(REAL_LONG_FORM).exists(), "real corpus not present in this worktree")
+    def test_long_bilingual_form_has_no_leader_only_labels(self):
+        d = detect(REAL_LONG_FORM)
+        labels = [f["label"] for f in d["fields"]]
+        self.assertEqual(len(labels), 117)
+        self.assertFalse(any(_is_pure_leader(l) for l in labels))
+        # Hand-verified: page 8 carries two "day of . . . ." write-on lines
+        # that fall back to "this" once their trailing leader is stripped.
+        self.assertEqual(labels.count("this"), 2)
 
 
 if __name__ == "__main__":

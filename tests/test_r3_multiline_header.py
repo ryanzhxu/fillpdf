@@ -13,11 +13,17 @@ in engine/detect/rules.py).
 Run standalone with:  .venv/bin/python -m pytest tests/test_r3_multiline_header.py
 """
 import unittest
+from pathlib import Path
 
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
 from engine.detect import detect
+
+# The real file that motivated this fix (see module docstring). Not part of
+# this worktree's tracked fixtures -- eval/corpus/real is gitignored -- so
+# this test skips if it is not present rather than failing a clean checkout.
+REAL_MOTIVATING_PDF = "/Users/ryan.xu/Developer/formfill/eval/corpus/real/ebe4beb36bad2b41.pdf"
 
 
 def _write(tmpdir, name, data):
@@ -90,6 +96,22 @@ class TestR3MultilineHeaderGuard(unittest.TestCase):
     def test_real_fixture_field_count_is_unchanged(self):
         out = detect("fixtures/safer.pdf")
         self.assertEqual(len(out["fields"]), 222)
+
+    @unittest.skipUnless(Path(REAL_MOTIVATING_PDF).exists(), "real corpus not present in this worktree")
+    def test_real_fetched_form_no_longer_has_the_scrambled_header_field(self):
+        # Hand-verified: reverting just this guard (_row_gap_exceeds forced
+        # to always return False) reproduces exactly one bogus field on this
+        # file today -- a 573pt-wide text box on page 2 whose label is
+        # several unrelated Korean checklist lines merged into one cell and
+        # sorted by x0 into a scrambled string starting "팀의 정보 ...".
+        # This does not claim the file has zero REAL fields -- its
+        # checkboxes are a separate, documented, still-open gap (see
+        # AUTOPILOT.md / .autobuild/PROGRESS.md pass 12) -- only that this
+        # specific confirmed-bogus field does not reappear.
+        out = detect(REAL_MOTIVATING_PDF)
+        bogus_fragment = "팀의 정보 숫자 의사소통"
+        for f in out["fields"]:
+            self.assertNotIn(bogus_fragment, f.get("label") or "")
 
 
 if __name__ == "__main__":

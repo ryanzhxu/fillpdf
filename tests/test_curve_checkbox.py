@@ -10,11 +10,19 @@ _rect_like_curves in engine/detect/rules.py).
 Run standalone with:  .venv/bin/python -m pytest tests/test_curve_checkbox.py
 """
 import unittest
+from pathlib import Path
 
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
 from engine.detect import detect
+
+# The real file that motivated this rule (see module docstring). Not part of
+# this worktree's tracked fixtures -- eval/corpus/real is gitignored, real
+# corpus PDFs live only in the main repo checkout -- so this test skips if it
+# is not present rather than failing a clean checkout. Same pattern as
+# eval/test_guards.py's REAL_BAD_PDF.
+REAL_MOTIVATING_PDF = "/Users/ryan.xu/Developer/formfill/eval/corpus/real/1bdaa5e8fd5eaace.pdf"
 
 
 def _write(tmpdir, name, data):
@@ -109,6 +117,28 @@ class TestCurveCheckbox(unittest.TestCase):
         # safer.pdf's checkboxes are plain rects; this rule must not alter it.
         out = detect("fixtures/safer.pdf")
         self.assertEqual(len(out["fields"]), 222)
+
+    @unittest.skipUnless(Path(REAL_MOTIVATING_PDF).exists(), "real corpus not present in this worktree")
+    def test_real_fetched_form_finds_all_20_curve_drawn_options(self):
+        # Hand-verified against the PDF itself (a 4-page ACC-style
+        # application): page 2 draws a title pick-list (Mr/Mrs/Ms/Miss), two
+        # Yes/No questions, an ID-confirmation pair, and a gender pick-list
+        # (Male/Female/Gender diverse) as rounded-rect curves; page 3 draws
+        # three more Yes/No pairs the same way. Before this rule existed the
+        # file scored 0 fields.
+        out = detect(REAL_MOTIVATING_PDF)
+        fields = out["fields"]
+        self.assertEqual(len(fields), 20)
+        self.assertTrue(all(f["type"] == "checkbox" and f["rule"] == "R18" for f in fields))
+        labels = {f["label"] for f in fields}
+        self.assertEqual(
+            labels,
+            {"Mr", "Mrs", "Ms", "Miss", "Yes", "No",
+             "The name I wrote in Question 1", "The name I wrote in Question 2", "Other",
+             "Male", "Female", "Gender diverse"},
+        )
+        self.assertEqual(sum(1 for f in fields if f["page"] == 2), 14)
+        self.assertEqual(sum(1 for f in fields if f["page"] == 3), 6)
 
 
 if __name__ == "__main__":

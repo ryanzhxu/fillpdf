@@ -19,6 +19,7 @@ Run standalone with:  .venv/bin/python -m pytest tests/test_r5b_underline_gap.py
 """
 import io
 import unittest
+from pathlib import Path
 
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -27,6 +28,11 @@ import pdfplumber
 from engine.detect import detect
 
 PAGE_H = 792
+
+# The real file that motivated this fix (see module docstring). Not part of
+# this worktree's tracked fixtures -- eval/corpus/real is gitignored -- so
+# this test skips if it is not present rather than failing a clean checkout.
+REAL_MOTIVATING_PDF = "/Users/ryan.xu/Developer/formfill/eval/corpus/real/9e5fa53418722365.pdf"
 
 
 def _write(tmpdir, name, data):
@@ -117,6 +123,26 @@ class TestR5bUnderlineGapGuard(unittest.TestCase):
     def test_real_fixture_field_count_is_unchanged(self):
         out = detect("fixtures/safer.pdf")
         self.assertEqual(len(out["fields"]), 222)
+
+    @unittest.skipUnless(Path(REAL_MOTIVATING_PDF).exists(), "real corpus not present in this worktree")
+    def test_real_fetched_form_no_longer_has_the_heading_underline_fields(self):
+        # Hand-verified: reverting just the tolerance (ON_RULE_TOL_Y 3.5 ->
+        # 3.0) reproduces exactly these 4 bogus fields on this file today.
+        # This does not claim the file has zero REAL fields -- its
+        # checkboxes use a glyph R1 does not yet recognize, a separate,
+        # documented, still-open gap -- only that these specific
+        # confirmed-bogus fields do not reappear.
+        out = detect(REAL_MOTIVATING_PDF)
+        bogus_fragments = (
+            "Drop-down lenses.",
+            "The Site Plan shall demonstrate how the development compli",
+            "The applicant shall submit a Lighting Plan for new commerc",
+            "(Check at least one of the following",
+        )
+        for f in out["fields"]:
+            label = f.get("label") or ""
+            for bad in bogus_fragments:
+                self.assertNotIn(bad, label, f"bogus label reappeared: {label!r}")
 
 
 if __name__ == "__main__":
