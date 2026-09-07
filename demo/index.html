@@ -128,8 +128,8 @@ body.picking header button,body.picking #stat,body.picking .hint{display:none}
 #g-pagelabel.g-pagelabel{font-family:var(--font-mono);color:var(--ink-faint);text-transform:uppercase;
        font-size:11.5px;letter-spacing:.06em;margin:16px 0 10px;border-top:1px solid var(--line);padding-top:14px}
 
-#g-active.g-active{background:var(--accent-wash);border:1px solid color-mix(in srgb,var(--accent) 25%,transparent);
-       border-radius:13px;padding:16px;margin-bottom:16px}
+.g-active-row{background:var(--accent-wash);border:1px solid color-mix(in srgb,var(--accent) 25%,transparent);
+       border-radius:13px;padding:16px;margin:4px 0}
 .g-step{font-family:var(--font-mono);font-size:12px;color:var(--accent-deep);font-weight:700;
        letter-spacing:.06em;text-transform:uppercase}
 .g-label{font-family:var(--font-display);font-size:20px;font-weight:600;color:var(--ink);
@@ -165,12 +165,10 @@ body.picking header button,body.picking #stat,body.picking .hint{display:none}
 .g-item{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:10px;cursor:pointer;
        color:var(--ink-soft);min-height:44px}
 .g-item:hover{background:var(--surface-2)}
-.g-item.active{background:var(--accent-wash)}
 .g-item>*:not(.g-tick){min-width:0;flex:1}
 .g-tick{flex:none;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line-strong);
        background:var(--surface);display:grid;place-items:center;font-family:var(--font-mono);
        font-size:11px;font-weight:700;color:var(--ink-faint)}
-.g-item.active .g-tick{border-color:var(--accent);color:var(--accent)}
 .g-item.done .g-tick{background:var(--accent);border-color:var(--accent);color:var(--surface)}
 .g-item b{display:block;font-size:13.5px;font-weight:600;color:var(--ink);white-space:nowrap;
        overflow:hidden;text-overflow:ellipsis}
@@ -207,7 +205,6 @@ body.picking header button,body.picking #stat,body.picking .hint{display:none}
       <div id="g-pmeta" class="g-pmeta">0 of 0 filled</div>
     </div>
     <div id="g-pagelabel" class="g-pagelabel"></div>
-    <div id="g-active" class="g-active"></div>
     <div id="g-empty" class="g-empty" hidden></div>
     <div id="g-list" class="g-list"></div>
   </aside>
@@ -1221,6 +1218,12 @@ function buildGuideList(cur, pageGroup){
   var i, idx, f, done, label, valueText;
   for (idx = 0; idx < pageGroup.length; idx++){
     i = pageGroup[idx];
+    if (i === cur){
+      // Placeholder at the active field's position in the list; buildActiveCard()
+      // below fills in the expanded step card once this element exists in the DOM.
+      html += '<div class="g-active-row" id="g-active" data-i="' + i + '"></div>';
+      continue;
+    }
     f = FIELDS[i];
     done = isFieldFilled(f);
     label = guideLabelFor(i, pageGroup);
@@ -1229,7 +1232,7 @@ function buildGuideList(cur, pageGroup){
     } else {
       valueText = f.value === true ? tr('ticked_value') : tr('empty_value');
     }
-    html += '<div class="g-item' + (i === cur ? ' active' : '') + (done ? ' done' : '') + '"'
+    html += '<div class="g-item' + (done ? ' done' : '') + '"'
           + ' data-i="' + i + '" data-n="' + (idx + 1) + '">'
           + '<span class="g-tick">' + (done ? '✓' : (idx + 1)) + '</span>'
           + '<span><b>' + escHtml(label) + '</b><small>' + escHtml(valueText) + '</small></span>'
@@ -1242,7 +1245,9 @@ function buildGuideList(cur, pageGroup){
       if (!isNaN(i2)) focusField(i2);
     };
   });
-  var activeItem = listEl.querySelector('.g-item.active');
+  // Fill in the expanded card now that its placeholder exists in the list.
+  buildActiveCard(cur, pageGroup);
+  var activeItem = document.getElementById('g-active');
   if (activeItem) activeItem.scrollIntoView({block: 'nearest'});
 }
 
@@ -1258,7 +1263,6 @@ function renderGuide(){
   var pfill = document.getElementById('g-pfill');
   var pmeta = document.getElementById('g-pmeta');
   var pagelabel = document.getElementById('g-pagelabel');
-  var activeEl = document.getElementById('g-active');
   var emptyEl = document.getElementById('g-empty');
   var listEl = document.getElementById('g-list');
 
@@ -1274,19 +1278,16 @@ function renderGuide(){
       emptyEl.textContent = tr('guide_empty_message');
       emptyEl.hidden = false;
     }
-    if (activeEl) activeEl.hidden = true;
     if (listEl) listEl.hidden = true;
     return;
   }
 
   if (emptyEl) emptyEl.hidden = true;
-  if (activeEl) activeEl.hidden = false;
   if (listEl) listEl.hidden = false;
 
   var cur = guideCurrentField();
   if (cur === null || !FIELDS[cur]){
     if (pagelabel) pagelabel.hidden = true;
-    if (activeEl) activeEl.innerHTML = '';
     if (listEl) listEl.innerHTML = '<div class="g-lab">' + escHtml(tr('this_page')) + '</div>';
     return;
   }
@@ -1312,7 +1313,6 @@ function renderGuide(){
   }
   if (pageGroup.indexOf(cur) === -1) pageGroup = [cur];
 
-  buildActiveCard(cur, pageGroup);
   buildGuideList(cur, pageGroup);
 }
 
@@ -1411,7 +1411,7 @@ document.addEventListener('input', onFldMutate);
 document.addEventListener('change', onFldMutate);
 
 window.renderGuide = renderGuide;
-if (document.getElementById('g-active') && typeof FIELDS !== 'undefined'){
+if (document.getElementById('g-list') && typeof FIELDS !== 'undefined'){
   renderGuide();
 }
 </script>
