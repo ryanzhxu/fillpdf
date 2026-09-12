@@ -136,8 +136,10 @@ def detect(pdf_path: Union[str, Path], page_backend=None) -> dict:
     same rules as a real text-layer page, and its fields are tagged
     `origin: "ocr"`. Returning `None` leaves that page's current scanned
     behavior unchanged. Passing no `page_backend` at all reproduces today's
-    behavior exactly -- see
-    docs/superpowers/specs/2026-09-12-scan-detection-interface-design.md.
+    behavior exactly.
+    A backend that raises propagates the exception out of detect() --
+    returning None is the only sanctioned way to decline a page.
+    See docs/superpowers/specs/2026-09-12-scan-detection-interface-design.md.
     """
     fields, pages = [], []
     carry, prev_width = None, None

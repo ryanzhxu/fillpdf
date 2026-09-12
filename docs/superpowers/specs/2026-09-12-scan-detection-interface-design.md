@@ -102,6 +102,19 @@ same contract:
 - **`curves` may legitimately be `[]`.** Curve-drawn checkbox-like shapes
   (`_rect_like_curves`) are a refinement on top of `rects`, not a separate
   detection path. A v1 CV backend only needs to emit `rects`.
+- **Coordinates must be in PDF points, matching the real page.** Every
+  `chars`/`rects`/`curves` entry's x0/x1/top/bottom and the synthetic page's
+  own width/height must be in the same coordinate space as the real page
+  `detect()` already reports in `pages[]` -- PDF points, top-down origin. A
+  backend must rescale before returning a `DetectablePage`; pixel
+  coordinates or any other scaled space would make every field rect wrong
+  relative to the page dimensions callers already have.
+- **A populated `curves` entry is not rect-shaped.** If a backend does
+  supply curves (optional for v1), each entry needs `x0`/`x1`/`top`/`bottom`
+  (as rects do) plus `path`: a list of `(operator, (x, y))` tuples
+  (`operator` one of `"m"`/`"l"`/`"c"`/`"h"`, starting with `"m"` and ending
+  with `"h"`) describing a rectangle-like outline -- see `rules.py`'s
+  `_rect_like_curves()`.
 
 ### Checkbox mapping
 
@@ -142,14 +155,28 @@ CV box-finding), so consumers must be able to tell them apart:
   (alongside `detected`/`user_added`/`user_moved`).
 - `detect()`'s single `notice` field stays document-level, so a mixed
   document (some real text pages, some OCR'd, maybe some still-undetected
-  scans) needs one precedence order: `scanned` (a backend was available but
-  declined on at least one page, or no backend was given and the existing
-  majority-scanned threshold is met) outranks `ocr_assisted` (at least one
-  page's fields came from a backend and no page hit the `scanned` case)
-  outranks `no_fields` (unchanged from today). `ocr_assisted` fires whenever
-  any page used a backend, regardless of whether other pages had a normal
+  scans) needs one precedence order: `scanned` (the existing majority-scanned
+  threshold, unchanged from before this interface existed: pages that are
+  scanned AND either got no backend or had their backend call decline, as a
+  fraction of all pages, is >= 0.5) outranks `ocr_assisted` (at least one
+  page's fields came from a backend, and the document did not hit the
+  `scanned` threshold) outranks `no_fields` (unchanged from today).
+  `ocr_assisted` fires whenever any page used a backend and the document
+  is not majority-scanned, regardless of whether other pages had a normal
   text layer — so a consumer always knows to review the document, not just
   when the whole thing was a scan.
+
+  Known limitation, deferred to whichever sub-project first wires a real
+  backend into a real caller: when the majority-scanned threshold IS met
+  but a minority of pages were still OCR-recovered, `SCANNED_MESSAGE`'s "no
+  fields could be found" wording can be shown alongside a non-empty
+  `fields` list. This shape already existed before this interface (a
+  normal text page can already sit alongside a majority of undetected
+  scanned pages) -- this interface only makes it reachable via
+  `page_backend` too. It is unreachable in production today because no
+  caller passes `page_backend` yet. Making the message conditionally
+  accurate is a product-copy decision, not an interface decision, so it is
+  intentionally left for whichever sub-project first ships a real caller.
 
 ## Testing / verification
 

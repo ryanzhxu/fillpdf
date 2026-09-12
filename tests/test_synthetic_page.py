@@ -83,6 +83,7 @@ class TestSyntheticPage(unittest.TestCase):
         self.assertEqual(r5[0]["type"], "text")
         self.assertEqual(r5[0]["label"], "Name")
         self.assertEqual(r5[0]["page"], 1)
+        self.assertEqual(r5[0]["rect"], [43, 81.0, 71, 101.0])
 
     def test_r18_checkbox_from_synthetic_rects(self):
         fields, _carry = detect_page(_make_fixture(), pno=1, carry_in=None)
@@ -91,6 +92,7 @@ class TestSyntheticPage(unittest.TestCase):
         self.assertEqual(r18[0]["type"], "checkbox")
         self.assertEqual(r18[0]["label"], "Agree")
         self.assertEqual(r18[0]["page"], 1)
+        self.assertEqual(r18[0]["rect"], [10, 30.0, 30, 50.0])
 
     def test_exactly_two_fields_total(self):
         # Guards against the fixture accidentally tripping an unrelated rule.

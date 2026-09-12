@@ -667,7 +667,7 @@ function draw(){
     const f = FIELDS[i];
     const b = document.createElement('div');
     b.dataset.i = i;
-    b.className = 'fld' + (f.origin === 'detected' ? '' : ' user') + (sel === i ? ' sel' : '');
+    b.className = 'fld' + ((f.origin === 'user_added' || f.origin === 'user_moved') ? ' user' : '') + (sel === i ? ' sel' : '');
     // Lead with the label. It is the only thing that tells a person what a
     // box actually is -- especially a checkbox, where the id is just chk_7.
     b.title = (f.label ? f.label + '\n' : '') + `${f.id}${f.rule ? '  ('+f.rule+')' : ''}`;
@@ -741,7 +741,7 @@ function deselect(){
 }
 function stat(){
   const t = FIELDS.filter(f=>f.type==='text').length;
-  const u = FIELDS.filter(f=>f.origin!=='detected').length;
+  const u = FIELDS.filter(f=>f.origin==='user_added' || f.origin==='user_moved').length;
   const yours = u ? tr('stat_yours', {yours: u}) : '';
   $('#stat').textContent = tr('stat_summary', {total: FIELDS.length, text: t, checkbox: FIELDS.length-t, yours});
 }

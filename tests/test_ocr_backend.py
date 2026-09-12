@@ -38,6 +38,19 @@ def _image_only_pdf(n_pages=1):
     return buf.getvalue()
 
 
+def _text_then_scan_pdf():
+    """Page 1: a real text-layer field. Page 2: an image-only scan."""
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=letter)
+    c.drawString(72, 700, "Name: ______________________")
+    c.showPage()
+    img = ImageReader(Image.new("RGB", (600, 800), (235, 235, 235)))
+    c.drawImage(img, 0, 0, width=letter[0], height=letter[1])
+    c.showPage()
+    c.save()
+    return buf.getvalue()
+
+
 def _write(tmpdir, name, data):
     p = tmpdir / name
     p.write_bytes(data)
@@ -90,6 +103,26 @@ class TestOcrBackend(unittest.TestCase):
             raise AssertionError("backend called on a non-scanned page")
         out = detect("fixtures/safer.pdf", page_backend=_boom)
         self.assertNotIn("notice", out)
+
+    def test_scanned_outranks_ocr_assisted_on_a_mixed_multipage_document(self):
+        # 3-page scan, backend succeeds only on page 1 -- 2 of 3 pages are
+        # still undetected, so the majority-scanned threshold (>=0.5) wins
+        # over ocr_assisted, even though OCR fields exist.
+        path = _write(self.tmp, "scan3.pdf", _image_only_pdf(n_pages=3))
+        out = detect(path, page_backend=lambda pg, i: _make_fixture() if i == 1 else None)
+        self.assertEqual(out["notice"]["code"], "scanned")
+        self.assertEqual(len(out["fields"]), 2)
+        self.assertTrue(all(f["origin"] == "ocr" for f in out["fields"]))
+
+    def test_mixed_document_tags_origin_per_page(self):
+        # Page 1 is real text (origin "detected"); page 2 is a scan a
+        # backend recovers (origin "ocr") -- both must coexist correctly
+        # in one document's fields list.
+        path = _write(self.tmp, "mixed.pdf", _text_then_scan_pdf())
+        out = detect(path, page_backend=lambda pg, i: _make_fixture() if i == 2 else None)
+        self.assertEqual(out["notice"]["code"], "ocr_assisted")
+        by_id = {f["id"]: f["origin"] for f in out["fields"]}
+        self.assertEqual(by_id, {"p1_name": "detected", "p2_name": "ocr", "p2_chk": "ocr"})
 
 
 if __name__ == "__main__":
