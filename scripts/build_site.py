@@ -48,7 +48,8 @@ WHEELS = ("pdfminer.six", "pdfplumber")
 
 # The detector. engine/ is a namespace package, so there is no __init__.py to
 # copy; the browser adds the site root to sys.path and imports engine.detect.
-ENGINE_FILES = ["engine/detect/__init__.py", "engine/detect/rules.py"]
+ENGINE_FILES = ["engine/detect/__init__.py", "engine/detect/rules.py",
+                 "engine/detect/page_protocol.py"]
 
 
 def build(out: Path) -> Path:
