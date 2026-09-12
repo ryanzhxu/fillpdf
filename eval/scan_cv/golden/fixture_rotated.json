@@ -1,0 +1,56 @@
+{
+  "dpi": 300,
+  "true_skew_deg": 3.0,
+  "rects": [
+    {
+      "x0": 10.0,
+      "x1": 190.0,
+      "top": 14.0,
+      "bottom": 16.0,
+      "width": 180.0,
+      "height": 2.0,
+      "fill": false,
+      "stroke": true
+    },
+    {
+      "x0": 10.0,
+      "x1": 190.0,
+      "top": 34.0,
+      "bottom": 36.0,
+      "width": 180.0,
+      "height": 2.0,
+      "fill": false,
+      "stroke": true
+    },
+    {
+      "x0": 10.0,
+      "x1": 190.0,
+      "top": 54.0,
+      "bottom": 56.0,
+      "width": 180.0,
+      "height": 2.0,
+      "fill": false,
+      "stroke": true
+    },
+    {
+      "x0": 10.0,
+      "x1": 190.0,
+      "top": 74.0,
+      "bottom": 76.0,
+      "width": 180.0,
+      "height": 2.0,
+      "fill": false,
+      "stroke": true
+    },
+    {
+      "x0": 10.0,
+      "x1": 30.0,
+      "top": 50.0,
+      "bottom": 70.0,
+      "width": 20.0,
+      "height": 20.0,
+      "fill": true,
+      "stroke": false
+    }
+  ]
+}
