@@ -41,6 +41,20 @@ NO_FIELDS_MESSAGE = (
 )
 
 
+# A page a backend successfully OCR'd is real, but structurally
+# lower-confidence than a page read from an actual text layer: word-level
+# OCR boxes and approximate CV box-finding, not exact vector geometry. Say
+# so, the same way SCANNED_MESSAGE and NO_FIELDS_MESSAGE already do, rather
+# than let an OCR-derived field look identical in confidence to one read
+# from a real flat form.
+OCR_ASSISTED_MESSAGE = (
+    "Some pages in this document had no text layer, so FormFill used OCR to "
+    "read them instead. OCR-derived fields are less reliable than fields "
+    "read from a real text layer -- check labels and positions carefully "
+    "before using them."
+)
+
+
 def _page_is_scanned(pg) -> bool:
     """True when a page is a page-filling image with almost no text."""
     non_ws = sum(1 for c in pg.chars if c["text"].strip())
@@ -110,23 +124,39 @@ def _strip_dot_leaders(label: str) -> str:
     return stripped.strip() if stripped != s else s
 
 
-def detect(pdf_path: Union[str, Path]) -> dict:
+def detect(pdf_path: Union[str, Path], page_backend=None) -> dict:
     """Detect fillable regions in a flat PDF.
 
     Pure function. No network, no mutation of the input, no global state.
     Returns the shape defined in eval/contracts/fields.schema.json.
+
+    `page_backend`, when given, is called as `page_backend(pdfplumber_page,
+    page_number)` on every page `_page_is_scanned()` flags. Returning a
+    `page_protocol.DetectablePage`-shaped object runs that page through the
+    same rules as a real text-layer page, and its fields are tagged
+    `origin: "ocr"`. Returning `None` leaves that page's current scanned
+    behavior unchanged. Passing no `page_backend` at all reproduces today's
+    behavior exactly -- see
+    docs/superpowers/specs/2026-09-12-scan-detection-interface-design.md.
     """
     fields, pages = [], []
     carry, prev_width = None, None
     scanned_pages = 0
+    ocr_pages: set = set()
     with pdfplumber.open(str(pdf_path)) as pdf:
         for i, pg in enumerate(pdf.pages, 1):
             pages.append({"page": i, "width": float(pg.width), "height": float(pg.height)})
             if prev_width is not None and abs(pg.width - prev_width) > 1:
                 carry = None      # a page-size/orientation change breaks column geometry
+            page_source = pg
             if _page_is_scanned(pg):
-                scanned_pages += 1
-            page_fields, carry = _detect_page(pg, i, carry_in=carry)
+                synthetic = page_backend(pg, i) if page_backend else None
+                if synthetic is not None:
+                    page_source = synthetic
+                    ocr_pages.add(i)
+                else:
+                    scanned_pages += 1
+            page_fields, carry = _detect_page(page_source, i, carry_in=carry)
             fields += page_fields
             prev_width = pg.width
 
@@ -140,7 +170,7 @@ def detect(pdf_path: Union[str, Path]) -> dict:
         base = f"p{f['page']}_" + (slug(f["label"]) if f["type"] == "text" else "chk")
         seen[base] = seen.get(base, 0) + 1
         f["id"] = base if seen[base] == 1 else f"{base}_{seen[base]}"
-        f["origin"] = "detected"
+        f["origin"] = "ocr" if f["page"] in ocr_pages else "detected"
 
     _group_yes_no(fields)
 
@@ -149,6 +179,8 @@ def detect(pdf_path: Union[str, Path]) -> dict:
     # image page in an otherwise text PDF is not a scan, so require a majority.
     if pages and scanned_pages / len(pages) >= 0.5:
         out["notice"] = {"code": "scanned", "message": SCANNED_MESSAGE}
+    elif ocr_pages:
+        out["notice"] = {"code": "ocr_assisted", "message": OCR_ASSISTED_MESSAGE}
     elif pages and not fields:
         out["notice"] = {"code": "no_fields", "message": NO_FIELDS_MESSAGE}
     return out
