@@ -10,6 +10,7 @@ import unittest
 from pathlib import Path
 
 import cv2
+import numpy as np
 
 from engine.scan_cv.preprocess import preprocess
 from engine.scan_cv.deskew import deskew
@@ -55,6 +56,33 @@ class TestLines(unittest.TestCase):
             self.assertGreaterEqual(d["width"], 5)
             self.assertFalse(d["fill"])
             self.assertTrue(d["stroke"])
+
+    def test_keeps_a_table_rule_whose_column_divider_only_brackets_one_end(self):
+        # A T-junction (a table's write-on rule meeting a column divider at
+        # one end only) is not a closed box -- only a real box has a
+        # bracketing vertical at BOTH endpoints. Repro of a real bug: with
+        # only one endpoint required, two ordinary table rules sharing one
+        # left-hand column divider were both misread as box edges and
+        # silently dropped (0 of 2 detected instead of 2 of 2).
+        img = np.full((300, 600, 3), 255, dtype=np.uint8)
+        cv2.line(img, (100, 150), (300, 150), (0, 0, 0), 2)
+        cv2.line(img, (100, 200), (300, 200), (0, 0, 0), 2)
+        cv2.line(img, (100, 75), (100, 225), (0, 0, 0), 2)
+        binary = preprocess(img)
+        deskewed, M = deskew(binary)
+        detected = detect_lines(deskewed, M, dpi=72)
+        self.assertEqual(len(detected), 2)
+
+    def test_still_drops_a_real_closed_box(self):
+        # A genuine closed box (bracketed by a vertical at BOTH endpoints)
+        # must still be excluded -- that is detect_checkboxes' job, not a
+        # line -- so the fix above must not just always keep lines.
+        img = np.full((300, 600, 3), 255, dtype=np.uint8)
+        cv2.rectangle(img, (100, 100), (160, 160), (0, 0, 0), 2)
+        binary = preprocess(img)
+        deskewed, M = deskew(binary)
+        detected = detect_lines(deskewed, M, dpi=72)
+        self.assertEqual(len(detected), 0)
 
     def test_detects_lines_on_the_rotated_fixture_ignoring_the_checkbox(self):
         data = json.loads((GOLDEN / "fixture_rotated.json").read_text())

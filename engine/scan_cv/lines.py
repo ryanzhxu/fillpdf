@@ -100,17 +100,28 @@ def _vertical_strokes(deskewed):
 
 def _is_box_edge(px0, px1, py, verticals):
     """True if a vertical stroke of comparable length brackets this
-    horizontal segment at (approximately) one of its endpoints -- i.e. it is
-    one side of a small closed box rather than a free-standing line."""
+    horizontal segment at BOTH of its endpoints -- i.e. it is one side of a
+    small closed box rather than a free-standing line.
+
+    Requiring both ends, not just one, matters on a real table: a write-on
+    rule that starts at a column divider (a T-junction, not a box corner)
+    has a comparable-length vertical at exactly one endpoint, and a single-
+    endpoint check misreads that as a box edge and drops a real line. A
+    closed box always has a vertical at both ends; a T-junction never does.
+    """
     length = px1 - px0
-    for vx, vy0, vy1 in verticals:
-        vlen = vy1 - vy0
-        if not (SQUARE_ASPECT_LOW * length <= vlen <= SQUARE_ASPECT_HIGH * length):
-            continue
-        if (abs(vx - px0) <= ENDPOINT_TOL_PX or abs(vx - px1) <= ENDPOINT_TOL_PX) \
-                and vy0 - ENDPOINT_TOL_PX <= py <= vy1 + ENDPOINT_TOL_PX:
-            return True
-    return False
+
+    def _bracketed_at(x_target):
+        for vx, vy0, vy1 in verticals:
+            vlen = vy1 - vy0
+            if not (SQUARE_ASPECT_LOW * length <= vlen <= SQUARE_ASPECT_HIGH * length):
+                continue
+            if abs(vx - x_target) <= ENDPOINT_TOL_PX \
+                    and vy0 - ENDPOINT_TOL_PX <= py <= vy1 + ENDPOINT_TOL_PX:
+                return True
+        return False
+
+    return _bracketed_at(px0) and _bracketed_at(px1)
 
 
 def _merge_collinear(segments):
