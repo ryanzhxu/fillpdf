@@ -94,6 +94,31 @@ class TestBackend(unittest.TestCase):
             self.assertLessEqual(y1, page["height"])
             self.assertEqual(f["origin"], "ocr")
 
+    def test_detect_end_to_end_at_non_default_dpi(self):
+        # make_cv_ocr_backend(pdf_path, dpi=...) exposes dpi as a real,
+        # already-public parameter, but every other end-to-end test in this
+        # file calls it with the default (300) only -- so the render.py ->
+        # pipeline.py -> ocr.py coordinate chain has never actually been
+        # checked at any other scale, despite dpi mismatches being the exact
+        # class of bug found repeatedly elsewhere in this backend (the
+        # missing --dpi fix, the CropBox/MediaBox scale note). Two prior end-
+        # to-end fixtures full runs already timed dpi=300 at ~1-2s; the
+        # values below span a plausible real range without adding much
+        # wall-clock time to the suite.
+        for dpi in (150, 400):
+            with self.subTest(dpi=dpi):
+                doc = detect(str(SAMPLE), page_backend=make_cv_ocr_backend(SAMPLE, dpi=dpi))
+                self.assertEqual(doc["notice"]["code"], "ocr_assisted")
+                self.assertGreater(len(doc["fields"]), 0)
+                pages_by_number = {p["page"]: p for p in doc["pages"]}
+                for f in doc["fields"]:
+                    page = pages_by_number[f["page"]]
+                    x0, y0, x1, y1 = f["rect"]
+                    self.assertGreaterEqual(x0, 0)
+                    self.assertGreaterEqual(y0, 0)
+                    self.assertLessEqual(x1, page["width"])
+                    self.assertLessEqual(y1, page["height"])
+
     def test_detect_end_to_end_on_multi_page_scanned_pdf(self):
         # Every other end-to-end test in this file (and every prior
         # AUTOPILOT.md pass's manual verification) only ever exercised
