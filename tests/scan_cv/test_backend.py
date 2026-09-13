@@ -45,6 +45,35 @@ class TestBackend(unittest.TestCase):
         self.assertEqual(len(r5), 1)
         self.assertEqual(r5[0]["label"], "Name")
 
+    def test_assembled_page_drives_a_real_checkbox_rule(self):
+        # Same purpose as test_assembled_page_drives_a_real_rule above, but
+        # for the OTHER real rule a scan_cv-assembled page can feed: R18,
+        # which fires on a fill=True/stroke=False square in the 18-32pt band
+        # (engine/scan_cv/checkboxes.py's CHK_MIN_PT/CHK_MAX_PT match R18's
+        # own R18_CHK_MIN/R18_CHK_MAX exactly, by design -- see checkboxes.py's
+        # module docstring). No prior test ran a CV-detected checkbox rect
+        # through the real, unmodified rules.py end to end; test_pipeline.py
+        # only checks detect_lines_and_boxes() returns the right rect SHAPE,
+        # and the real end-to-end tests below never exercise this path since
+        # none of the 3 real scanned corpus files happen to contain a
+        # detectable checkbox at production DPI (see PROGRESS.md).
+        fake_rects = [{"x0": 10, "x1": 30, "top": 10, "bottom": 30,
+                       "width": 20, "height": 20, "fill": True, "stroke": False}]
+        fake_words = [{"x0": 35, "x1": 55, "top": 15, "bottom": 25, "text": "Yes"}]
+        fake_chars = []
+        with mock.patch("engine.scan_cv.backend.render_page_to_bitmap", return_value="bitmap"), \
+             mock.patch("engine.scan_cv.backend.detect_lines_and_boxes", return_value=fake_rects), \
+             mock.patch("engine.scan_cv.backend.ocr_page", return_value=(fake_words, fake_chars)):
+            backend = make_cv_ocr_backend(SAMPLE)
+            with pdfplumber.open(SAMPLE) as pdf:
+                page = backend(pdf.pages[0], 1)
+        from engine.detect.rules import detect as detect_page
+        fields, _carry = detect_page(page, pno=1, carry_in=None)
+        r18 = [f for f in fields if f["rule"] == "R18"]
+        self.assertEqual(len(r18), 1)
+        self.assertEqual(r18[0]["type"], "checkbox")
+        self.assertEqual(r18[0]["label"], "Yes")
+
     def test_backend_declines_a_page_with_nothing_recovered(self):
         # A blank/near-blank scan (no OCR words, no CV rects) should decline
         # (return None) rather than claim ocr_assisted over an empty page --
