@@ -4,6 +4,7 @@ pypdf>=6.0
 pypdfium2>=5.0
 pillow>=11.0
 opencv-python>=4.10   # BSD license; scan CV pipeline only, never imported by engine/detect/*
+pytesseract>=0.3      # Apache 2.0 license; scan CV pipeline only, requires system Tesseract
 
 # eval harness
 reportlab>=4.0
