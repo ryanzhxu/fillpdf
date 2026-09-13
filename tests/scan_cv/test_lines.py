@@ -14,7 +14,7 @@ import numpy as np
 
 from engine.scan_cv.preprocess import preprocess
 from engine.scan_cv.deskew import deskew
-from engine.scan_cv.lines import detect_lines
+from engine.scan_cv.lines import detect_lines, detect_verticals
 
 GOLDEN = Path(__file__).parent.parent.parent / "eval" / "scan_cv" / "golden"
 COORD_TOLERANCE_PT = 3.0
@@ -83,6 +83,41 @@ class TestLines(unittest.TestCase):
         deskewed, M = deskew(binary)
         detected = detect_lines(deskewed, M, dpi=72)
         self.assertEqual(len(detected), 0)
+
+    def test_detects_a_box_sides_as_verticals(self):
+        # A boxed heading/instruction panel (all 4 sides drawn, no fill) is
+        # exactly the shape detect_lines() alone cannot describe -- see
+        # detect_verticals()'s docstring and
+        # tests/scan_cv/test_backend.py's regression test on the real
+        # motivating fixture. Here: a plain rectangle with one line of text
+        # inside it, at a large enough scale that its sides clear
+        # BOX_SIDE_MIN_LEN_PT.
+        img = np.full((300, 600, 3), 255, dtype=np.uint8)
+        cv2.rectangle(img, (100, 100), (500, 160), (0, 0, 0), 2)
+        cv2.putText(img, "A BOXED HEADING", (150, 138),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+        binary = preprocess(img)
+        deskewed, M = deskew(binary)
+        verticals = detect_verticals(deskewed, M, dpi=72)
+        self.assertGreaterEqual(len(verticals), 2)
+        xs = sorted(v["x0"] for v in verticals)
+        self.assertAlmostEqual(xs[0], 99.0, delta=3)
+        self.assertAlmostEqual(xs[-1], 499.0, delta=3)
+        for v in verticals:
+            self.assertLess(v["width"], 3)
+            self.assertGreaterEqual(v["height"], 5)
+
+    def test_ignores_short_vertical_strokes_like_letters(self):
+        # An ordinary letter's vertical stroke (well under
+        # BOX_SIDE_MIN_LEN_PT at typical form-text sizes) must not register
+        # as a box side.
+        img = np.full((300, 600, 3), 255, dtype=np.uint8)
+        cv2.putText(img, "Illinois", (150, 150),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+        binary = preprocess(img)
+        deskewed, M = deskew(binary)
+        verticals = detect_verticals(deskewed, M, dpi=72)
+        self.assertEqual(verticals, [])
 
     def test_detects_lines_on_the_rotated_fixture_ignoring_the_checkbox(self):
         data = json.loads((GOLDEN / "fixture_rotated.json").read_text())

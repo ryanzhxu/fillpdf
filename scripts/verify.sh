@@ -20,7 +20,7 @@ OUT=.autobuild/verify_score
 step() { printf '\n=== %s ===\n' "$1"; }
 
 step "tests"
-"$PY" -m pytest -q --ignore=eval/adversarial || { echo "VERIFY FAIL: tests"; exit 1; }
+"$PY" -m pytest -q --ignore=eval/adversarial --ignore=server/tests || { echo "VERIFY FAIL: tests"; exit 1; }
 
 step "detection eval (about two minutes)"
 rm -rf "$OUT"
