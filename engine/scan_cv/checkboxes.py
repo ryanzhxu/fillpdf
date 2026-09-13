@@ -10,6 +10,31 @@ import cv2
 import numpy as np
 
 CHK_MIN_PT, CHK_MAX_PT = 18.0, 32.0
+# Deliberately identical to engine/detect/rules.py's own R18_CHK_MIN/MAX --
+# see backend.py's test_assembled_page_drives_a_real_checkbox_rule.
+#
+# Known, measured gap: real checkboxes smaller than CHK_MIN_PT exist and are
+# invisible to this module. eval/corpus/real/5180e9e5652573e2.pdf page 14's
+# "YES [] NO []" boxes are 24x24px at the production DPI (300) -- 5.76pt,
+# below even rules.py's own R18_CURVE_CHK_MIN=14pt exception for the
+# curve-drawn (native, non-scanned) path. Confirmed by hand: 11 such boxes
+# are visibly present on that one real page and detect_checkboxes finds
+# none of them (the single box it does return there is a false positive --
+# a "P.M." table cell, not a checkbox).
+#
+# Tried and rejected: lowering CHK_MIN_PT to 5.0 to catch them. It does
+# recover those 11 boxes, but it also newly matches unrelated small-square
+# fragments of the decorative letterhead logo on
+# eval/scan_cv/samples/agm_proxy_form.pdf (a file with zero real
+# checkboxes) -- 6 false positives there, confirmed by cropping and
+# inspecting the matched pixels (window-grid graphic in the "AWM" logo).
+# So this is not a safe size-threshold change; catching real small
+# checkboxes without also catching small decorative noise needs an
+# additional discriminating feature (e.g. a caption-adjacency check, or a
+# border-thickness/fill-ratio test small pictorial fragments would fail)
+# that has not been designed or tuned, and there is no ground-truth corpus
+# for scanned real forms to tune it against. Left as a documented
+# limitation rather than a speculative fix.
 SQUARE_TOL_PT = 8.0
 
 # A write-on/table rule that happens to cross a checkbox merges with it into
