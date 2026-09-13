@@ -98,6 +98,27 @@ class TestOcrPage(unittest.TestCase):
         self.assertEqual(words, [])
         self.assertEqual(chars, [])
 
+    def test_zero_confidence_word_is_still_kept(self):
+        # A real recognized word can legitimately score exactly 0 confidence
+        # (measured on real corpus scans: "But", "City", "VIOLATION" all
+        # scored 0 while being correctly recognized) -- only tesseract's
+        # -1-confidence block/line summary rows (which always carry empty
+        # text, already excluded by the `not text` check) should be dropped.
+        bitmap = _synthetic_bitmap_with_word("NAME", 20.0, 40.0)
+        fake_data = {
+            "text": ["", "NAME"],
+            "left": [0, 30],
+            "top": [0, 60],
+            "width": [0, 100],
+            "height": [0, 30],
+            "conf": [-1, 0],
+        }
+        with mock.patch("pytesseract.image_to_data", return_value=fake_data):
+            words, chars = ocr_page(bitmap, dpi=DPI)
+
+        self.assertEqual(len(words), 1)
+        self.assertEqual(words[0]["text"], "NAME")
+
     def test_runs_on_the_real_target_scan_without_crashing(self):
         with pdfplumber.open(SAMPLE) as pdf:
             page = pdf.pages[0]

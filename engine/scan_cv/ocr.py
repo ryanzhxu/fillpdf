@@ -14,7 +14,17 @@ page skew internally, so there is no accuracy reason to deskew first.
 import pytesseract
 from PIL import Image
 
-MIN_CONFIDENCE = 0  # Tesseract reports -1 for non-word rows (blocks/lines).
+MIN_CONFIDENCE = 0  # Tesseract reports -1 for non-word rows (blocks/lines);
+# real recognized words can legitimately score exactly 0. `data["text"]` is
+# already empty on every -1 row in practice (block/line summary rows carry
+# no text of their own), so the `text` check above already excludes them --
+# this threshold only needs to exclude genuinely negative confidence, not
+# reject a real word for scoring as low as MIN_CONFIDENCE itself. Measured
+# on eval/scan_cv/samples/agm_proxy_form.pdf and two real corpus scans: a
+# strict `<=` here silently dropped real, correctly-recognized words
+# ("But", "City", "VIOLATION") that happened to score exactly 0 confidence,
+# while every actual -1-confidence row was already blank-text and excluded
+# regardless.
 
 # pytesseract's own default (timeout=0) waits on the tesseract subprocess
 # forever -- see pytesseract.pytesseract.timeout_manager, `not seconds` skips
@@ -75,7 +85,7 @@ def ocr_page(bitmap, dpi, timeout=TIMEOUT_SECONDS):
         data["conf"],
     ):
         text = text.strip()
-        if not text or float(conf) <= MIN_CONFIDENCE:
+        if not text or float(conf) < MIN_CONFIDENCE:
             continue
         x0, top_pt = left / scale, top / scale
         x1, bottom_pt = (left + width) / scale, (top + height) / scale
