@@ -26,6 +26,12 @@ jobs:
           node-version: "22"
           cache: npm
 
+      # engine/scan_cv/ocr.py wraps pytesseract, which shells out to a system
+      # Tesseract binary -- pip alone does not provide it. Without this the
+      # scan-cv OCR tests fail with TesseractNotFoundError on a clean runner.
+      - name: Install (system)
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
+
       - name: Install (python)
         run: pip install -r requirements.txt
 
