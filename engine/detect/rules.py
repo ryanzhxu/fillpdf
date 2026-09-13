@@ -3,7 +3,7 @@ import re
 
 CHECK_GLYPHS = {"\uf063", "\uf06f"}          # Webdings box, Wingdings box
 MASK_ONLY = set("()- $.")
-SIGNATURE = re.compile(r"signatur", re.I)      # signature lines get no input box
+SIGNATURE = re.compile(r"signatur|\bsigned\b", re.I)  # signature lines get no input box
 
 # R2's largest false-positive group, measured on the tuning corpus: a "label"
 # made up of no actual words at all -- a printed dollar amount ("$31,200"), a

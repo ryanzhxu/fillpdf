@@ -17,6 +17,14 @@ SQUARE_ASPECT_LOW = 0.4      # a horizontal candidate whose length is within
 SQUARE_ASPECT_HIGH = 2.5     # this ratio of a bracketing vertical's length is a box side
 ENDPOINT_TOL_PX = 6          # px; how close a vertical must sit to an endpoint to bracket it
 
+BOX_SIDE_MIN_LEN_PT = 10     # points; shortest a genuine box-side vertical must run to be
+                             # reported as a page rect (see detect_verticals) -- long enough
+                             # to erase an ordinary letter stroke (cap-height rarely exceeds
+                             # ~9pt at typical form-text sizes), short enough to still catch
+                             # a single-line boxed caption. Confirmed against
+                             # eval/scan_cv/samples/agm_proxy_form.pdf's "*Please attach
+                             # voting instructions...*" box, whose sides run 14.6pt.
+
 
 def detect_lines(deskewed, M, dpi):
     """deskewed: the binary, already-deskewed image (engine.scan_cv.deskew's
@@ -87,15 +95,58 @@ def detect_lines(deskewed, M, dpi):
     return out
 
 
-def _vertical_strokes(deskewed):
-    """Finds vertical strokes at least VERTICAL_OPEN_KSIZE px long via a
-    vertical morphological opening -- long enough to survive stray noise,
-    short enough to still catch a checkbox's sides. Returns (x, y0, y1)
-    per stroke, x at its horizontal center."""
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, VERTICAL_OPEN_KSIZE))
+def _vertical_strokes(deskewed, ksize=VERTICAL_OPEN_KSIZE):
+    """Finds vertical strokes at least `ksize` px long via a vertical
+    morphological opening -- long enough to survive stray noise, short
+    enough to still catch a checkbox's sides at the default `ksize`.
+    Returns (x, y0, y1) per stroke, x at its horizontal center."""
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, ksize))
     vopened = cv2.morphologyEx(deskewed, cv2.MORPH_OPEN, kernel)
     n, _labels, stats, _centroids = cv2.connectedComponentsWithStats(vopened)
     return [(x + bw / 2.0, y, y + bh) for x, y, bw, bh, _area in stats[1:]]
+
+
+def detect_verticals(deskewed, M, dpi):
+    """Detects vertical box-side strokes -- a boxed heading or instruction
+    panel's left/right border, a table's column divider -- and emits them
+    as DetectablePage rects matching rules.py's thin-ruling-line convention
+    (width<3, height>=5, same as detect_lines above but rotated 90 degrees).
+
+    rules.py already has guards written specifically to tell a box border
+    apart from a genuine write-on line (R5b's `_qualified_write_on_lines`
+    checks for a bracketing vertical at a candidate rule's endpoints;
+    grid_cells() uses `v` the same way to split/reject manufactured cells)
+    -- but on a vector-PDF page these vertical rects come for free from the
+    page's real drawing operators, while a scanned page's page.rects came
+    from detect_lines() alone, which only ever emits HORIZONTAL rects. With
+    zero verticals, those guards can never fire, so a boxed heading or
+    instruction panel's own border gets read as a blank write-on line with
+    the box's own printed text as its caption. Confirmed on
+    eval/scan_cv/samples/agm_proxy_form.pdf: both "PROXY FORM" (the page's
+    own title, inside a bordered box) and "*Please attach voting
+    instructions for your proxy if required*" (a single-line bordered
+    instruction strip) were read this way. Adding the missing verticals
+    lets rules.py's existing guards reject both without any change there.
+    """
+    M_inv = cv2.invertAffineTransform(M)
+    scale = dpi / 72.0
+    ksize = max(3, int(BOX_SIDE_MIN_LEN_PT * scale))
+    strokes = _vertical_strokes(deskewed, ksize=ksize)
+    out = []
+    for x, y0, y1 in strokes:
+        if y1 - y0 < ksize:
+            continue
+        p0 = M_inv @ np.array([x, y0, 1.0])
+        p1 = M_inv @ np.array([x, y1, 1.0])
+        qy0, qy1 = sorted((p0[1], p1[1]))
+        qx = (p0[0] + p1[0]) / 2.0
+        x_pt, y0_pt, y1_pt = qx / scale, qy0 / scale, qy1 / scale
+        out.append({
+            "x0": x_pt - 1.0, "x1": x_pt + 1.0, "top": y0_pt, "bottom": y1_pt,
+            "width": 2.0, "height": y1_pt - y0_pt,
+            "fill": False, "stroke": True,
+        })
+    return out
 
 
 def _is_box_edge(px0, px1, py, verticals):

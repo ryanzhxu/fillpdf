@@ -123,6 +123,29 @@ class TestBackend(unittest.TestCase):
             self.assertLessEqual(y1, page["height"])
             self.assertEqual(f["origin"], "ocr")
 
+    def test_agm_proxy_form_ignores_boxed_headings_and_the_signature_line(self):
+        # Regression test for three false positives a person found in
+        # production, all real text on this page that is not a field:
+        # "PROXY FORM" (the page's own title, printed inside a bordered
+        # box) and "*Please attach voting instructions for your proxy if
+        # required*" (a single-line bordered instruction strip) were each
+        # read as a blank write-on line because the scanned page had no
+        # vertical rects at all -- see engine/scan_cv/lines.py's
+        # detect_verticals(). "Signed;" was a manufactured R2 cell whose
+        # top edge was actually that instruction strip's own bottom
+        # border, paired with the real "Owner" signature line below it --
+        # see engine.detect.rules.SIGNATURE, broadened to also match a
+        # bare "signed" rather than only "signature".
+        doc = detect(str(SAMPLE), page_backend=make_cv_ocr_backend(SAMPLE))
+        labels = [f["label"] for f in doc["fields"]]
+        self.assertNotIn("PROXY FORM", labels)
+        self.assertNotIn("Signed;", labels)
+        for label in labels:
+            self.assertNotIn("voting instructions", label)
+        # The real fields on this page must survive all three fixes.
+        self.assertIn("appoint", labels)
+        self.assertIn("Owner", labels)
+
     def test_detect_end_to_end_at_non_default_dpi(self):
         # make_cv_ocr_backend(pdf_path, dpi=...) exposes dpi as a real,
         # already-public parameter, but every other end-to-end test in this
@@ -225,7 +248,7 @@ class TestBackend(unittest.TestCase):
         self.assertGreater(len(fields_by_page[2]), 0)
         self.assertTrue(all(f["origin"] == "ocr" for f in fields_by_page[2]))
         page2_labels = " ".join(f.get("label", "") for f in fields_by_page[2])
-        self.assertIn("PROXY FORM", page2_labels)
+        self.assertIn("appoint", page2_labels)
 
     @unittest.skipUnless(COURT_FORM_1.exists() and COURT_FORM_2.exists(),
                           "real corpus not present in this worktree")
