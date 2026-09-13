@@ -44,12 +44,27 @@ def ocr_page(bitmap, dpi, timeout=TIMEOUT_SECONDS):
     the same as "no words recognized", so a stuck OCR call degrades the same
     way a blank page already does (backend.py's CV-only/decline fallback)
     instead of hanging detect() forever.
+
+    Passes `--dpi` explicitly: the PIL image built from `bitmap` carries no
+    DPI metadata (render_page_to_bitmap builds it from a raw numpy array),
+    and without it tesseract falls back to an internal guess rather than
+    the bitmap's real resolution, which measurably degrades recognition on
+    dense real-world layouts. Measured directly against
+    eval/corpus/real/d5a49cf46d75829e.pdf's page 5 (a dense two-column code
+    table): omitting --dpi recognized only 147 words and silently dropped
+    whole table rows (e.g. "002 AMBULANCE", "003 ANTIQUE VEHICLE" missing
+    entirely); passing the correct --dpi recognized 341 words at
+    effectively the same average confidence (79.7 vs 80.3), recovering the
+    missing rows. Confirmed this is not a one-file fluke: also checked
+    against eval/scan_cv/samples/agm_proxy_form.pdf and
+    eval/corpus/real/5180e9e5652573e2.pdf, where word counts and confidence
+    were flat to slightly better -- no file got worse.
     """
     scale = dpi / 72.0
     image = Image.fromarray(bitmap[:, :, ::-1])  # BGR -> RGB
     try:
         data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT,
-                                         timeout=timeout)
+                                         timeout=timeout, config=f"--dpi {round(dpi)}")
     except RuntimeError:
         return [], []
 
