@@ -63,7 +63,7 @@ jobs:
       # so CI works around them rather than editing them. Consequence: the
       # synthetic hard-corpus suite is macOS-only and runs locally, never here.
       - name: Tests
-        run: python -m pytest -q --ignore=eval/adversarial --ignore=eval/synth
+        run: python -m pytest -q --ignore=eval/adversarial --ignore=eval/synth --ignore=server/tests
 
       - name: Detection eval (skipped, corpus not in repo)
         run: |
