@@ -16,8 +16,17 @@ from PIL import Image
 
 MIN_CONFIDENCE = 0  # Tesseract reports -1 for non-word rows (blocks/lines).
 
+# pytesseract's own default (timeout=0) waits on the tesseract subprocess
+# forever -- see pytesseract.pytesseract.timeout_manager, `not seconds` skips
+# the timeout branch entirely. AUTOPILOT.md's part-4 bar requires detect() to
+# run "without crashing or timing out" on a real scan, which a hung
+# subprocess would silently break for any future page, not just tonight's
+# one golden sample. 60s is generous for a single page at 300 DPI (the real
+# target scan finishes in ~1-2s).
+TIMEOUT_SECONDS = 60
 
-def ocr_page(bitmap, dpi):
+
+def ocr_page(bitmap, dpi, timeout=TIMEOUT_SECONDS):
     """bitmap: a BGR image (cv2.imread-shaped) rendered at `dpi`, as
     render_page_to_bitmap() returns. Returns (words, chars):
 
@@ -29,10 +38,20 @@ def ocr_page(bitmap, dpi):
 
     All coordinates are in PDF points, matching the page `bitmap` was
     rendered from at `dpi`.
+
+    If the tesseract subprocess does not finish within `timeout` seconds,
+    pytesseract kills it and raises RuntimeError -- caught here and treated
+    the same as "no words recognized", so a stuck OCR call degrades the same
+    way a blank page already does (backend.py's CV-only/decline fallback)
+    instead of hanging detect() forever.
     """
     scale = dpi / 72.0
     image = Image.fromarray(bitmap[:, :, ::-1])  # BGR -> RGB
-    data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
+    try:
+        data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT,
+                                         timeout=timeout)
+    except RuntimeError:
+        return [], []
 
     words = []
     chars = []
