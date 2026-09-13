@@ -63,21 +63,20 @@ class TestBackend(unittest.TestCase):
         self.assertEqual(page.curves, [])
 
     def test_detect_end_to_end_on_agm_proxy_form(self):
-        # Two of AUTOPILOT.md's part-4 mechanical checks, provable today:
-        # detect() runs without crashing or timing out, and it tags the
-        # document ocr_assisted (not scanned) -- i.e. the backend actually
-        # ran and was not declined. The third check (a non-empty fields
-        # list) is NOT asserted here: as of this pass, the real CV/OCR
-        # output on this specific hard scan produces geometry (2 detected
-        # lines, 0 checkboxes; see .autobuild/PROGRESS.md) that does not
-        # line up with any existing rule's pattern, so fields is legitimately
-        # empty right now. Asserting non-empty here would either fail
-        # honestly or invite fudging the pipeline to satisfy this one file --
-        # both against AUTOPILOT.md's "never weaken a measurement" rule. Any
-        # field that IS produced must still land in bounds, so that part of
-        # the bar is enforced below regardless of count.
+        # AUTOPILOT.md's part-4 mechanical checks: detect() runs without
+        # crashing or timing out, tags the document ocr_assisted (not
+        # scanned) -- i.e. the backend actually ran and was not declined --
+        # and returns a non-empty fields list (engine/scan_cv/lines.py's
+        # morphological-opening fix raised this file's detected line count
+        # from 2 to 10, enough for rules.py to now find real fields here;
+        # see .autobuild/PROGRESS.md). Every field's rect must still land in
+        # bounds, checked below regardless of count. This does NOT assert
+        # the fields are the CORRECT ones -- there is no hand-verified
+        # ground truth for this file (see AUTOPILOT.md's part 4) -- only
+        # that the pipeline produces mechanically-sane, non-empty output.
         doc = detect(str(SAMPLE), page_backend=make_cv_ocr_backend(SAMPLE))
         self.assertEqual(doc["notice"]["code"], "ocr_assisted")
+        self.assertGreater(len(doc["fields"]), 0)
         pages_by_number = {p["page"]: p for p in doc["pages"]}
         for f in doc["fields"]:
             page = pages_by_number[f["page"]]
