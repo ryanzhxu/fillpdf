@@ -131,6 +131,45 @@ class TestBackend(unittest.TestCase):
             self.assertLessEqual(y1, page["height"])
             self.assertEqual(f["origin"], "ocr")
 
+    def test_detect_end_to_end_on_mixed_real_and_scanned_document(self):
+        # Every prior end-to-end test builds its multi-page fixture by
+        # duplicating the SAME page (either AGM_PROXY_FORM alone, or that
+        # page twice), so an off-by-one between render_page_to_bitmap's
+        # 0-indexed page_number and detect()'s 1-indexed page_backend calls
+        # could not have been caught: a wrongly-shifted index would just
+        # render the identical neighboring page again. A real-world scanned
+        # PDF is often mixed (e.g. a text cover page ahead of a scanned
+        # form), so build page 1 from fixtures/safer.pdf (a real text page,
+        # known to have detectable fields) and page 2 from the scanned
+        # AGM_PROXY_FORM, and confirm each page's fields come from the
+        # right source: page 1 detected normally, page 2 via real OCR with
+        # AGM-specific content (proving the backend rendered page 2, not
+        # page 1, for the scanned page).
+        text_reader = pypdf.PdfReader("fixtures/safer.pdf")
+        scan_reader = pypdf.PdfReader(str(SAMPLE))
+        writer = pypdf.PdfWriter()
+        writer.add_page(text_reader.pages[1])  # a safer.pdf page with real fields
+        writer.add_page(scan_reader.pages[0])
+        with tempfile.TemporaryDirectory() as tmpdir:
+            mixed = Path(tmpdir) / "mixed.pdf"
+            with open(mixed, "wb") as f:
+                writer.write(f)
+
+            doc = detect(str(mixed), page_backend=make_cv_ocr_backend(mixed))
+
+        self.assertEqual(doc["notice"]["code"], "ocr_assisted")
+        fields_by_page = {1: [], 2: []}
+        for f in doc["fields"]:
+            fields_by_page[f["page"]].append(f)
+
+        self.assertGreater(len(fields_by_page[1]), 0)
+        self.assertTrue(all(f["origin"] == "detected" for f in fields_by_page[1]))
+
+        self.assertGreater(len(fields_by_page[2]), 0)
+        self.assertTrue(all(f["origin"] == "ocr" for f in fields_by_page[2]))
+        page2_labels = " ".join(f.get("label", "") for f in fields_by_page[2])
+        self.assertIn("PROXY FORM", page2_labels)
+
 
 if __name__ == "__main__":
     unittest.main()
