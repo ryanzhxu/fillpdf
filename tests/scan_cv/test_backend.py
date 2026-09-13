@@ -170,6 +170,56 @@ class TestBackend(unittest.TestCase):
         page2_labels = " ".join(f.get("label", "") for f in fields_by_page[2])
         self.assertIn("PROXY FORM", page2_labels)
 
+    def test_detect_end_to_end_on_real_world_scanned_court_forms(self):
+        # Every prior end-to-end test in this file only ever exercised
+        # AGM_PROXY_FORM (single-handedly authored as this run's one golden
+        # sample) or synthetic fixtures built from it -- never a scanned
+        # document the backend hadn't already been tuned against. This repo
+        # already holds two such documents unexercised by anything:
+        # eval/corpus/real/{5180e9e5652573e2,d5a49cf46d75829e}.pdf, real
+        # Illinois court "Civil Law Citation and Complaint" scans (17 and 16
+        # pages, 0 extractable chars each -- manifest.json verdict "scan").
+        # eval/blind.py's own _flat_real_pdfs() only probes "flat-wordlike"/
+        # "flat-sparse" verdicts, so these two "scan"-verdict files have
+        # never been run through detect() at all, let alone with the real
+        # OCR+CV backend -- confirmed by grepping manifest.json and
+        # eval/blind.py's filter before writing this test. Extract one real
+        # page from each (chosen by hand-checking which pages the full
+        # document actually places fields on, to keep the test fast) rather
+        # than running the full 16-17 page document, and confirm the same
+        # mechanical bar as every other end-to-end test here: no crash,
+        # ocr_assisted notice, a non-empty fields list, and every rect
+        # in-page-bounds. Not a claim the fields are correct -- there is no
+        # hand-verified ground truth for either file -- only that the
+        # pipeline runs end-to-end and produces mechanically-sane output on
+        # real-world documents beyond the one golden sample.
+        cases = [
+            ("eval/corpus/real/5180e9e5652573e2.pdf", 13),  # page 14: 35 fields
+            ("eval/corpus/real/d5a49cf46d75829e.pdf", 4),  # page 5: 38 fields
+        ]
+        for source_path, page_index in cases:
+            with self.subTest(source=source_path, page_index=page_index):
+                reader = pypdf.PdfReader(source_path)
+                writer = pypdf.PdfWriter()
+                writer.add_page(reader.pages[page_index])
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    single_page = Path(tmpdir) / "page.pdf"
+                    with open(single_page, "wb") as f:
+                        writer.write(f)
+                    doc = detect(str(single_page), page_backend=make_cv_ocr_backend(single_page))
+
+                self.assertEqual(doc["notice"]["code"], "ocr_assisted")
+                self.assertGreater(len(doc["fields"]), 0)
+                pages_by_number = {p["page"]: p for p in doc["pages"]}
+                for f in doc["fields"]:
+                    page = pages_by_number[f["page"]]
+                    x0, y0, x1, y1 = f["rect"]
+                    self.assertGreaterEqual(x0, 0)
+                    self.assertGreaterEqual(y0, 0)
+                    self.assertLessEqual(x1, page["width"])
+                    self.assertLessEqual(y1, page["height"])
+                    self.assertEqual(f["origin"], "ocr")
+
 
 if __name__ == "__main__":
     unittest.main()
