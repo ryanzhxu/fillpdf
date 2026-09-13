@@ -87,6 +87,29 @@ class TestCheckboxes(unittest.TestCase):
             self.assertTrue(d["fill"])
             self.assertFalse(d["stroke"])
 
+    def test_detects_two_adjacent_checkboxes_independently(self):
+        # A real, common form pattern ("Yes [ ]  No [ ]") that no existing
+        # fixture exercises -- every golden fixture has exactly one checkbox.
+        # Two squares close together are a real risk for a contour-based
+        # detector: _erase_long_lines' morphological kernel is on the order
+        # of a checkbox's own size, so it could plausibly bridge a narrow gap
+        # and merge both squares into one blob that fails the 4-corner test.
+        scale = 300 / 72.0
+        img = np.full((round(100 * scale), round(400 * scale), 3), 255, dtype=np.uint8)
+        x0 = 50.0
+        for _ in range(2):
+            x1 = x0 + 20.0
+            cv2.rectangle(
+                img, (round(x0 * scale), round(30 * scale)),
+                (round(x1 * scale), round(50 * scale)), (0, 0, 0), 2)
+            x0 = x1 + 15.0  # a typical tight real-world checkbox spacing
+        binary = preprocess(img)
+        deskewed, M = deskew(binary)
+        detected = detect_checkboxes(deskewed, M, dpi=300)
+        self.assertEqual(len(detected), 2)
+        xs = sorted(d["x0"] for d in detected)
+        self.assertGreater(xs[1] - xs[0], 20.0)  # two distinct boxes, not one merged blob
+
     def test_detects_the_checkbox_on_the_rotated_fixture_ignoring_lines(self):
         data = json.loads((GOLDEN / "fixture_rotated.json").read_text())
         exp = _expected_checkbox_post_render(data)
