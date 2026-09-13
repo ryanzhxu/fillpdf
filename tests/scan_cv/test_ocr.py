@@ -14,6 +14,7 @@ Run standalone with:  .venv/bin/python -m pytest tests/scan_cv/test_ocr.py
 """
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import cv2
 import numpy as np
@@ -78,6 +79,21 @@ class TestOcrPage(unittest.TestCase):
                       dtype=np.uint8)
 
         words, chars = ocr_page(img, dpi=DPI)
+
+        self.assertEqual(words, [])
+        self.assertEqual(chars, [])
+
+    def test_subprocess_timeout_yields_no_words_instead_of_hanging(self):
+        # pytesseract's documented failure mode for a stuck tesseract
+        # subprocess is to kill it and raise RuntimeError once `timeout`
+        # elapses (pytesseract.pytesseract.timeout_manager). ocr_page must
+        # turn that into "no words recognized" rather than letting it
+        # propagate and crash detect() -- see AUTOPILOT.md part 4's "without
+        # crashing or timing out" bar.
+        bitmap = _synthetic_bitmap_with_word("NAME", 20.0, 40.0)
+        with mock.patch("pytesseract.image_to_data",
+                        side_effect=RuntimeError("Tesseract process timeout")):
+            words, chars = ocr_page(bitmap, dpi=DPI, timeout=1)
 
         self.assertEqual(words, [])
         self.assertEqual(chars, [])
