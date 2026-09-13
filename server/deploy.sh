@@ -24,7 +24,7 @@ if [ ! -f requirements.txt ] || [ ! -d server ]; then
   exit 1
 fi
 
-docker build -f server/Dockerfile -t "$IMAGE" .
+docker build --platform linux/amd64 -f server/Dockerfile -t "$IMAGE" .
 docker push "$IMAGE"
 
 gcloud run deploy fillpdf-ocr \
