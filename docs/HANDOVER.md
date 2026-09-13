@@ -44,9 +44,46 @@ any number typed into prose.
 `19fe9fb`.** The corpus was corrected twice; older figures were measured
 against fields no rule could ever find.
 
+## Scanned / image-only PDFs (added 2026-09-12/13, not yet in the numbers above)
+
+A second, independent pipeline now handles PDFs with zero extractable
+characters (a raster scan, no AcroForm, nothing `pdfplumber` can read as
+text) — the case `detect()` previously could only tag `scanned` and give up
+on. It does not touch or change anything measured in "Where it stands" above;
+`eval/corpus/tuning`/`eval/holdout` contain no scanned PDFs, so those numbers
+are unaffected by design.
+
+    ./.venv/bin/python demo/demo.py eval/scan_cv/samples/agm_proxy_form.pdf
+
+Shape of it:
+
+- `engine/detect/page_protocol.py` defines `DetectablePage`, and `detect()`
+  takes an optional `page_backend(pdfplumber_page, page_number) ->
+  DetectablePage | None`, so the SAME unmodified `rules.py` runs against
+  whatever a backend produces for a scanned page. See
+  `docs/superpowers/specs/2026-09-12-scan-detection-interface-design.md`.
+- `engine/scan_cv/` is a real OCR+CV backend: `render.py` rasterizes a page
+  via `pypdfium2` at 300 DPI, `preprocess.py`/`deskew.py` binarize and
+  straighten it, `lines.py`/`checkboxes.py` find write-on lines and boxes via
+  OpenCV, `ocr.py` wraps `pytesseract` (system Tesseract required — check
+  `tesseract --version`) for words/chars, and `backend.py` assembles all of
+  it into one `page_backend` (`make_cv_ocr_backend`), wired into
+  `demo/demo.py`. `opencv-python` (BSD) and `pytesseract` (Apache 2.0) are
+  the two new dependencies this adds; neither is imported from
+  `engine/detect/*`, which stays pure-Python for its Pyodide browser build.
+- Validated mechanically (no hand-labelled ground truth exists for this file,
+  see `AUTOPILOT.md` part 4) against `eval/scan_cv/samples/agm_proxy_form.pdf`,
+  a real scanned AGM proxy form: `detect()` runs without crashing, returns
+  notice `ocr_assisted` (not `scanned`), and every field's rect lands inside
+  the page bounds — see
+  `tests/scan_cv/test_backend.py::test_detect_end_to_end_on_agm_proxy_form`.
+  Whether the fields it finds are the *correct* ones still needs a human
+  looking at the rendered page; that has not happened yet.
+
 ## Layout
 
     engine/detect/          the detector. rules.py is ~1,500 lines, 12 rules
+    engine/scan_cv/         scanned-PDF OCR+CV backend (see section above)
     eval/                   the evaluation harness
       label.py              strips a fillable PDF into (flat pdf, answer key)
       score.py              matches detections to truth, writes scores/<sha>.json
