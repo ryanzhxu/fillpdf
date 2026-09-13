@@ -1,0 +1,15 @@
+{
+  "dpi": 300,
+  "rects": [
+    {
+      "x0": 10.0,
+      "x1": 30.0,
+      "top": 50.0,
+      "bottom": 70.0,
+      "width": 20.0,
+      "height": 20.0,
+      "fill": true,
+      "stroke": false
+    }
+  ]
+}

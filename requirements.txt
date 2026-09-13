@@ -3,6 +3,7 @@ pdfplumber>=0.11
 pypdf>=6.0
 pypdfium2>=5.0
 pillow>=11.0
+opencv-python>=4.10   # BSD license; scan CV pipeline only, never imported by engine/detect/*
 
 # eval harness
 reportlab>=4.0
