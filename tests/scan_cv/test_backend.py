@@ -220,6 +220,32 @@ class TestBackend(unittest.TestCase):
                     self.assertLessEqual(x1, page["width"])
                     self.assertLessEqual(y1, page["height"])
 
+    @unittest.skipUnless(COURT_FORM_1.exists(), "real corpus not present in this worktree")
+    def test_detect_end_to_end_on_full_multi_page_real_scan(self):
+        # The previous test extracts one hand-picked page from each real
+        # court-form scan to keep the suite fast, which proves correctness
+        # on a real page but never exercises AUTOPILOT.md part 4's "runs
+        # without crashing or timing out" bar over a genuinely large
+        # real-world document -- every OTHER multi-page test in this file
+        # uses a 2-page fixture built by duplicating a single page. Run the
+        # full, unmodified 17-page scan (all pages OCR'd and CV'd for real,
+        # ~24s) straight through detect() and check the same mechanical bar
+        # as every other end-to-end test: no crash, ocr_assisted notice, a
+        # non-empty fields list, every rect in-page-bounds. Not a claim the
+        # fields are correct -- there is no hand-verified ground truth for
+        # this file.
+        doc = detect(str(COURT_FORM_1), page_backend=make_cv_ocr_backend(COURT_FORM_1))
+        self.assertEqual(doc["notice"]["code"], "ocr_assisted")
+        self.assertGreater(len(doc["fields"]), 0)
+        pages_by_number = {p["page"]: p for p in doc["pages"]}
+        for f in doc["fields"]:
+            page = pages_by_number[f["page"]]
+            x0, y0, x1, y1 = f["rect"]
+            self.assertGreaterEqual(x0, 0)
+            self.assertGreaterEqual(y0, 0)
+            self.assertLessEqual(x1, page["width"])
+            self.assertLessEqual(y1, page["height"])
+
 
 if __name__ == "__main__":
     unittest.main()
