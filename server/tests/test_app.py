@@ -36,7 +36,7 @@ def client():
 
 
 def test_healthz(client):
-    resp = client.get("/healthz")
+    resp = client.get("/health")
     assert resp.status_code == 200
     assert resp.get_json() == {"status": "ok"}
 
@@ -84,5 +84,5 @@ def test_cors_header_present(client):
 def test_cors_header_respects_env_override(client, monkeypatch):
     import app as app_module
     monkeypatch.setattr(app_module, "ALLOWED_ORIGIN", "http://example.test")
-    resp = client.get("/healthz")
+    resp = client.get("/health")
     assert resp.headers.get("Access-Control-Allow-Origin") == "http://example.test"

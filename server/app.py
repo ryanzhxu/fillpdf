@@ -45,8 +45,10 @@ def _too_large(_e):
     return jsonify(error=f"file too large; the limit is {limit_mb}MB"), 413
 
 
-@app.route("/healthz", methods=["GET"])
+@app.route("/health", methods=["GET"])
 def healthz():
+    # Not /healthz -- Cloud Run's frontend reserves that exact path and
+    # serves its own 404 before the request reaches this container.
     return jsonify(status="ok")
 
 
