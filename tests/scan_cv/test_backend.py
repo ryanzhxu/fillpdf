@@ -16,6 +16,9 @@ from engine.detect.page_protocol import DetectablePage
 from engine.scan_cv.backend import make_cv_ocr_backend
 
 SAMPLE = Path(__file__).parent.parent.parent / "eval" / "scan_cv" / "samples" / "agm_proxy_form.pdf"
+_CORPUS_REAL = Path(__file__).parent.parent.parent / "eval" / "corpus" / "real"
+COURT_FORM_1 = _CORPUS_REAL / "5180e9e5652573e2.pdf"
+COURT_FORM_2 = _CORPUS_REAL / "d5a49cf46d75829e.pdf"
 
 
 class TestBackend(unittest.TestCase):
@@ -169,6 +172,53 @@ class TestBackend(unittest.TestCase):
         self.assertTrue(all(f["origin"] == "ocr" for f in fields_by_page[2]))
         page2_labels = " ".join(f.get("label", "") for f in fields_by_page[2])
         self.assertIn("PROXY FORM", page2_labels)
+
+    @unittest.skipUnless(COURT_FORM_1.exists() and COURT_FORM_2.exists(),
+                          "real corpus not present in this worktree")
+    def test_detect_end_to_end_on_real_world_scanned_court_forms(self):
+        # Every other end-to-end test in this file exercises AGM_PROXY_FORM
+        # or synthetic fixtures built from it -- never a scanned document the
+        # backend hadn't already been tuned against. eval/corpus/real/ holds
+        # two such documents no other test or eval/blind.py's own
+        # _flat_real_pdfs() filter has ever run through detect(): real
+        # Illinois court "Civil Law Citation and Complaint" scans, manifest
+        # verdict "scan", 0 extractable chars. Extract one real page from
+        # each (hand-picked as a page the full document actually places
+        # fields on) rather than the full 16-17 page document, to keep the
+        # test fast, and hold the real backend to the same mechanical bar as
+        # every other end-to-end test here: no crash, ocr_assisted notice, a
+        # non-empty fields list, every rect in-page-bounds. Not a claim the
+        # fields are correct -- there is no hand-verified ground truth for
+        # either file. Guarded by skipUnless because eval/corpus/ is
+        # gitignored (36MB of stripped real forms) and absent on CI and
+        # fresh worktrees -- see tests/test_r5b_underline_gap.py for the same
+        # pattern.
+        cases = [
+            (COURT_FORM_1, 13),  # page 14: fields present
+            (COURT_FORM_2, 4),  # page 5: fields present
+        ]
+        for source_path, page_index in cases:
+            with self.subTest(source=str(source_path), page_index=page_index):
+                reader = pypdf.PdfReader(str(source_path))
+                writer = pypdf.PdfWriter()
+                writer.add_page(reader.pages[page_index])
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    single_page = Path(tmpdir) / "one_page.pdf"
+                    with open(single_page, "wb") as f:
+                        writer.write(f)
+
+                    doc = detect(str(single_page), page_backend=make_cv_ocr_backend(single_page))
+
+                self.assertEqual(doc["notice"]["code"], "ocr_assisted")
+                self.assertGreater(len(doc["fields"]), 0)
+                pages_by_number = {p["page"]: p for p in doc["pages"]}
+                for f in doc["fields"]:
+                    page = pages_by_number[f["page"]]
+                    x0, y0, x1, y1 = f["rect"]
+                    self.assertGreaterEqual(x0, 0)
+                    self.assertGreaterEqual(y0, 0)
+                    self.assertLessEqual(x1, page["width"])
+                    self.assertLessEqual(y1, page["height"])
 
 
 if __name__ == "__main__":
