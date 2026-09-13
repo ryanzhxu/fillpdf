@@ -27,6 +27,7 @@ HERE = Path(__file__).parent
 # measured -- if they drifted apart the demo would stop being evidence.
 sys.path.insert(0, str(HERE.parent))
 from engine.detect import detect as detect_pdf  # noqa: E402
+from engine.scan_cv.backend import make_cv_ocr_backend  # noqa: E402
 OUT = HERE / "out"
 
 # detect() is a pure function over an already-open pdfplumber document and is
@@ -83,8 +84,10 @@ def build(pdf_path: Path):
         # One call into the same entry point the evaluation harness scores.
         # The demo used to re-implement the per-page loop and the id
         # assignment, which meant it could silently drift from what was
-        # being measured.
-        doc = detect_pdf(str(pdf_path))
+        # being measured. page_backend runs real OCR+CV (engine/scan_cv/) on
+        # any page detect_pdf() flags as scanned, so a scanned PDF gets a
+        # real feel-test here too, not just the "scanned" notice.
+        doc = detect_pdf(str(pdf_path), page_backend=make_cv_ocr_backend(pdf_path))
     except Exception as e:
         if type(e).__name__ not in UNREADABLE_EXCEPTION_NAMES:
             raise
