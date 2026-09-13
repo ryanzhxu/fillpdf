@@ -72,6 +72,79 @@ class TestDeskew(unittest.TestCase):
         self.assertAlmostEqual(angle, -2.4, delta=ANGLE_TOLERANCE_DEG)
 
 
+class TestDeskewOnDenseAndEdgeContent(unittest.TestCase):
+    """Real pages whose ink is not thin rules on mostly-white paper.
+
+    Every golden fixture is a handful of hairlines on a white page, which
+    is the easiest case there is. These are the two shapes that a guard
+    tuned only on that easy case gets wrong, and both were live bugs:
+    a dense page (the score's ceiling drops as more rows carry ink) and a
+    page whose structure sits outside the middle of the frame.
+    """
+
+    def _bars(self, skew_deg, pitch_pt=4.0, bar_pt=1.6):
+        """Solid rules on a fixed pitch. The row-sum profile of dense
+        single-spaced text looks like this, and 1.6pt of ink per 4.0pt of
+        pitch is an ordinary duty cycle for it."""
+        img = _blank_page()
+        y = 10.0
+        while y <= 90.0:
+            cv2.rectangle(img, (round(15.0 * SCALE), round(y * SCALE)),
+                          (round(185.0 * SCALE), round((y + bar_pt) * SCALE)),
+                          (0, 0, 0), -1)
+            y += pitch_pt
+        M = cv2.getRotationMatrix2D((PAGE_W / 2.0, PAGE_H / 2.0), skew_deg, 1.0)
+        img = cv2.warpAffine(img, M, (PAGE_W, PAGE_H), borderValue=(255, 255, 255))
+        return preprocess(img)
+
+    def test_dense_text_page_recovers_small_skew(self):
+        """A guard that required the peak to beat the sweep median by a
+        fixed absolute margin answered 0.0 here -- silently, on a real
+        skew. The score tops out near 1.2 on a page this dense, so the
+        margin has to be a ratio, never a fixed quantity."""
+        angle = detect_skew_angle(self._bars(0.75))
+        self.assertAlmostEqual(angle, -0.75, delta=ANGLE_TOLERANCE_DEG)
+
+    def test_dense_text_page_recovers_larger_skew(self):
+        """Same page at 3.5deg. The absolute-margin guard failed here too,
+        and non-monotonically -- 2.0 and 5.0 passed while 0.75 and 3.5 did
+        not -- which is what exposed it as noise-floor behavior."""
+        angle = detect_skew_angle(self._bars(3.5))
+        self.assertAlmostEqual(angle, -3.5, delta=ANGLE_TOLERANCE_DEG)
+
+    def test_dense_text_page_at_several_duty_cycles(self):
+        for bar_pt in (0.4, 0.8, 1.2, 1.6, 2.0, 2.4):
+            with self.subTest(bar_pt=bar_pt):
+                angle = detect_skew_angle(self._bars(3.0, bar_pt=bar_pt))
+                self.assertAlmostEqual(angle, -3.0, delta=ANGLE_TOLERANCE_DEG)
+
+    def _edge_rules(self, ys_pt, skew_deg):
+        img = _blank_page()
+        for y_pt in ys_pt:
+            cv2.line(img, (round(10.0 * SCALE), round(y_pt * SCALE)),
+                     (round(190.0 * SCALE), round(y_pt * SCALE)), (0, 0, 0), 2)
+        M = cv2.getRotationMatrix2D((PAGE_W / 2.0, PAGE_H / 2.0), skew_deg, 1.0)
+        img = cv2.warpAffine(img, M, (PAGE_W, PAGE_H), borderValue=(255, 255, 255))
+        return preprocess(img)
+
+    def test_rules_only_near_the_page_edges_recover_skew(self):
+        """A header rule and a footer rule with nothing between them.
+        Scoring a centered sub-window instead of the whole frame read
+        these off the fragments that clipped into the window, answering
+        as far as 9.0 degrees out on a true 3.0."""
+        for ys in ((1.0, 99.0), (2.0, 98.0), (5.0, 95.0), (8.0, 92.0),
+                   (2.0, 4.0, 96.0, 98.0), (5.0, 10.0, 90.0, 95.0)):
+            with self.subTest(rules=ys):
+                angle = detect_skew_angle(self._edge_rules(ys, 3.0))
+                self.assertAlmostEqual(angle, -3.0, delta=ANGLE_TOLERANCE_DEG)
+
+    def test_rules_only_near_the_page_edges_report_no_skew_when_straight(self):
+        for ys in ((1.0, 99.0), (2.0, 98.0), (5.0, 95.0), (8.0, 92.0)):
+            with self.subTest(rules=ys):
+                angle = detect_skew_angle(self._edge_rules(ys, 0.0))
+                self.assertAlmostEqual(angle, 0.0, delta=ANGLE_TOLERANCE_DEG)
+
+
 class TestDeskewOnPagesWithNoDominantDirection(unittest.TestCase):
     """A page with no dominant horizontal direction must report no skew.
 
@@ -120,11 +193,8 @@ class TestDeskewOnPagesWithNoDominantDirection(unittest.TestCase):
 
     def test_page_of_vertical_rules_only_reports_no_skew(self):
         """This page answered 0.0 before the fix and must keep doing so.
-        It is the case that forces the second half of the guard: inside
-        the window several vertical rules leave a score curve whose peak
-        is 21x its own median, so a ratio check alone would accept them.
-        The absolute gain check is what rejects them (their peak sits 200x
-        under it)."""
+        Its profile is the same at every angle, so the sweep is flat and
+        the guard rejects it."""
         img = _blank_page()
         for i in range(5):
             x = int(PAGE_W * (i + 1) / 6)

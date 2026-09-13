@@ -22,11 +22,10 @@ rotations than a single fine sweep and lands nearer the true angle. The
 residual matters downstream: leftover skew makes a corrected ruling line
 climb across rows in a staircase, which a later Hough pass can misread.
 
-Two guards keep the search from reporting an angle a page does not
-actually support -- both were added after measured counterexamples, see
-`_inscribed_window` and `_is_supported`.
+Two details keep the search from reporting an angle a page does not
+actually support, both added after measured counterexamples: the border
+fill in `_profile_score` and the check in `_is_supported`.
 """
-import math
 import statistics
 
 import cv2
@@ -35,71 +34,32 @@ SEARCH_DEG = 10.0
 COARSE_STEP_DEG = 1.0
 FINE_STEP_DEG = 0.05
 
-# Guard thresholds for `_is_supported`, in the scale-free units of
-# `_profile_score`. Calibrated against synthetic pages spanning real skews
-# (0.7 to 7.3 degrees, 1 to 4 rules, text-like blocks) and structureless
-# pages (scattered dots, vertical rules only, all-foreground, blank): the
-# weakest real page clears the ratio gate by 1.21x and the gain gate by
-# 2.38x, and the structureless page that comes closest still misses one
-# gate or the other by 1.28x. See tests/scan_cv/test_deskew.py.
+# Guard threshold for `_is_supported`. Calibrated against synthetic pages
+# spanning real skews (0.1 to 7.3 degrees; 1 to 4 rules; text-like blocks
+# from sparse to a 0.6 ink-to-pitch ratio; rules confined to the page
+# edges) and 81 structureless pages (scattered dots at 5 to 200 marks,
+# vertical rules, salt-and-pepper, uniform ink, blank). The weakest real
+# page scores 2.42x its sweep's median and the strongest structureless
+# page that would otherwise answer a nonzero angle scores 1.74x, so the
+# threshold sits between them. See tests/scan_cv/test_deskew.py.
 MIN_PEAK_RATIO = 2.0
-MIN_PEAK_GAIN = 1.0
 
 
-def _inscribed_window(shape, search_deg):
-    """Returns the (width, height) of the largest centered, axis-aligned
-    window that no rotation in [-search_deg, search_deg] can fill with
-    border pixels.
+def _profile_score(binary, angle, border):
+    """Peakedness of the horizontal row-sum profile at `angle` (higher is
+    better aligned).
 
-    Scoring the whole frame instead is wrong: `warpAffine` cuts wedges of
-    `borderValue` into the corners of a same-size rotation, and those
-    wedges are pixels the rotation invented rather than page content.
-    Their area grows with |angle|, so on a page with little real
-    horizontal ink the wedge geometry -- not the page -- becomes the
-    dominant term in the profile, and the search reads a large angle off
-    its own border artifact. Measured before this window existed: an
+    `border` is what a same-size rotation puts in the corners it cannot
+    fill from the source, and it must be the image's own mean level. A
+    hard 0 there is a lie: it claims the corners are blank when they are
+    simply unknown, and the wedge it invents grows with |angle|, so on a
+    page with little real horizontal ink the wedge geometry rather than
+    the page becomes the dominant term. Measured with borderValue=0: an
     all-foreground image scored 991,066,982 at -10 degrees against 0 at 0
-    degrees, and pinned the answer to the search bound.
-
-    The window keeps the image's aspect ratio, so it is `scale * w` by
-    `scale * h`. A centered window fits inside the frame rotated by
-    `theta` when its own corners, rotated back by `theta`, stay inside the
-    frame: `scale * (w cos + h sin) <= w` and `scale * (w sin + h cos) <=
-    h`. Each bound is a sinusoid of amplitude hypot(w, h), so its largest
-    value over [0, search_deg] is at the interior peak when that peak is
-    inside the range and at `search_deg` otherwise. Past both peaks the
-    bounds saturate at hypot(w, h), which yields the window inscribed in
-    the image's inscribed circle, so a `search_deg` far wider than the
-    default degrades gracefully instead of needing a clamp. Verified
-    border-free through a 90-degree search on page-sized images; an image
-    only a pixel or two across cannot hold a centered window at all, but
-    it also has no skew to read, and `_is_supported` answers 0.0 for it.
-
-    The cost is the page's outer margin: at the default 10-degree search a
-    letter page keeps its central 83% in each axis. Skew is a property of
-    the whole page, so estimating it from the middle is sound, but a page
-    whose only horizontal structure sits in the discarded margin -- rules
-    along the very top and bottom edges and nothing between them -- reads
-    a worse angle than it would from the full frame. Measured on such a
-    page: -4.5 degrees against a true -3.0. Adding one rule anywhere in
-    the middle restores an exact reading.
-    """
-    h, w = shape
-    theta = math.radians(abs(search_deg))
-    diag = math.hypot(w, h)
-    reach_x = (diag if math.atan2(h, w) <= theta
-               else w * math.cos(theta) + h * math.sin(theta))
-    reach_y = (diag if math.atan2(w, h) <= theta
-               else w * math.sin(theta) + h * math.cos(theta))
-    # Spend one pixel per axis on slack: the window is placed at an integer
-    # offset, so its center can sit half a pixel off the rotation center.
-    scale = min((w - 1) / reach_x, (h - 1) / reach_y)
-    return max(1, int(w * scale)), max(1, int(h * scale))
-
-
-def _profile_score(binary, angle, window):
-    """Peakedness of the horizontal row-sum profile at `angle`, measured
-    over `window` only (higher is better aligned).
+    degrees, and pinned the answer to the search bound. Filling with the
+    mean makes the wedge contribute the page's own average ink, so it
+    neither adds nor removes contrast and the score stays comparable
+    across angles.
 
     The value is the profile's squared coefficient of variation,
     `var / mean**2`, not the raw variance. Raw variance scales with the
@@ -110,14 +70,9 @@ def _profile_score(binary, angle, window):
     Rotation uses INTER_NEAREST: linear interpolation on a binary image
     invents gray fringe values that blunt the profile.
     """
-    win_w, win_h = window
     h, w = binary.shape
     M = cv2.getRotationMatrix2D((w / 2.0, h / 2.0), angle, 1.0)
-    # Warp straight into the window instead of warping the full frame and
-    # slicing: same pixels, fewer of them.
-    M[0, 2] -= (w - win_w) // 2
-    M[1, 2] -= (h - win_h) // 2
-    rotated = cv2.warpAffine(binary, M, (win_w, win_h), borderValue=0,
+    rotated = cv2.warpAffine(binary, M, (w, h), borderValue=border,
                              flags=cv2.INTER_NEAREST)
     profile = rotated.sum(axis=1)
     mean = profile.mean()
@@ -126,7 +81,7 @@ def _profile_score(binary, angle, window):
     return float(profile.var() / (mean * mean))
 
 
-def _sweep(binary, window, lo, hi, step):
+def _sweep(binary, border, lo, hi, step):
     """Scans [lo, hi] on an integer-indexed grid and returns
     (best_angle, every_score). The grid is indexed rather than accumulated
     so the sampled angles are exact and identical in any reimplementation.
@@ -135,7 +90,7 @@ def _sweep(binary, window, lo, hi, step):
     best_angle, best_score = lo, -1.0
     for i in range(int(round((hi - lo) / step)) + 1):
         angle = lo + i * step
-        score = _profile_score(binary, angle, window)
+        score = _profile_score(binary, angle, border)
         scores.append(score)
         if score > best_score or (score == best_score
                                   and abs(angle) < abs(best_angle)):
@@ -147,29 +102,34 @@ def _is_supported(scores):
     """True when the coarse sweep found a real peak rather than noise.
 
     A page with a dominant horizontal direction concentrates its ink into
-    a few rows at one angle only, so its winning score towers over the
-    rest of the sweep. A page without one produces a curve that is flat,
-    or that drifts with |angle| under residual rasterization effects; on
-    such a curve the winning angle is whichever angle noise or drift
-    happened to favor, which is exactly the reading this guard exists to
-    suppress.
+    a few rows at one angle only, so its winning score stands well above
+    the rest of the sweep. A page without one produces a nearly flat
+    curve whose winner is whichever angle noise happened to favor, which
+    is exactly the reading this check exists to suppress.
 
-    Both a ratio and a difference must clear their threshold, because
-    each alone admits a measured counterexample. Ratio alone accepts a
-    page of vertical rules, whose curve is near zero everywhere yet whose
-    peak is still several times its own median. Difference alone accepts
-    a page of scattered dots, whose profile is lumpy enough that
-    reshuffling the lumps moves the score by a wide absolute margin. Both
-    thresholds compare against the sweep's median, which on a real page
-    sits well off the peak.
+    The comparison is against the sweep's median, which on a real page
+    sits well off the peak, and it is a ratio rather than a fixed
+    quantity. An earlier version of this guard also required the peak to
+    beat the median by an absolute margin. That was wrong: the score's
+    ceiling depends on what fraction of rows carry ink, so an ordinary
+    single-spaced text page tops out near 1.2 and a fixed margin of 1.0
+    silently rejected real skew on it. Nothing here may assume a page is
+    mostly white.
 
-    Neither test divides, so an all-zero curve (a blank or a uniformly
-    inked page) fails the difference test rather than raising.
+    The test is strict, so an all-zero curve -- a blank or a uniformly
+    inked page, where every angle scores 0.0 -- is rejected rather than
+    accepted on a degenerate 0 >= 0.
+
+    Two structureless shapes out of 81 tested still get through, both
+    pages that carry no horizontal ink at all: a page ruled only with
+    45-degree diagonals answers +4.40, and five vertical rules on a page
+    tilted 3 degrees answer -1.60. An absolute floor on the peak would
+    catch both, and it is deliberately not here -- that is the construct
+    that silently rejected real skew on dense text, and a page of pure
+    diagonals is not a form scan. Prefer a wrong angle on a page with no
+    horizontal structure over a silent 0.0 on a page that has some.
     """
-    peak = max(scores)
-    baseline = statistics.median(scores)
-    return (peak >= MIN_PEAK_RATIO * baseline
-            and peak - baseline >= MIN_PEAK_GAIN)
+    return max(scores) > MIN_PEAK_RATIO * statistics.median(scores)
 
 
 def detect_skew_angle(binary, search_deg=SEARCH_DEG,
@@ -186,18 +146,21 @@ def detect_skew_angle(binary, search_deg=SEARCH_DEG,
     whose only long strokes are vertical. Such a page has nothing to
     straighten to, and `_is_supported` rejects the sweep's winner rather
     than passing back an angle the image does not support. That is the
-    safe failure, and it is enforced, not merely hoped for: the guard is
-    what makes it true. A page that does carry horizontal structure still
-    resolves skews well under a degree.
+    safe failure, and it is enforced, not merely hoped for.
+
+    Pages that do carry horizontal structure keep their reading whether
+    the structure is thin or dense: a single rule, rules confined to the
+    page edges, and single-spaced text all resolve, down to skews of
+    about 0.1 degrees.
     """
-    window = _inscribed_window(binary.shape, search_deg)
-    coarse, scores = _sweep(binary, window, -search_deg, search_deg,
+    border = float(binary.mean())
+    coarse, scores = _sweep(binary, border, -search_deg, search_deg,
                             coarse_step_deg)
     if not _is_supported(scores):
         return 0.0
     lo = max(-search_deg, coarse - coarse_step_deg)
     hi = min(search_deg, coarse + coarse_step_deg)
-    return _sweep(binary, window, lo, hi, fine_step_deg)[0]
+    return _sweep(binary, border, lo, hi, fine_step_deg)[0]
 
 
 def deskew(binary):
