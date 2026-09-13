@@ -440,7 +440,7 @@ def test_build_still_raises_on_a_genuinely_unexpected_error(tmp_path, monkeypatc
     mod = _load_demo_module()
     monkeypatch.setattr(mod, "OUT", tmp_path / "demo_out")
 
-    def _boom(_path):
+    def _boom(_path, page_backend=None):
         raise RuntimeError("not a real PDF-parse failure")
 
     monkeypatch.setattr(mod, "detect_pdf", _boom)
